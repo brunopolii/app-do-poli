@@ -57,7 +57,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                   decoration: const InputDecoration(labelText: 'Valor'),
                 ),
                 DropdownButtonFormField<String>(
-                  value: category,
+                  initialValue: category,
                   items: ['Outros', 'Comida', 'Transporte', 'Lazer', 'Contas']
                       .map(
                         (value) => DropdownMenuItem(

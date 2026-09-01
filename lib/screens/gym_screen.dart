@@ -252,7 +252,7 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: selected,
+                initialValue: selected,
                 items: filtered
                     .map(
                       (item) => DropdownMenuItem<String>(
@@ -269,7 +269,7 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
                 decoration: const InputDecoration(labelText: 'Exercício'),
               ),
               DropdownButtonFormField<int>(
-                value: sets,
+                initialValue: sets,
                 items: [2, 3, 4, 5]
                     .map(
                       (value) => DropdownMenuItem<int>(
@@ -286,7 +286,7 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
                 decoration: const InputDecoration(labelText: 'Séries'),
               ),
               DropdownButtonFormField<int>(
-                value: reps,
+                initialValue: reps,
                 items: [5, 6, 8, 10, 12, 15, 20]
                     .map(
                       (value) => DropdownMenuItem<int>(
@@ -373,7 +373,7 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
                 ],
               ),
               DropdownButtonFormField<String>(
-                value: group,
+                initialValue: group,
                 items: groups
                     .map(
                       (value) => DropdownMenuItem<String>(
