@@ -1,0 +1,23 @@
+name: app_do_poli
+description: App do Poli V3 corrigida
+publish_to: "none"
+version: 3.0.1+4
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.5.3
+  intl: ^0.20.2
+  image_picker: ^1.1.2
+  http: ^1.5.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
