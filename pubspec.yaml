@@ -1,7 +1,7 @@
 name: app_do_poli
 description: LifeTrack - organizador pessoal
 publish_to: "none"
-version: 4.0.0+5
+version: 4.0.0+6
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -12,6 +12,7 @@ dependencies:
   shared_preferences: ^2.5.3
   intl: ^0.20.2
   image_picker: ^1.1.2
+  http: ^1.6.0
   flutter_local_notifications: ^19.4.0
   timezone: ^0.10.1
 
