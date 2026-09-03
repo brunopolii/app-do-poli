@@ -11,10 +11,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<AgendaEvent> events = [];
-  List<Meal> meals = [];
-  List<MoneyTransaction> finance = [];
-  List<WorkoutPlan> plans = [];
+  List<AgendaEvent> events = <AgendaEvent>[];
+  List<Meal> meals = <Meal>[];
+  List<MoneyTransaction> finance = <MoneyTransaction>[];
+  List<WorkoutPlan> plans = <WorkoutPlan>[];
   Map<String, double>? goals;
   bool loading = true;
 
@@ -30,58 +30,127 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString('nutrition_goals');
     if (raw != null) {
-      final p = raw.split('|');
-      if (p.length == 4) {
-        goals = {'calories': double.tryParse(p[0]) ?? 0, 'protein': double.tryParse(p[1]) ?? 0, 'carbs': double.tryParse(p[2]) ?? 0, 'fat': double.tryParse(p[3]) ?? 0};
+      final parts = raw.split('|');
+      if (parts.length == 4) {
+        goals = <String, double>{
+          'calories': double.tryParse(parts[0]) ?? 0,
+          'protein': double.tryParse(parts[1]) ?? 0,
+          'carbs': double.tryParse(parts[2]) ?? 0,
+          'fat': double.tryParse(parts[3]) ?? 0,
+        };
       }
     }
     if (mounted) setState(() => loading = false);
   }
 
-  @override Widget build(BuildContext context) {
+  double _sumMeals(double Function(Meal) value, List<Meal> list) {
+    double total = 0;
+    for (final meal in list) total += value(meal);
+    return total;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     if (loading) return const Center(child: CircularProgressIndicator());
     final now = DateTime.now();
-    final todayEvents = events.where((e) => e.date == today).toList()..sort((a,b) => a.start.compareTo(b.start));
-    final todayMeals = meals.where((e) => e.date == today).toList();
-    final todayPlans = plans.where((p) => p.weekdays.contains(now.weekday)).toList();
-    double calories = 0, protein = 0, carbs = 0, fat = 0;
-    for (final meal in todayMeals) { calories += meal.calories; protein += meal.protein; carbs += meal.carbs; fat += meal.fat; }
-    double income = 0, expense = 0;
+    final dayEvents = events.where((e) => e.date == today).toList();
+    dayEvents.sort((a, b) => a.start.compareTo(b.start));
+    final dayMeals = meals.where((e) => e.date == today).toList();
+    final dayPlans = plans.where((p) => p.weekdays.contains(now.weekday)).toList();
+    final calories = _sumMeals((m) => m.calories, dayMeals);
+    final protein = _sumMeals((m) => m.protein, dayMeals);
+    final carbs = _sumMeals((m) => m.carbs, dayMeals);
+    final fat = _sumMeals((m) => m.fat, dayMeals);
     final monthKey = DateFormat('yyyy-MM').format(now);
-    for (final item in finance.where((e) => e.date.startsWith(monthKey))) { if (item.income) income += item.amount; else expense += item.amount; }
-    double balance = 0;
-    for (final item in finance) { balance += item.income ? item.amount : -item.amount; }
+    final monthTransactions = finance.where((e) => e.date.startsWith(monthKey)).toList();
+    final income = _sumFinance(monthTransactions, true);
+    final expense = _sumFinance(monthTransactions, false);
+    final balance = _sumFinance(finance, true) - _sumFinance(finance, false);
 
-    return SafeArea(child: ListView(padding: const EdgeInsets.fromLTRB(16,16,16,32), children: [
-      Text('Olá! 👋', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-      Text(DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(now)),
-      const SizedBox(height: 16),
-      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Resumo de hoje', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 14),
-        Row(children: [_counter(Icons.event_outlined, 'Agenda', todayEvents.length), _counter(Icons.fitness_center, 'Treinos', todayPlans.length), _counter(Icons.restaurant_outlined, 'Refeições', todayMeals.length)]),
-      ])),
-      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Próximo compromisso', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        if (todayEvents.isEmpty) const Text('Nada agendado para hoje.') else ListTile(contentPadding: EdgeInsets.zero, leading: const CircleAvatar(child: Icon(Icons.event)), title: Text(todayEvents.first.title), subtitle: Text('${todayEvents.first.start} • ${todayEvents.first.end}')),
-      ])),
-      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Alimentação de hoje', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+    final children = <Widget>[];
+    children.add(Text('Olá! 👋', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)));
+    children.add(Text(DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(now)));
+    children.add(const SizedBox(height: 16));
+    children.add(AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+      Text('Resumo de hoje', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+      const SizedBox(height: 14),
+      Row(children: <Widget>[
+        _counter(Icons.event_outlined, 'Agenda', '${dayEvents.length}'),
+        _counter(Icons.fitness_center, 'Treinos', '${dayPlans.length}'),
+        _counter(Icons.restaurant_outlined, 'Refeições', '${dayMeals.length}'),
+      ]),
+    ])));
+    children.add(AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+      Text('Próximo compromisso', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+      const SizedBox(height: 8),
+      if (dayEvents.isEmpty) const Text('Nada agendado para hoje.') else ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const CircleAvatar(child: Icon(Icons.event)),
+        title: Text(dayEvents.first.title),
+        subtitle: Text('${dayEvents.first.start} • ${dayEvents.first.end}'),
+      ),
+    ])));
+    children.add(AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+      Text('Alimentação de hoje', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+      const SizedBox(height: 14),
+      Row(children: <Widget>[
+        _stat('${calories.toStringAsFixed(0)}', 'kcal'),
+        _stat('${protein.toStringAsFixed(0)}g', 'proteína'),
+        _stat('${carbs.toStringAsFixed(0)}g', 'carbo'),
+        _stat('${fat.toStringAsFixed(0)}g', 'gordura'),
+      ]),
+      if (goals != null) ...<Widget>[
         const SizedBox(height: 12),
-        Row(children: [_stat('${calories.toStringAsFixed(0)}', 'kcal'), _stat('${protein.toStringAsFixed(0)}g', 'proteína'), _stat('${carbs.toStringAsFixed(0)}g', 'carbo'), _stat('${fat.toStringAsFixed(0)}g', 'gordura')]),
-        if (goals != null) ...[const SizedBox(height: 12), LinearProgressIndicator(value: goals!['calories']! <= 0 ? 0 : (calories / goals!['calories']!).clamp(0.0,1.0).toDouble()), const SizedBox(height: 5), Text('Meta: ${goals!['calories']!.toStringAsFixed(0)} kcal')],
-      ])),
-      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Financeiro do mês', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        Row(children: [_stat('R$ ${income.toStringAsFixed(0)}', 'entradas'), _stat('R$ ${expense.toStringAsFixed(0)}', 'despesas'), _stat('R$ ${(income-expense).toStringAsFixed(0)}', 'resultado')]),
-        const SizedBox(height: 10), Text('Saldo atual: R$ ${balance.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w600)),
-      ])),
-      if (todayPlans.isNotEmpty) AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Treinos de hoje', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)), ...todayPlans.map((p) => ListTile(contentPadding: EdgeInsets.zero, leading: const CircleAvatar(child: Icon(Icons.fitness_center)), title: Text(p.name), subtitle: Text('${p.exercisesFor(now.weekday).length} exercícios')))])),
+        LinearProgressIndicator(value: goals!['calories']! <= 0 ? 0 : (calories / goals!['calories']!).clamp(0.0, 1.0).toDouble(), minHeight: 8),
+        const SizedBox(height: 5),
+        Text('Meta: ${goals!['calories']!.toStringAsFixed(0)} kcal'),
+      ],
+    ])));
+    children.add(AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+      Text('Financeiro do mês', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+      const SizedBox(height: 14),
+      Row(children: <Widget>[
+        _stat('R$ ${income.toStringAsFixed(0)}', 'entradas'),
+        _stat('R$ ${expense.toStringAsFixed(0)}', 'despesas'),
+        _stat('R$ ${(income - expense).toStringAsFixed(0)}', 'resultado'),
+      ]),
+      const SizedBox(height: 10),
+      Text('Saldo atual: R$ ${balance.toStringAsFixed(2)}'),
+    ])));
+    if (dayPlans.isNotEmpty) {
+      final workoutChildren = <Widget>[];
+      workoutChildren.add(Text('Treinos de hoje', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)));
+      for (final plan in dayPlans) {
+        workoutChildren.add(ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const CircleAvatar(child: Icon(Icons.fitness_center)),
+          title: Text(plan.name),
+          subtitle: Text('${plan.exercisesFor(now.weekday).length} exercícios'),
+        ));
+      }
+      children.add(AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: workoutChildren)));
+    }
+    return SafeArea(child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: children));
+  }
+
+  double _sumFinance(Iterable<MoneyTransaction> list, bool income) {
+    double total = 0;
+    for (final item in list) { if (item.income == income) total += item.amount; }
+    return total;
+  }
+
+  Widget _counter(IconData icon, String label, String value) {
+    return Expanded(child: Column(children: <Widget>[
+      Icon(icon), const SizedBox(height: 6),
+      Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+      Text(label, style: Theme.of(context).textTheme.bodySmall),
     ]));
   }
 
-  Widget _counter(IconData icon, String label, int value) => Expanded(child: Column(children: [Icon(icon), const SizedBox(height: 5), Text('$value', style: const TextStyle(fontWeight: FontWeight.bold)), Text(label)]));
-  Widget _stat(String value, String label) => Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(value, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)), Text(label, style: Theme.of(context).textTheme.bodySmall)]));
+  Widget _stat(String value, String label) {
+    return Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+      Text(value, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+      Text(label, style: Theme.of(context).textTheme.bodySmall),
+    ]));
+  }
 }
