@@ -4,9 +4,7 @@ import '../models/models.dart';
 import '../services/storage_service.dart';
 import '../widgets/app_card.dart';
 
-const expenseCategories = <String>[
-  'Alimentação', 'Transporte', 'Moradia', 'Lazer', 'Educação', 'Saúde', 'Compras', 'Outros'
-];
+const expenseCategories = <String>['Alimentação', 'Transporte', 'Moradia', 'Lazer', 'Educação', 'Saúde', 'Compras', 'Outros'];
 const incomeCategories = <String>['Salário', 'Freelance', 'Investimentos', 'Outros'];
 
 class FinanceScreen extends StatefulWidget {
@@ -16,7 +14,7 @@ class FinanceScreen extends StatefulWidget {
 }
 
 class _FinanceScreenState extends State<FinanceScreen> {
-  List<MoneyTransaction> transactions = <MoneyTransaction>[];
+  List<MoneyTransaction> transactions = [];
   DateTime selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
   @override
@@ -31,35 +29,26 @@ class _FinanceScreenState extends State<FinanceScreen> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _save() async {
-    await StorageService.write(
-      'finance',
-      transactions.map((item) => item.toJson()).toList(),
-    );
+  Future<void> _save() {
+    return StorageService.write('finance', transactions.map((e) => e.toJson()).toList());
   }
 
-  bool _inMonth(MoneyTransaction item) {
-    return item.date.startsWith(DateFormat('yyyy-MM').format(selectedMonth));
+  double _sum(Iterable<MoneyTransaction> items) {
+    return items.fold<double>(0, (sum, item) => sum + item.amount);
   }
 
-  double _total(Iterable<MoneyTransaction> items) {
-    return items.fold(0.0, (sum, item) => sum + item.amount);
-  }
-
-  Future<void> _editTransaction([MoneyTransaction? old]) async {
+  Future<void> _showEditor([MoneyTransaction? old]) async {
     final description = TextEditingController(text: old?.description ?? '');
-    final amount = TextEditingController(
-      text: old == null ? '' : old.amount.toStringAsFixed(2),
-    );
-    bool income = old?.income ?? false;
+    final amountController = TextEditingController(text: old == null ? '' : old.amount.toStringAsFixed(2));
+    bool isIncome = old?.income ?? false;
     String category = old?.category ?? 'Outros';
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            final categories = income ? incomeCategories : expenseCategories;
+          builder: (context, setDialogState) {
+            final categories = isIncome ? incomeCategories : expenseCategories;
             if (!categories.contains(category)) category = 'Outros';
             return AlertDialog(
               title: Text(old == null ? 'Nova movimentação' : 'Editar movimentação'),
@@ -67,42 +56,23 @@ class _FinanceScreenState extends State<FinanceScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    TextField(controller: description, decoration: const InputDecoration(labelText: 'Descrição')),
                     TextField(
-                      controller: description,
-                      decoration: const InputDecoration(
-                        labelText: 'Descrição',
-                        prefixIcon: Icon(Icons.notes_outlined),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: amount,
+                      controller: amountController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Valor',
-                        prefixText: 'R$ ',
-                      ),
+                      decoration: const InputDecoration(labelText: 'Valor', prefixText: 'R$ '),
                     ),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Entrada de dinheiro'),
-                      value: income,
-                      onChanged: (value) {
-                        setDialogState(() => income = value);
-                      },
+                      title: const Text('É uma entrada'),
+                      value: isIncome,
+                      onChanged: (value) => setDialogState(() => isIncome = value),
                     ),
                     DropdownButtonFormField<String>(
-                      initialValue: category,
-                      items: categories
-                          .map((item) => DropdownMenuItem<String>(
-                                value: item,
-                                child: Text(item),
-                              ))
-                          .toList(),
+                      value: category,
+                      items: categories.map((item) => DropdownMenuItem<String>(value: item, child: Text(item))).toList(),
                       onChanged: (value) {
-                        if (value != null) {
-                          setDialogState(() => category = value);
-                        }
+                        if (value != null) setDialogState(() => category = value);
                       },
                       decoration: const InputDecoration(labelText: 'Categoria'),
                     ),
@@ -110,14 +80,8 @@ class _FinanceScreenState extends State<FinanceScreen> {
                 ),
               ),
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('Cancelar'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(dialogContext, true),
-                  child: const Text('Salvar'),
-                ),
+                TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancelar')),
+                FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Salvar')),
               ],
             );
           },
@@ -125,10 +89,8 @@ class _FinanceScreenState extends State<FinanceScreen> {
       },
     );
 
-    final value = double.tryParse(amount.text.replaceAll(',', '.'));
-    if (confirmed != true || description.text.trim().isEmpty || value == null || value <= 0) {
-      return;
-    }
+    final value = double.tryParse(amountController.text.replaceAll(',', '.'));
+    if (confirmed != true || description.text.trim().isEmpty || value == null || value <= 0) return;
 
     final item = MoneyTransaction(
       id: old?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
@@ -136,7 +98,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
       description: description.text.trim(),
       category: category,
       amount: value,
-      income: income,
+      income: isIncome,
     );
 
     transactions.removeWhere((entry) => entry.id == item.id);
@@ -153,22 +115,18 @@ class _FinanceScreenState extends State<FinanceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final monthItems = transactions.where(_inMonth).toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
-    final income = _total(monthItems.where((item) => item.income));
-    final expense = _total(monthItems.where((item) => !item.income));
-    final monthBalance = income - expense;
-    final totalIncome = _total(transactions.where((item) => item.income));
-    final totalExpense = _total(transactions.where((item) => !item.income));
-    final balance = totalIncome - totalExpense;
+    final monthKey = DateFormat('yyyy-MM').format(selectedMonth);
+    final monthItems = transactions.where((item) => item.date.startsWith(monthKey)).toList();
+    monthItems.sort((a, b) => b.date.compareTo(a.date));
+    final income = _sum(monthItems.where((item) => item.income));
+    final expenses = _sum(monthItems.where((item) => !item.income));
+    final balance = _sum(transactions.where((item) => item.income)) - _sum(transactions.where((item) => !item.income));
 
-    final byCategory = <String, double>{};
+    final categories = <String, double>{};
     for (final item in monthItems.where((item) => !item.income)) {
-      byCategory[item.category] = (byCategory[item.category] ?? 0) + item.amount;
+      categories[item.category] = (categories[item.category] ?? 0) + item.amount;
     }
-    final maxCategory = byCategory.isEmpty
-        ? 0.0
-        : byCategory.values.reduce((a, b) => a > b ? a : b);
+    final maxCategory = categories.isEmpty ? 1.0 : categories.values.reduce((a, b) => a > b ? a : b);
 
     return SafeArea(
       child: ListView(
@@ -181,94 +139,62 @@ class _FinanceScreenState extends State<FinanceScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Financeiro', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-                    Text('${monthItems.length} movimentações em ${DateFormat('MMMM', 'pt_BR').format(selectedMonth)}'),
+                    Text('${monthItems.length} movimentações neste mês'),
                   ],
                 ),
               ),
-              IconButton.filled(
-                onPressed: _editTransaction,
-                icon: const Icon(Icons.add),
-                tooltip: 'Nova movimentação',
-              ),
+              IconButton.filled(onPressed: _showEditor, icon: const Icon(Icons.add)),
             ],
           ),
-          const SizedBox(height: 14),
           AppCard(
             child: Row(
               children: [
-                IconButton(
-                  onPressed: () => setState(() => selectedMonth = DateTime(selectedMonth.year, selectedMonth.month - 1)),
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                Expanded(
-                  child: Text(
-                    DateFormat('MMMM yyyy', 'pt_BR').format(selectedMonth),
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => setState(() => selectedMonth = DateTime(selectedMonth.year, selectedMonth.month + 1)),
-                  icon: const Icon(Icons.chevron_right),
-                ),
+                IconButton(onPressed: () => setState(() => selectedMonth = DateTime(selectedMonth.year, selectedMonth.month - 1)), icon: const Icon(Icons.chevron_left)),
+                Expanded(child: Text(DateFormat('MMMM yyyy', 'pt_BR').format(selectedMonth), textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))),
+                IconButton(onPressed: () => setState(() => selectedMonth = DateTime(selectedMonth.year, selectedMonth.month + 1)), icon: const Icon(Icons.chevron_right)),
               ],
             ),
           ),
-          Row(
-            children: [
-              _metric('Entradas', income, Icons.arrow_downward),
-              _metric('Despesas', expense, Icons.arrow_upward),
-            ],
-          ),
+          Row(children: [_metric('Entradas', income, Icons.south_west), _metric('Despesas', expenses, Icons.north_east)]),
           AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Saldo atual', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  'R$ ${balance.toStringAsFixed(2)}',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(child: _smallStat('Este mês', monthBalance)),
-                    Expanded(child: _smallStat('Entradas totais', totalIncome)),
-                    Expanded(child: _smallStat('Despesas totais', totalExpense)),
-                  ],
-                ),
-              ],
-            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Saldo atual', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text('R$ ${balance.toStringAsFixed(2)}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text('Resultado do mês: R$ ${(income - expenses).toStringAsFixed(2)}'),
+            ]),
           ),
-          if (byCategory.isNotEmpty)
+          if (categories.isNotEmpty)
             AppCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Despesas por categoria', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  ...byCategory.entries.map(
-                    (entry) => _bar(entry.key, entry.value, maxCategory),
-                  ),
-                ],
-              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Despesas por categoria', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                ...categories.entries.map((entry) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [Expanded(child: Text(entry.key)), Text('R$ ${entry.value.toStringAsFixed(2)}')]),
+                      const SizedBox(height: 5),
+                      LinearProgressIndicator(value: entry.value / maxCategory, minHeight: 8),
+                    ]),
+                  );
+                }),
+              ]),
             ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text('Movimentações', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          if (monthItems.isEmpty)
-            const AppCard(child: Text('Nenhuma movimentação neste mês.')),
-          ...monthItems.map(
-            (item) => AppCard(
+          if (monthItems.isEmpty) const AppCard(child: Text('Nenhuma movimentação neste mês.')),
+          ...monthItems.map((item) {
+            return AppCard(
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(child: Icon(item.income ? Icons.south_west : Icons.north_east)),
-                title: Text(item.description, style: const TextStyle(fontWeight: FontWeight.w600)),
+                leading: CircleAvatar(child: Icon(item.income ? Icons.arrow_downward : Icons.arrow_upward)),
+                title: Text(item.description),
                 subtitle: Text('${item.category} • ${DateFormat('dd/MM').format(DateTime.parse(item.date))}'),
                 trailing: PopupMenuButton<String>(
                   onSelected: (value) {
-                    if (value == 'edit') _editTransaction(item);
+                    if (value == 'edit') _showEditor(item);
                     if (value == 'delete') _delete(item);
                   },
                   itemBuilder: (context) => const [
@@ -277,8 +203,8 @@ class _FinanceScreenState extends State<FinanceScreen> {
                   ],
                 ),
               ),
-            ),
-          ),
+            );
+          }),
         ],
       ),
     );
@@ -287,40 +213,12 @@ class _FinanceScreenState extends State<FinanceScreen> {
   Widget _metric(String label, double value, IconData icon) {
     return Expanded(
       child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 20),
-            const SizedBox(height: 6),
-            Text('R$ ${value.toStringAsFixed(0)}', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            Text(label, style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _smallStat(String label, double value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('R$ ${value.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-      ],
-    );
-  }
-
-  Widget _bar(String label, double value, double total) {
-    final progress = total <= 0 ? 0.0 : (value / total).clamp(0.0, 1.0).toDouble();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [Expanded(child: Text(label)), Text('R$ ${value.toStringAsFixed(2)}')]),
-          const SizedBox(height: 5),
-          LinearProgressIndicator(value: progress, minHeight: 8),
-        ],
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon),
+          const SizedBox(height: 6),
+          Text('R$ ${value.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(label),
+        ]),
       ),
     );
   }
