@@ -4,11 +4,22 @@ import '../models/models.dart';
 import '../services/storage_service.dart';
 import '../widgets/app_card.dart';
 
-const List<String> _expenseCategories = <String>[
-  'Alimentação', 'Transporte', 'Moradia', 'Lazer', 'Educação', 'Saúde', 'Compras', 'Outros'
+const List<String> expenseCategories = <String>[
+  'Alimentação',
+  'Transporte',
+  'Moradia',
+  'Lazer',
+  'Educação',
+  'Saúde',
+  'Compras',
+  'Outros',
 ];
-const List<String> _incomeCategories = <String>[
-  'Salário', 'Freelance', 'Investimentos', 'Outros'
+
+const List<String> incomeCategories = <String>[
+  'Salário',
+  'Freelance',
+  'Investimentos',
+  'Outros',
 ];
 
 class FinanceScreen extends StatefulWidget {
@@ -20,67 +31,85 @@ class FinanceScreen extends StatefulWidget {
 
 class _FinanceScreenState extends State<FinanceScreen> {
   List<MoneyTransaction> transactions = <MoneyTransaction>[];
-  DateTime month = DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
   @override
   void initState() {
     super.initState();
-    _load();
+    loadTransactions();
   }
 
-  Future<void> _load() async {
+  Future<void> loadTransactions() async {
     final data = await StorageService.read('finance');
-    final loaded = <MoneyTransaction>[];
+    final result = <MoneyTransaction>[];
     for (final item in data) {
-      loaded.add(MoneyTransaction.fromJson(item));
+      result.add(MoneyTransaction.fromJson(item));
     }
-    if (mounted) setState(() => transactions = loaded);
+    if (!mounted) return;
+    setState(() {
+      transactions = result;
+    });
   }
 
-  Future<void> _save() async {
-    await StorageService.write(
-      'finance',
-      transactions.map((item) => item.toJson()).toList(),
-    );
+  Future<void> saveTransactions() async {
+    final data = <Map<String, dynamic>>[];
+    for (final item in transactions) {
+      data.add(item.toJson());
+    }
+    await StorageService.write('finance', data);
   }
 
-  Future<void> _openEditor([MoneyTransaction? old]) async {
-    final descriptionController = TextEditingController(text: old?.description ?? '');
-    final amountController = TextEditingController(
-      text: old == null ? '' : old.amount.toStringAsFixed(2),
-    );
-    bool income = old?.income ?? false;
-    String category = old?.category ?? 'Outros';
+  double sumTransactions(List<MoneyTransaction> list, bool income) {
+    double total = 0;
+    for (final item in list) {
+      if (item.income == income) total += item.amount;
+    }
+    return total;
+  }
 
-    final result = await showDialog<bool>(
+  Future<void> editTransaction([MoneyTransaction? existing]) async {
+    final description = TextEditingController(text: existing?.description ?? '');
+    final amount = TextEditingController(
+      text: existing == null ? '' : existing.amount.toStringAsFixed(2),
+    );
+    bool isIncome = existing?.income ?? false;
+    String category = existing?.category ?? 'Outros';
+
+    final saved = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) {
+      builder: (BuildContext dialogContext) {
         return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            final categories = income ? _incomeCategories : _expenseCategories;
-            if (!categories.contains(category)) category = 'Outros';
+          builder: (BuildContext context, StateSetter setDialogState) {
+            final categories = isIncome ? incomeCategories : expenseCategories;
+            if (!categories.contains(category)) {
+              category = 'Outros';
+            }
             return AlertDialog(
-              title: Text(old == null ? 'Nova movimentação' : 'Editar movimentação'),
+              title: Text(existing == null ? 'Nova movimentação' : 'Editar movimentação'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
                     TextField(
-                      controller: descriptionController,
+                      controller: description,
                       decoration: const InputDecoration(labelText: 'Descrição'),
                     ),
+                    const SizedBox(height: 8),
                     TextField(
-                      controller: amountController,
+                      controller: amount,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(labelText: 'Valor', prefixText: 'R$ '),
+                      decoration: const InputDecoration(
+                        labelText: 'Valor',
+                        prefixText: 'R$ ',
+                      ),
                     ),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('Entrada'),
-                      value: income,
-                      onChanged: (value) {
+                      value: isIncome,
+                      onChanged: (bool value) {
                         setDialogState(() {
-                          income = value;
+                          isIncome = value;
                           category = 'Outros';
                         });
                       },
@@ -88,11 +117,17 @@ class _FinanceScreenState extends State<FinanceScreen> {
                     DropdownButton<String>(
                       isExpanded: true,
                       value: category,
-                      items: categories.map((item) {
-                        return DropdownMenuItem<String>(value: item, child: Text(item));
+                      items: categories.map((String item) {
+                        return DropdownMenuItem<String>(
+                          value: item,
+                          child: Text(item),
+                        );
                       }).toList(),
-                      onChanged: (value) {
-                        if (value != null) setDialogState(() => category = value);
+                      onChanged: (String? value) {
+                        if (value == null) return;
+                        setDialogState(() {
+                          category = value;
+                        });
                       },
                     ),
                   ],
@@ -100,11 +135,11 @@ class _FinanceScreenState extends State<FinanceScreen> {
               ),
               actions: <Widget>[
                 TextButton(
-                  onPressed: () => Navigator.pop(dialogContext, false),
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
                   child: const Text('Cancelar'),
                 ),
                 FilledButton(
-                  onPressed: () => Navigator.pop(dialogContext, true),
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
                   child: const Text('Salvar'),
                 ),
               ],
@@ -114,48 +149,55 @@ class _FinanceScreenState extends State<FinanceScreen> {
       },
     );
 
-    final parsed = double.tryParse(amountController.text.trim().replaceAll(',', '.'));
-    if (result != true || descriptionController.text.trim().isEmpty || parsed == null || parsed <= 0) {
-      return;
-    }
+    final parsedAmount = double.tryParse(
+      amount.text.trim().replaceAll(',', '.'),
+    );
+    if (saved != true || description.text.trim().isEmpty) return;
+    if (parsedAmount == null || parsedAmount <= 0) return;
 
-    final item = MoneyTransaction(
-      id: old?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
-      date: old?.date ?? DateFormat('yyyy-MM-dd').format(DateTime.now()),
-      description: descriptionController.text.trim(),
+    final transaction = MoneyTransaction(
+      id: existing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+      date: existing?.date ?? DateFormat('yyyy-MM-dd').format(DateTime.now()),
+      description: description.text.trim(),
       category: category,
-      amount: parsed,
-      income: income,
+      amount: parsedAmount,
+      income: isIncome,
     );
 
-    transactions.removeWhere((entry) => entry.id == item.id);
-    transactions.add(item);
-    await _save();
-    if (mounted) setState(() {});
+    transactions.removeWhere((item) => item.id == transaction.id);
+    transactions.add(transaction);
+    await saveTransactions();
+    if (!mounted) return;
+    setState(() {});
   }
 
-  Future<void> _remove(MoneyTransaction item) async {
+  Future<void> deleteTransaction(MoneyTransaction item) async {
     transactions.removeWhere((entry) => entry.id == item.id);
-    await _save();
-    if (mounted) setState(() {});
+    await saveTransactions();
+    if (!mounted) return;
+    setState(() {});
   }
 
-  double _sum(Iterable<MoneyTransaction> values, bool income) {
-    double total = 0;
-    for (final item in values) {
-      if (item.income == income) total += item.amount;
-    }
-    return total;
+  String formatDate(String value) {
+    final date = DateTime.tryParse(value);
+    if (date == null) return value;
+    return DateFormat('dd/MM').format(date);
   }
 
   @override
   Widget build(BuildContext context) {
-    final monthKey = DateFormat('yyyy-MM').format(month);
-    final items = transactions.where((item) => item.date.startsWith(monthKey)).toList();
-    items.sort((a, b) => b.date.compareTo(a.date));
-    final income = _sum(items, true);
-    final expense = _sum(items, false);
-    final balance = _sum(transactions, true) - _sum(transactions, false);
+    final monthKey = DateFormat('yyyy-MM').format(selectedMonth);
+    final monthItems = <MoneyTransaction>[];
+    for (final item in transactions) {
+      if (item.date.startsWith(monthKey)) monthItems.add(item);
+    }
+    monthItems.sort((a, b) => b.date.compareTo(a.date));
+
+    final income = sumTransactions(monthItems, true);
+    final expense = sumTransactions(monthItems, false);
+    final totalIncome = sumTransactions(transactions, true);
+    final totalExpense = sumTransactions(transactions, false);
+    final currentBalance = totalIncome - totalExpense;
 
     return SafeArea(
       child: ListView(
@@ -166,28 +208,50 @@ class _FinanceScreenState extends State<FinanceScreen> {
               Expanded(
                 child: Text(
                   'Financeiro',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              IconButton.filled(onPressed: _openEditor, icon: const Icon(Icons.add)),
+              IconButton(
+                onPressed: () => editTransaction(),
+                icon: const Icon(Icons.add_circle),
+              ),
             ],
           ),
           AppCard(
             child: Row(
               children: <Widget>[
                 IconButton(
-                  onPressed: () => setState(() => month = DateTime(month.year, month.month - 1)),
+                  onPressed: () {
+                    setState(() {
+                      selectedMonth = DateTime(
+                        selectedMonth.year,
+                        selectedMonth.month - 1,
+                      );
+                    });
+                  },
                   icon: const Icon(Icons.chevron_left),
                 ),
                 Expanded(
                   child: Text(
-                    DateFormat('MMMM yyyy', 'pt_BR').format(month),
+                    DateFormat('MMMM yyyy', 'pt_BR').format(selectedMonth),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 IconButton(
-                  onPressed: () => setState(() => month = DateTime(month.year, month.month + 1)),
+                  onPressed: () {
+                    setState(() {
+                      selectedMonth = DateTime(
+                        selectedMonth.year,
+                        selectedMonth.month + 1,
+                      );
+                    });
+                  },
                   icon: const Icon(Icons.chevron_right),
                 ),
               ],
@@ -195,65 +259,93 @@ class _FinanceScreenState extends State<FinanceScreen> {
           ),
           Row(
             children: <Widget>[
-              Expanded(child: _metric('Entradas', income, Icons.arrow_downward)),
-              Expanded(child: _metric('Despesas', expense, Icons.arrow_upward)),
+              Expanded(child: metricCard('Entradas', income, Icons.arrow_downward)),
+              Expanded(child: metricCard('Despesas', expense, Icons.arrow_upward)),
             ],
           ),
           AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const Text('Saldo atual', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text(
+                  'Saldo atual',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 6),
-                Text('R$ ${balance.toStringAsFixed(2)}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                Text('Resultado do mês: R$ ${(income - expense).toStringAsFixed(2)}'),
+                Text(
+                  'R$ ${currentBalance.toStringAsFixed(2)}',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  'Resultado do mês: R$ ${(income - expense).toStringAsFixed(2)}',
+                ),
               ],
             ),
           ),
           const SizedBox(height: 8),
-          Text('Movimentações', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-          if (items.isEmpty)
-            const AppCard(child: Text('Nenhuma movimentação neste mês.'))
+          Text(
+            'Movimentações',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (monthItems.isEmpty)
+            const AppCard(
+              child: Text('Nenhuma movimentação neste mês.'),
+            )
           else
-            ...items.map((item) => AppCard(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(child: Icon(item.income ? Icons.add : Icons.remove)),
-                title: Text(item.description),
-                subtitle: Text('${item.category} • ${_date(item.date)}'),
-                trailing: PopupMenuButton<String>(
-                  onSelected: (value) {
-                    if (value == 'edit') _openEditor(item);
-                    if (value == 'delete') _remove(item);
-                  },
-                  itemBuilder: (context) => const <PopupMenuEntry<String>>[
-                    PopupMenuItem<String>(value: 'edit', child: Text('Editar')),
-                    PopupMenuItem<String>(value: 'delete', child: Text('Excluir')),
-                  ],
+            ...monthItems.map((item) {
+              return AppCard(
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    child: Icon(item.income ? Icons.add : Icons.remove),
+                  ),
+                  title: Text(item.description),
+                  subtitle: Text('${item.category} • ${formatDate(item.date)}'),
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (String value) {
+                      if (value == 'edit') editTransaction(item);
+                      if (value == 'delete') deleteTransaction(item);
+                    },
+                    itemBuilder: (BuildContext context) {
+                      return const <PopupMenuEntry<String>>[
+                        PopupMenuItem<String>(
+                          value: 'edit',
+                          child: Text('Editar'),
+                        ),
+                        PopupMenuItem<String>(
+                          value: 'delete',
+                          child: Text('Excluir'),
+                        ),
+                      ];
+                    },
+                  ),
                 ),
-              ),
-            )),
+              );
+            }).toList(),
         ],
       ),
     );
   }
 
-  Widget _metric(String label, double value, IconData icon) {
+  Widget metricCard(String label, double value, IconData icon) {
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Icon(icon),
           const SizedBox(height: 6),
-          Text('R$ ${value.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(
+            'R$ ${value.toStringAsFixed(2)}',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
           Text(label),
         ],
       ),
     );
-  }
-
-  String _date(String value) {
-    final date = DateTime.tryParse(value);
-    return date == null ? value : DateFormat('dd/MM').format(date);
   }
 }
