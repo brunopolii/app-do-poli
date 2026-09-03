@@ -1,49 +1,12 @@
-
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/models.dart';
+import '../services/storage_service.dart';
 import '../widgets/app_card.dart';
-
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text(
-          'Olá! 👋',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-        const SizedBox(height: 6),
-        const Text('Tudo do seu dia em um só lugar.'),
-        const SizedBox(height: 18),
-        const AppCard(
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: CircleAvatar(child: Icon(Icons.today)),
-            title: Text('Hoje'),
-            subtitle: Text('Confira sua agenda, treino, alimentação e finanças.'),
-          ),
-        ),
-        const AppCard(
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: CircleAvatar(child: Icon(Icons.fitness_center)),
-            title: Text('Academia'),
-            subtitle: Text('Registre seus exercícios e cargas.'),
-          ),
-        ),
-        const AppCard(
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: CircleAvatar(child: Icon(Icons.restaurant)),
-            title: Text('Alimentação'),
-            subtitle: Text('Acompanhe calorias e macronutrientes.'),
-          ),
-        ),
-      ],
-    );
-  }
+class HomeScreen extends StatefulWidget{const HomeScreen({super.key});@override State<HomeScreen> createState()=>_HomeScreenState();}
+class _HomeScreenState extends State<HomeScreen>{List<AgendaEvent> events=[];List<Meal> meals=[];List<MoneyTransaction> finance=[];List<WorkoutPlan> plans=[];Map<String,double>? goals;List<WeightEntry> weights=[];bool loading=true;String get today=>DateFormat('yyyy-MM-dd').format(DateTime.now());
+ @override void initState(){super.initState();_load();}Future<void> _load()async{events=(await StorageService.read('agenda')).map(AgendaEvent.fromJson).toList();meals=(await StorageService.read('meals')).map(Meal.fromJson).toList();finance=(await StorageService.read('finance')).map(MoneyTransaction.fromJson).toList();plans=(await StorageService.read('workout_plans')).map(WorkoutPlan.fromJson).toList();weights=(await StorageService.read('body_weights')).map(WeightEntry.fromJson).toList()..sort((a,b)=>b.date.compareTo(a.date));final p=await SharedPreferences.getInstance();final g=p.getString('nutrition_goals')?.split('|');if(g?.length==4)goals={'calories':double.tryParse(g![0])??0,'protein':double.tryParse(g[1])??0};if(mounted)setState(()=>loading=false);}
+ @override Widget build(BuildContext context){if(loading)return const Center(child:CircularProgressIndicator());final now=DateTime.now(),todayEvents=events.where((e)=>e.date==today).toList()..sort((a,b)=>a.start.compareTo(b.start));final todayMeals=meals.where((m)=>m.date==today);final kcal=todayMeals.fold(0.0,(s,m)=>s+m.calories),protein=todayMeals.fold(0.0,(s,m)=>s+m.protein);final income=finance.where((x)=>x.income).fold(0.0,(s,x)=>s+x.amount),expense=finance.where((x)=>!x.income).fold(0.0,(s,x)=>s+x.amount);final todayPlans=plans.where((p)=>p.weekdays.contains(now.weekday)).toList();final weight=weights.isEmpty?null:weights.first.weight;return SafeArea(child:ListView(padding:const EdgeInsets.fromLTRB(16,14,16,30),children:[Text('Olá! 👋',style:Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.bold)),Text(DateFormat("EEEE, dd 'de' MMMM",'pt_BR').format(now),style:Theme.of(context).textTheme.bodyLarge),const SizedBox(height:18),AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Seu dia',style:Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold)),const SizedBox(height:12),Row(children:[_mini(Icons.event_outlined,'Agenda','${todayEvents.length} compromisso(s)'),_mini(Icons.fitness_center,'Treino','${todayPlans.length} disponível(is)'),_mini(Icons.monitor_weight_outlined,'Peso',weight==null?'—':'${weight.toStringAsFixed(1)} kg')])])),AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Próximo compromisso',style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.bold)),const SizedBox(height:8),if(todayEvents.isEmpty)const Text('Nada agendado para hoje.') else ListTile(contentPadding:EdgeInsets.zero,leading:const CircleAvatar(child:Icon(Icons.event)),title:Text(todayEvents.first.title),subtitle:Text('${todayEvents.first.start} • ${todayEvents.first.description.isEmpty?'Sem descrição':todayEvents.first.description}'))])),AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Alimentação hoje',style:Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold)),const SizedBox(height:10),Row(children:[_stat('${kcal.toStringAsFixed(0)}','kcal'),_stat('${protein.toStringAsFixed(0)}g','proteína'),_stat('${todayMeals.length}','refeições')]),if(goals!=null)Padding(padding:const EdgeInsets.only(top:12),child:LinearProgressIndicator(value:goals!['calories']!<=0?0:(kcal/goals!['calories']!).clamp(0.0,1.0),minHeight:8))])),AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Financeiro',style:Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold)),const SizedBox(height:10),Row(children:[_stat('R$ ${income.toStringAsFixed(0)}','entradas'),_stat('R$ ${expense.toStringAsFixed(0)}','despesas'),_stat('R$ ${(income-expense).toStringAsFixed(0)}','saldo')])])),if(todayPlans.isNotEmpty)AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Treinos disponíveis hoje',style:Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold)),const SizedBox(height:8),...todayPlans.map((p)=>ListTile(contentPadding:EdgeInsets.zero,leading:const CircleAvatar(child:Icon(Icons.fitness_center)),title:Text(p.name),subtitle:Text('${p.exercisesFor(now.weekday).length} exercícios')))])),if(events.isNotEmpty)AppCard(child:Text('${events.length} compromisso(s) • ${plans.length} divisão(ões) de treino • ${finance.length} movimentação(ões)',style:Theme.of(context).textTheme.bodyMedium))]));}
+ Widget _mini(IconData i,String title,String value)=>Expanded(child:Column(children:[Icon(i),const SizedBox(height:5),Text(value,textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:12)),Text(title,style:Theme.of(context).textTheme.bodySmall)]));Widget _stat(String value,String label)=>Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(value,style:Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold)),Text(label,style:Theme.of(context).textTheme.bodySmall)]));
 }
