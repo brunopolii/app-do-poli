@@ -1,0 +1,65 @@
+name: Codex Develop and Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "What should Codex build or change?"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  codex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: true
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.2"
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run Codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          permission-profile: ":workspace"
+          safety-strategy: drop-sudo
+          prompt: |
+            You are the primary developer for this Flutter project.
+
+            Work directly in the repository and implement the user's request below.
+            Inspect the existing project before changing it. Preserve working features unless the request requires changing them.
+            You may create, edit, move, or delete project files when necessary.
+            Keep the project compatible with Flutter 3.47.2 and Android release builds.
+            Run flutter pub get when dependencies change.
+            Run flutter analyze and fix all errors you introduce.
+            Run relevant Flutter tests when available.
+            Do not add secrets, API keys, passwords, or private credentials to the repository.
+            Do not merely explain how to implement the request: actually implement it in the workspace.
+
+            USER REQUEST:
+            ${{ inputs.task }}
+
+      - name: Commit and push Codex changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes were produced by Codex."
+            exit 0
+          fi
+          git commit -m "feat: implement requested changes with Codex"
+          git push origin HEAD:main
