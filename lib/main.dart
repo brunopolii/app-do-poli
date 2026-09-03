@@ -18,7 +18,7 @@ class AppDoPoli extends StatefulWidget {
 }
 
 class _AppDoPoliState extends State<AppDoPoli> {
-  int selectedIndex = 2;
+  int selectedIndex = 1;
   ThemeMode themeMode = ThemeMode.system;
 
   @override
@@ -40,14 +40,14 @@ class _AppDoPoliState extends State<AppDoPoli> {
             ),
           ],
         ),
-        body: IndexedStack(index: selectedIndex, children: const [AgendaScreen(), GymScreen(), HomeScreen(), FoodScreen(), FinanceScreen()]),
+        body: IndexedStack(index: selectedIndex, children: const [AgendaScreen(), HomeScreen(), GymScreen(), FoodScreen(), FinanceScreen()]),
         bottomNavigationBar: NavigationBar(
           selectedIndex: selectedIndex,
           onDestinationSelected: (index) => setState(() => selectedIndex = index),
           destinations: const [
             NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month), label: 'Agenda'),
-            NavigationDestination(icon: Icon(Icons.fitness_center_outlined), selectedIcon: Icon(Icons.fitness_center), label: 'Academia'),
             NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Início'),
+            NavigationDestination(icon: Icon(Icons.fitness_center_outlined), selectedIcon: Icon(Icons.fitness_center), label: 'Academia'),
             NavigationDestination(icon: Icon(Icons.restaurant_outlined), selectedIcon: Icon(Icons.restaurant), label: 'Alimentação'),
             NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Financeiro'),
           ],
