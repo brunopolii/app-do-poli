@@ -6,6 +6,7 @@ import '../widgets/app_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -25,25 +26,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _load() async {
     try {
-      final a = await StorageService.read('agenda');
-      final f = await StorageService.read('meals');
-      final m = await StorageService.read('finance');
-      final w = await StorageService.read('workout_plans');
-      events = a.map((e) => AgendaEvent.fromJson(e)).toList();
-      meals = f.map((e) => Meal.fromJson(e)).toList();
-      money = m.map((e) => MoneyTransaction.fromJson(e)).toList();
-      plans = w.map((e) => WorkoutPlan.fromJson(e)).toList();
+      final agendaData = await StorageService.read('agenda');
+      final mealData = await StorageService.read('meals');
+      final financeData = await StorageService.read('finance');
+      final workoutData = await StorageService.read('workout_plans');
+
+      events = agendaData.map(AgendaEvent.fromJson).toList();
+      meals = mealData.map(Meal.fromJson).toList();
+      money = financeData.map(MoneyTransaction.fromJson).toList();
+      plans = workoutData.map(WorkoutPlan.fromJson).toList();
     } catch (_) {
       events = <AgendaEvent>[];
       meals = <Meal>[];
       money = <MoneyTransaction>[];
       plans = <WorkoutPlan>[];
     }
-    if (mounted) setState(() => loading = false);
+
+    if (!mounted) return;
+    setState(() => loading = false);
   }
 
-  double _food(List<Meal> list, int type) {
-    double total = 0;
+  double _foodValue(Iterable<Meal> list, int type) {
+    var total = 0.0;
     for (final item in list) {
       if (type == 0) total += item.calories;
       if (type == 1) total += item.protein;
@@ -53,8 +57,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return total;
   }
 
-  double _cash(List<MoneyTransaction> list, bool income) {
-    double total = 0;
+  double _cashValue(Iterable<MoneyTransaction> list, bool income) {
+    var total = 0.0;
     for (final item in list) {
       if (item.income == income) total += item.amount;
     }
@@ -63,78 +67,140 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return const Center(child: CircularProgressIndicator());
+    if (loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     final now = DateTime.now();
-    final today = DateFormat('yyyy-MM-dd').format(now);
+    final todayKey = DateFormat('yyyy-MM-dd').format(now);
     final monthKey = DateFormat('yyyy-MM').format(now);
-    final todayEvents = events.where((e) => e.date == today).toList();
-    final todayMeals = meals.where((e) => e.date == today).toList();
-    final todayPlans = plans.where((e) => e.weekdays.contains(now.weekday)).toList();
-    final monthMoney = money.where((e) => e.date.startsWith(monthKey)).toList();
+
+    final todayEvents = events.where((item) => item.date == todayKey).toList();
+    final todayMeals = meals.where((item) => item.date == todayKey).toList();
+    final todayPlans = plans.where((item) => item.weekdays.contains(now.weekday)).toList();
+    final monthMoney = money.where((item) => item.date.startsWith(monthKey)).toList();
+
     todayEvents.sort((a, b) => a.start.compareTo(b.start));
-    final income = _cash(monthMoney, true);
-    final expense = _cash(monthMoney, false);
-    final balance = _cash(money, true) - _cash(money, false);
+
+    final income = _cashValue(monthMoney, true);
+    final expense = _cashValue(monthMoney, false);
+    final balance = _cashValue(money, true) - _cashValue(money, false);
 
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: <Widget>[
-          Text('Olá! 👋', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Olá! 👋',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
           Text(DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(now)),
           const SizedBox(height: 16),
-          _card(context, 'Resumo de hoje', Row(children: <Widget>[
-            _counter(context, Icons.event_outlined, 'Agenda', todayEvents.length.toString()),
-            _counter(context, Icons.fitness_center, 'Treinos', todayPlans.length.toString()),
-            _counter(context, Icons.restaurant_outlined, 'Refeições', todayMeals.length.toString()),
-          ])),
-          _card(context, 'Próximo compromisso', todayEvents.isEmpty ? const Text('Nada agendado para hoje.') : ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const CircleAvatar(child: Icon(Icons.event)),
-            title: Text(todayEvents.first.title),
-            subtitle: Text('${todayEvents.first.start} • ${todayEvents.first.end}'),
-          )),
-          _card(context, 'Alimentação de hoje', Row(children: <Widget>[
-            _stat(context, _food(todayMeals, 0).toStringAsFixed(0), 'kcal'),
-            _stat(context, '${_food(todayMeals, 1).toStringAsFixed(0)}g', 'proteína'),
-            _stat(context, '${_food(todayMeals, 2).toStringAsFixed(0)}g', 'carbo'),
-            _stat(context, '${_food(todayMeals, 3).toStringAsFixed(0)}g', 'gordura'),
-          ])),
-          _card(context, 'Financeiro do mês', Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-            Row(children: <Widget>[
-              _stat(context, 'R$ ${income.toStringAsFixed(0)}', 'entradas'),
-              _stat(context, 'R$ ${expense.toStringAsFixed(0)}', 'despesas'),
-              _stat(context, 'R$ ${(income - expense).toStringAsFixed(0)}', 'resultado'),
-            ]),
-            const SizedBox(height: 10),
-            Text('Saldo atual: R$ ${balance.toStringAsFixed(2)}'),
-          ])),
+          _card(
+            context,
+            'Resumo de hoje',
+            Row(
+              children: <Widget>[
+                _counter(context, Icons.event_outlined, 'Agenda', todayEvents.length.toString()),
+                _counter(context, Icons.fitness_center, 'Treinos', todayPlans.length.toString()),
+                _counter(context, Icons.restaurant_outlined, 'Refeições', todayMeals.length.toString()),
+              ],
+            ),
+          ),
+          _card(
+            context,
+            'Próximo compromisso',
+            todayEvents.isEmpty
+                ? const Text('Nada agendado para hoje.')
+                : ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const CircleAvatar(child: Icon(Icons.event)),
+                    title: Text(todayEvents.first.title),
+                    subtitle: Text('${todayEvents.first.start} • ${todayEvents.first.end}'),
+                  ),
+          ),
+          _card(
+            context,
+            'Alimentação de hoje',
+            Row(
+              children: <Widget>[
+                _stat(context, _foodValue(todayMeals, 0).toStringAsFixed(0), 'kcal'),
+                _stat(context, '${_foodValue(todayMeals, 1).toStringAsFixed(0)}g', 'proteína'),
+                _stat(context, '${_foodValue(todayMeals, 2).toStringAsFixed(0)}g', 'carbo'),
+                _stat(context, '${_foodValue(todayMeals, 3).toStringAsFixed(0)}g', 'gordura'),
+              ],
+            ),
+          ),
+          _card(
+            context,
+            'Financeiro do mês',
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    _stat(context, 'R$ ${income.toStringAsFixed(0)}', 'entradas'),
+                    _stat(context, 'R$ ${expense.toStringAsFixed(0)}', 'despesas'),
+                    _stat(context, 'R$ ${(income - expense).toStringAsFixed(0)}', 'resultado'),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text('Saldo atual: R$ ${balance.toStringAsFixed(2)}'),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _card(BuildContext context, String title, Widget child) {
-    return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-      Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-      const SizedBox(height: 12),
-      child,
-    ]));
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
   }
 
   Widget _counter(BuildContext context, IconData icon, String label, String value) {
-    return Expanded(child: Column(children: <Widget>[
-      Icon(icon),
-      const SizedBox(height: 5),
-      Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-      Text(label, style: Theme.of(context).textTheme.bodySmall),
-    ]));
+    return Expanded(
+      child: Column(
+        children: <Widget>[
+          Icon(icon),
+          const SizedBox(height: 5),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ),
+    );
   }
 
   Widget _stat(BuildContext context, String value, String label) {
-    return Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-      Text(value, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-      Text(label, style: Theme.of(context).textTheme.bodySmall),
-    ]));
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ),
+    );
   }
 }
