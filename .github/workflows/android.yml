@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,8 +31,19 @@ jobs:
       - name: Build APK
         run: flutter build apk --release
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-do-poli-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: App do Poli APK ${{ github.run_number }}
+          body: |
+            APK pronto para instalar no Android.
+            Baixe o arquivo app-release.apk abaixo e instale no celular.
+          files: build/app/outputs/flutter-apk/app-release.apk
+          make_latest: true
