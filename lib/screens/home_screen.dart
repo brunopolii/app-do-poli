@@ -21,40 +21,63 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    loadData();
   }
 
-  Future<void> _load() async {
+  Future<void> loadData() async {
     try {
-      final agenda = await StorageService.read('agenda');
-      final food = await StorageService.read('meals');
-      final money = await StorageService.read('finance');
-      final workouts = await StorageService.read('workout_plans');
-      events = agenda.map((item) => AgendaEvent.fromJson(item)).toList();
-      meals = food.map((item) => Meal.fromJson(item)).toList();
-      finance = money.map((item) => MoneyTransaction.fromJson(item)).toList();
-      plans = workouts.map((item) => WorkoutPlan.fromJson(item)).toList();
+      final agendaData = await StorageService.read('agenda');
+      final mealData = await StorageService.read('meals');
+      final financeData = await StorageService.read('finance');
+      final workoutData = await StorageService.read('workout_plans');
+
+      final loadedEvents = <AgendaEvent>[];
+      final loadedMeals = <Meal>[];
+      final loadedFinance = <MoneyTransaction>[];
+      final loadedPlans = <WorkoutPlan>[];
+
+      for (final item in agendaData) {
+        loadedEvents.add(AgendaEvent.fromJson(item));
+      }
+      for (final item in mealData) {
+        loadedMeals.add(Meal.fromJson(item));
+      }
+      for (final item in financeData) {
+        loadedFinance.add(MoneyTransaction.fromJson(item));
+      }
+      for (final item in workoutData) {
+        loadedPlans.add(WorkoutPlan.fromJson(item));
+      }
+
+      events = loadedEvents;
+      meals = loadedMeals;
+      finance = loadedFinance;
+      plans = loadedPlans;
     } catch (_) {
       events = <AgendaEvent>[];
       meals = <Meal>[];
       finance = <MoneyTransaction>[];
       plans = <WorkoutPlan>[];
     }
-    if (mounted) setState(() => loading = false);
+
+    if (!mounted) return;
+    setState(() {
+      loading = false;
+    });
   }
 
-  double _foodTotal(List<Meal> values, String field) {
+  double foodTotal(List<Meal> list, String type) {
     double total = 0;
-    for (final item in values) {
-      if (field == 'calories') total += item.calories;
-      if (field == 'protein') total += item.protein;
-      if (field == 'carbs') total += item.carbs;
-      if (field == 'fat') total += item.fat;
+    for (final item in list) {
+      if (type == 'calories') total += item.calories;
+      if (type == 'protein') total += item.protein;
+      if (type == 'carbs') total += item.carbs;
+      if (type == 'fat') total += item.fat;
     }
     return total;
   }
 
-  double _moneyTotal(bool income) {
+  double moneyTotal(bool income) {
     double total = 0;
     for (final item in finance) {
       if (item.income == income) total += item.amount;
@@ -64,49 +87,74 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return const Center(child: CircularProgressIndicator());
+    if (loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     final now = DateTime.now();
     final today = DateFormat('yyyy-MM-dd').format(now);
-    final todayEvents = events.where((item) => item.date == today).toList();
-    todayEvents.sort((a, b) => a.start.compareTo(b.start));
-    final todayMeals = meals.where((item) => item.date == today).toList();
-    final todayPlans = plans.where((item) => item.weekdays.contains(now.weekday)).toList();
-    final calories = _foodTotal(todayMeals, 'calories');
-    final protein = _foodTotal(todayMeals, 'protein');
-    final carbs = _foodTotal(todayMeals, 'carbs');
-    final fat = _foodTotal(todayMeals, 'fat');
     final monthKey = DateFormat('yyyy-MM').format(now);
-    final monthMoney = finance.where((item) => item.date.startsWith(monthKey)).toList();
+
+    final todayEvents = <AgendaEvent>[];
+    final todayMeals = <Meal>[];
+    final todayPlans = <WorkoutPlan>[];
     double monthIncome = 0;
     double monthExpense = 0;
-    for (final item in monthMoney) {
-      if (item.income) {
-        monthIncome += item.amount;
-      } else {
-        monthExpense += item.amount;
+
+    for (final item in events) {
+      if (item.date == today) todayEvents.add(item);
+    }
+    todayEvents.sort((a, b) => a.start.compareTo(b.start));
+
+    for (final item in meals) {
+      if (item.date == today) todayMeals.add(item);
+    }
+
+    for (final item in plans) {
+      if (item.weekdays.contains(now.weekday)) todayPlans.add(item);
+    }
+
+    for (final item in finance) {
+      if (item.date.startsWith(monthKey)) {
+        if (item.income) {
+          monthIncome += item.amount;
+        } else {
+          monthExpense += item.amount;
+        }
       }
     }
-    final balance = _moneyTotal(true) - _moneyTotal(false);
+
+    final calories = foodTotal(todayMeals, 'calories');
+    final protein = foodTotal(todayMeals, 'protein');
+    final carbs = foodTotal(todayMeals, 'carbs');
+    final fat = foodTotal(todayMeals, 'fat');
+    final balance = moneyTotal(true) - moneyTotal(false);
 
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: <Widget>[
-          Text('Olá! 👋', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Olá! 👋',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           Text(DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(now)),
           const SizedBox(height: 16),
-          _card(
+          buildCard(
+            context,
             'Resumo de hoje',
             Row(
               children: <Widget>[
-                _counter(Icons.event_outlined, 'Agenda', todayEvents.length.toString()),
-                _counter(Icons.fitness_center, 'Treinos', todayPlans.length.toString()),
-                _counter(Icons.restaurant_outlined, 'Refeições', todayMeals.length.toString()),
+                buildCounter(Icons.event_outlined, 'Agenda', todayEvents.length.toString()),
+                buildCounter(Icons.fitness_center, 'Treinos', todayPlans.length.toString()),
+                buildCounter(Icons.restaurant_outlined, 'Refeições', todayMeals.length.toString()),
               ],
             ),
           ),
-          _card(
+          buildCard(
+            context,
             'Próximo compromisso',
             todayEvents.isEmpty
                 ? const Text('Nada agendado para hoje.')
@@ -117,27 +165,29 @@ class _HomeScreenState extends State<HomeScreen> {
                     subtitle: Text('${todayEvents.first.start} • ${todayEvents.first.end}'),
                   ),
           ),
-          _card(
+          buildCard(
+            context,
             'Alimentação de hoje',
             Row(
               children: <Widget>[
-                _stat(calories.toStringAsFixed(0), 'kcal'),
-                _stat('${protein.toStringAsFixed(0)}g', 'proteína'),
-                _stat('${carbs.toStringAsFixed(0)}g', 'carbo'),
-                _stat('${fat.toStringAsFixed(0)}g', 'gordura'),
+                buildStat(calories.toStringAsFixed(0), 'kcal'),
+                buildStat('${protein.toStringAsFixed(0)}g', 'proteína'),
+                buildStat('${carbs.toStringAsFixed(0)}g', 'carbo'),
+                buildStat('${fat.toStringAsFixed(0)}g', 'gordura'),
               ],
             ),
           ),
-          _card(
+          buildCard(
+            context,
             'Financeiro do mês',
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Row(
                   children: <Widget>[
-                    _stat('R$ ${monthIncome.toStringAsFixed(0)}', 'entradas'),
-                    _stat('R$ ${monthExpense.toStringAsFixed(0)}', 'despesas'),
-                    _stat('R$ ${(monthIncome - monthExpense).toStringAsFixed(0)}', 'resultado'),
+                    buildStat('R$ ${monthIncome.toStringAsFixed(0)}', 'entradas'),
+                    buildStat('R$ ${monthExpense.toStringAsFixed(0)}', 'despesas'),
+                    buildStat('R$ ${(monthIncome - monthExpense).toStringAsFixed(0)}', 'resultado'),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -146,7 +196,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           if (todayPlans.isNotEmpty)
-            _card(
+            buildCard(
+              context,
               'Treinos de hoje',
               Column(
                 children: todayPlans.map((plan) {
@@ -164,12 +215,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _card(String title, Widget child) {
+  Widget buildCard(BuildContext context, String title, Widget child) {
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 12),
           child,
         ],
@@ -177,7 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _counter(IconData icon, String label, String value) {
+  Widget buildCounter(IconData icon, String label, String value) {
     return Expanded(
       child: Column(
         children: <Widget>[
@@ -190,12 +246,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _stat(String value, String label) {
+  Widget buildStat(String value, String label) {
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(value, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           Text(label, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
