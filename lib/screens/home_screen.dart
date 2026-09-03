@@ -26,123 +26,100 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _load() async {
     try {
-      events = (await StorageService.read('agenda')).map(AgendaEvent.fromJson).toList();
-      meals = (await StorageService.read('meals')).map(Meal.fromJson).toList();
-      finance = (await StorageService.read('finance')).map(MoneyTransaction.fromJson).toList();
-      plans = (await StorageService.read('workout_plans')).map(WorkoutPlan.fromJson).toList();
+      final agendaData = await StorageService.read('agenda');
+      final mealData = await StorageService.read('meals');
+      final financeData = await StorageService.read('finance');
+      final planData = await StorageService.read('workout_plans');
+      events = agendaData.map(AgendaEvent.fromJson).toList();
+      meals = mealData.map(Meal.fromJson).toList();
+      finance = financeData.map(MoneyTransaction.fromJson).toList();
+      plans = planData.map(WorkoutPlan.fromJson).toList();
     } catch (_) {
       events = <AgendaEvent>[];
       meals = <Meal>[];
       finance = <MoneyTransaction>[];
       plans = <WorkoutPlan>[];
     }
-
-    if (mounted) {
-      setState(() => loading = false);
-    }
+    if (mounted) setState(() => loading = false);
   }
 
-  double _mealSum(List<Meal> values, double Function(Meal) selector) {
+  double _mealTotal(List<Meal> source, double Function(Meal) getValue) {
     double total = 0;
-    for (final meal in values) {
-      total += selector(meal);
-    }
+    for (final item in source) total += getValue(item);
     return total;
   }
 
-  double _financeSum(bool income, [Iterable<MoneyTransaction>? values]) {
-    final source = values ?? finance;
+  double _moneyTotal(bool income, [Iterable<MoneyTransaction>? source]) {
+    final values = source ?? finance;
     double total = 0;
-    for (final item in source) {
-      if (item.income == income) {
-        total += item.amount;
-      }
+    for (final item in values) {
+      if (item.income == income) total += item.amount;
     }
     return total;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    if (loading) return const Center(child: CircularProgressIndicator());
 
     final now = DateTime.now();
     final today = DateFormat('yyyy-MM-dd').format(now);
-    final dayEvents = events.where((item) => item.date == today).toList();
-    dayEvents.sort((a, b) => a.start.compareTo(b.start));
+    final todayEvents = events.where((item) => item.date == today).toList();
+    todayEvents.sort((a, b) => a.start.compareTo(b.start));
+    final todayMeals = meals.where((item) => item.date == today).toList();
+    final todayPlans = plans.where((item) => item.weekdays.contains(now.weekday)).toList();
 
-    final dayMeals = meals.where((item) => item.date == today).toList();
-    final todayPlans = plans.where((plan) => plan.weekdays.contains(now.weekday)).toList();
-
-    final calories = _mealSum(dayMeals, (meal) => meal.calories);
-    final protein = _mealSum(dayMeals, (meal) => meal.protein);
-    final carbs = _mealSum(dayMeals, (meal) => meal.carbs);
-    final fat = _mealSum(dayMeals, (meal) => meal.fat);
+    final calories = _mealTotal(todayMeals, (item) => item.calories);
+    final protein = _mealTotal(todayMeals, (item) => item.protein);
+    final carbs = _mealTotal(todayMeals, (item) => item.carbs);
+    final fat = _mealTotal(todayMeals, (item) => item.fat);
 
     final monthKey = DateFormat('yyyy-MM').format(now);
     final monthFinance = finance.where((item) => item.date.startsWith(monthKey)).toList();
-    final monthIncome = _financeSum(true, monthFinance);
-    final monthExpense = _financeSum(false, monthFinance);
-    final balance = _financeSum(true) - _financeSum(false);
+    final monthIncome = _moneyTotal(true, monthFinance);
+    final monthExpense = _moneyTotal(false, monthFinance);
+    final currentBalance = _moneyTotal(true) - _moneyTotal(false);
 
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: <Widget>[
-          Text(
-            'Olá! 👋',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
+          Text('Olá! 👋', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
           Text(DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(now)),
           const SizedBox(height: 16),
-          _summaryCard(dayEvents.length, todayPlans.length, dayMeals.length),
-          _agendaCard(dayEvents),
-          _foodCard(calories, protein, carbs, fat),
-          _financeCard(monthIncome, monthExpense, balance),
-          if (todayPlans.isNotEmpty) _workoutCard(todayPlans, now.weekday),
+          _summary(todayEvents.length, todayPlans.length, todayMeals.length),
+          _agenda(todayEvents),
+          _food(calories, protein, carbs, fat),
+          _finance(monthIncome, monthExpense, currentBalance),
+          if (todayPlans.isNotEmpty) _workouts(todayPlans, now.weekday),
         ],
       ),
     );
   }
 
-  Widget _summaryCard(int agenda, int workouts, int food) {
+  Widget _summary(int agenda, int workouts, int food) {
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            'Resumo de hoje',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
+          Text('Resumo de hoje', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 14),
-          Row(
-            children: <Widget>[
-              _counter(Icons.event_outlined, 'Agenda', agenda.toString()),
-              _counter(Icons.fitness_center, 'Treinos', workouts.toString()),
-              _counter(Icons.restaurant_outlined, 'Refeições', food.toString()),
-            ],
-          ),
+          Row(children: <Widget>[
+            _counter(Icons.event_outlined, 'Agenda', agenda.toString()),
+            _counter(Icons.fitness_center, 'Treinos', workouts.toString()),
+            _counter(Icons.restaurant_outlined, 'Refeições', food.toString()),
+          ]),
         ],
       ),
     );
   }
 
-  Widget _agendaCard(List<AgendaEvent> items) {
+  Widget _agenda(List<AgendaEvent> items) {
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            'Próximo compromisso',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
+          Text('Próximo compromisso', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           if (items.isEmpty)
             const Text('Nada agendado para hoje.')
@@ -158,50 +135,36 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _foodCard(double calories, double protein, double carbs, double fat) {
+  Widget _food(double calories, double protein, double carbs, double fat) {
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            'Alimentação de hoje',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
+          Text('Alimentação de hoje', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 14),
-          Row(
-            children: <Widget>[
-              _stat(calories.toStringAsFixed(0), 'kcal'),
-              _stat('${protein.toStringAsFixed(0)}g', 'proteína'),
-              _stat('${carbs.toStringAsFixed(0)}g', 'carbo'),
-              _stat('${fat.toStringAsFixed(0)}g', 'gordura'),
-            ],
-          ),
+          Row(children: <Widget>[
+            _stat(calories.toStringAsFixed(0), 'kcal'),
+            _stat('${protein.toStringAsFixed(0)}g', 'proteína'),
+            _stat('${carbs.toStringAsFixed(0)}g', 'carbo'),
+            _stat('${fat.toStringAsFixed(0)}g', 'gordura'),
+          ]),
         ],
       ),
     );
   }
 
-  Widget _financeCard(double income, double expense, double balance) {
+  Widget _finance(double income, double expense, double balance) {
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            'Financeiro do mês',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
+          Text('Financeiro do mês', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 14),
-          Row(
-            children: <Widget>[
-              _stat('R$ ${income.toStringAsFixed(0)}', 'entradas'),
-              _stat('R$ ${expense.toStringAsFixed(0)}', 'despesas'),
-              _stat('R$ ${(income - expense).toStringAsFixed(0)}', 'resultado'),
-            ],
-          ),
+          Row(children: <Widget>[
+            _stat('R$ ${income.toStringAsFixed(0)}', 'entradas'),
+            _stat('R$ ${expense.toStringAsFixed(0)}', 'despesas'),
+            _stat('R$ ${(income - expense).toStringAsFixed(0)}', 'resultado'),
+          ]),
           const SizedBox(height: 10),
           Text('Saldo atual: R$ ${balance.toStringAsFixed(2)}'),
         ],
@@ -209,16 +172,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _workoutCard(List<WorkoutPlan> items, int weekday) {
+  Widget _workouts(List<WorkoutPlan> items, int weekday) {
     final children = <Widget>[
-      Text(
-        'Treinos de hoje',
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-      ),
+      Text('Treinos de hoje', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
     ];
-
     for (final plan in items) {
       children.add(
         ListTile(
@@ -229,7 +186,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-
     return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children));
   }
 
@@ -251,12 +207,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
+          Text(value, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
           Text(label, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
