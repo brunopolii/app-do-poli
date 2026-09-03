@@ -26,14 +26,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _load() async {
     try {
-      final agendaData = await StorageService.read('agenda');
-      final mealData = await StorageService.read('meals');
-      final financeData = await StorageService.read('finance');
-      final planData = await StorageService.read('workout_plans');
-      events = agendaData.map(AgendaEvent.fromJson).toList();
-      meals = mealData.map(Meal.fromJson).toList();
-      finance = financeData.map(MoneyTransaction.fromJson).toList();
-      plans = planData.map(WorkoutPlan.fromJson).toList();
+      final agenda = await StorageService.read('agenda');
+      final food = await StorageService.read('meals');
+      final money = await StorageService.read('finance');
+      final workouts = await StorageService.read('workout_plans');
+      events = agenda.map((item) => AgendaEvent.fromJson(item)).toList();
+      meals = food.map((item) => Meal.fromJson(item)).toList();
+      finance = money.map((item) => MoneyTransaction.fromJson(item)).toList();
+      plans = workouts.map((item) => WorkoutPlan.fromJson(item)).toList();
     } catch (_) {
       events = <AgendaEvent>[];
       meals = <Meal>[];
@@ -43,16 +43,20 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() => loading = false);
   }
 
-  double _mealTotal(List<Meal> source, double Function(Meal) getValue) {
+  double _foodTotal(List<Meal> values, String field) {
     double total = 0;
-    for (final item in source) total += getValue(item);
+    for (final item in values) {
+      if (field == 'calories') total += item.calories;
+      if (field == 'protein') total += item.protein;
+      if (field == 'carbs') total += item.carbs;
+      if (field == 'fat') total += item.fat;
+    }
     return total;
   }
 
-  double _moneyTotal(bool income, [Iterable<MoneyTransaction>? source]) {
-    final values = source ?? finance;
+  double _moneyTotal(bool income) {
     double total = 0;
-    for (final item in values) {
+    for (final item in finance) {
       if (item.income == income) total += item.amount;
     }
     return total;
@@ -68,125 +72,109 @@ class _HomeScreenState extends State<HomeScreen> {
     todayEvents.sort((a, b) => a.start.compareTo(b.start));
     final todayMeals = meals.where((item) => item.date == today).toList();
     final todayPlans = plans.where((item) => item.weekdays.contains(now.weekday)).toList();
-
-    final calories = _mealTotal(todayMeals, (item) => item.calories);
-    final protein = _mealTotal(todayMeals, (item) => item.protein);
-    final carbs = _mealTotal(todayMeals, (item) => item.carbs);
-    final fat = _mealTotal(todayMeals, (item) => item.fat);
-
+    final calories = _foodTotal(todayMeals, 'calories');
+    final protein = _foodTotal(todayMeals, 'protein');
+    final carbs = _foodTotal(todayMeals, 'carbs');
+    final fat = _foodTotal(todayMeals, 'fat');
     final monthKey = DateFormat('yyyy-MM').format(now);
-    final monthFinance = finance.where((item) => item.date.startsWith(monthKey)).toList();
-    final monthIncome = _moneyTotal(true, monthFinance);
-    final monthExpense = _moneyTotal(false, monthFinance);
-    final currentBalance = _moneyTotal(true) - _moneyTotal(false);
+    final monthMoney = finance.where((item) => item.date.startsWith(monthKey)).toList();
+    double monthIncome = 0;
+    double monthExpense = 0;
+    for (final item in monthMoney) {
+      if (item.income) {
+        monthIncome += item.amount;
+      } else {
+        monthExpense += item.amount;
+      }
+    }
+    final balance = _moneyTotal(true) - _moneyTotal(false);
 
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        padding: const EdgeInsets.all(16),
         children: <Widget>[
           Text('Olá! 👋', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
           Text(DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(now)),
           const SizedBox(height: 16),
-          _summary(todayEvents.length, todayPlans.length, todayMeals.length),
-          _agenda(todayEvents),
-          _food(calories, protein, carbs, fat),
-          _finance(monthIncome, monthExpense, currentBalance),
-          if (todayPlans.isNotEmpty) _workouts(todayPlans, now.weekday),
-        ],
-      ),
-    );
-  }
-
-  Widget _summary(int agenda, int workouts, int food) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text('Resumo de hoje', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 14),
-          Row(children: <Widget>[
-            _counter(Icons.event_outlined, 'Agenda', agenda.toString()),
-            _counter(Icons.fitness_center, 'Treinos', workouts.toString()),
-            _counter(Icons.restaurant_outlined, 'Refeições', food.toString()),
-          ]),
-        ],
-      ),
-    );
-  }
-
-  Widget _agenda(List<AgendaEvent> items) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text('Próximo compromisso', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          if (items.isEmpty)
-            const Text('Nada agendado para hoje.')
-          else
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const CircleAvatar(child: Icon(Icons.event)),
-              title: Text(items.first.title),
-              subtitle: Text('${items.first.start} • ${items.first.end}'),
+          _card(
+            'Resumo de hoje',
+            Row(
+              children: <Widget>[
+                _counter(Icons.event_outlined, 'Agenda', todayEvents.length.toString()),
+                _counter(Icons.fitness_center, 'Treinos', todayPlans.length.toString()),
+                _counter(Icons.restaurant_outlined, 'Refeições', todayMeals.length.toString()),
+              ],
+            ),
+          ),
+          _card(
+            'Próximo compromisso',
+            todayEvents.isEmpty
+                ? const Text('Nada agendado para hoje.')
+                : ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const CircleAvatar(child: Icon(Icons.event)),
+                    title: Text(todayEvents.first.title),
+                    subtitle: Text('${todayEvents.first.start} • ${todayEvents.first.end}'),
+                  ),
+          ),
+          _card(
+            'Alimentação de hoje',
+            Row(
+              children: <Widget>[
+                _stat(calories.toStringAsFixed(0), 'kcal'),
+                _stat('${protein.toStringAsFixed(0)}g', 'proteína'),
+                _stat('${carbs.toStringAsFixed(0)}g', 'carbo'),
+                _stat('${fat.toStringAsFixed(0)}g', 'gordura'),
+              ],
+            ),
+          ),
+          _card(
+            'Financeiro do mês',
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    _stat('R$ ${monthIncome.toStringAsFixed(0)}', 'entradas'),
+                    _stat('R$ ${monthExpense.toStringAsFixed(0)}', 'despesas'),
+                    _stat('R$ ${(monthIncome - monthExpense).toStringAsFixed(0)}', 'resultado'),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text('Saldo atual: R$ ${balance.toStringAsFixed(2)}'),
+              ],
+            ),
+          ),
+          if (todayPlans.isNotEmpty)
+            _card(
+              'Treinos de hoje',
+              Column(
+                children: todayPlans.map((plan) {
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const CircleAvatar(child: Icon(Icons.fitness_center)),
+                    title: Text(plan.name),
+                    subtitle: Text('${plan.exercisesFor(now.weekday).length} exercícios'),
+                  );
+                }).toList(),
+              ),
             ),
         ],
       ),
     );
   }
 
-  Widget _food(double calories, double protein, double carbs, double fat) {
+  Widget _card(String title, Widget child) {
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text('Alimentação de hoje', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 14),
-          Row(children: <Widget>[
-            _stat(calories.toStringAsFixed(0), 'kcal'),
-            _stat('${protein.toStringAsFixed(0)}g', 'proteína'),
-            _stat('${carbs.toStringAsFixed(0)}g', 'carbo'),
-            _stat('${fat.toStringAsFixed(0)}g', 'gordura'),
-          ]),
+          Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          child,
         ],
       ),
     );
-  }
-
-  Widget _finance(double income, double expense, double balance) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text('Financeiro do mês', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 14),
-          Row(children: <Widget>[
-            _stat('R$ ${income.toStringAsFixed(0)}', 'entradas'),
-            _stat('R$ ${expense.toStringAsFixed(0)}', 'despesas'),
-            _stat('R$ ${(income - expense).toStringAsFixed(0)}', 'resultado'),
-          ]),
-          const SizedBox(height: 10),
-          Text('Saldo atual: R$ ${balance.toStringAsFixed(2)}'),
-        ],
-      ),
-    );
-  }
-
-  Widget _workouts(List<WorkoutPlan> items, int weekday) {
-    final children = <Widget>[
-      Text('Treinos de hoje', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-    ];
-    for (final plan in items) {
-      children.add(
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const CircleAvatar(child: Icon(Icons.fitness_center)),
-          title: Text(plan.name),
-          subtitle: Text('${plan.exercisesFor(weekday).length} exercícios'),
-        ),
-      );
-    }
-    return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children));
   }
 
   Widget _counter(IconData icon, String label, String value) {
@@ -194,7 +182,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         children: <Widget>[
           Icon(icon),
-          const SizedBox(height: 6),
+          const SizedBox(height: 5),
           Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
           Text(label, style: Theme.of(context).textTheme.bodySmall),
         ],
