@@ -36,7 +36,9 @@ class _FinanceScreenState extends State<FinanceScreen> {
       loaded.add(MoneyTransaction.fromJson(map));
     }
     if (!mounted) return;
-    setState(() => items = loaded);
+    setState(() {
+      items = loaded;
+    });
   }
 
   Future<void> _save() async {
@@ -49,7 +51,9 @@ class _FinanceScreenState extends State<FinanceScreen> {
   double _sum(Iterable<MoneyTransaction> list, bool income) {
     var total = 0.0;
     for (final item in list) {
-      if (item.income == income) total += item.amount;
+      if (item.income == income) {
+        total += item.amount;
+      }
     }
     return total;
   }
@@ -66,9 +70,11 @@ class _FinanceScreenState extends State<FinanceScreen> {
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (dialogBuildContext, setDialogState) {
             final categories = isIncome ? incomeCategories : expenseCategories;
-            if (!categories.contains(category)) category = 'Outros';
+            if (!categories.contains(category)) {
+              category = 'Outros';
+            }
             return AlertDialog(
               title: Text(old == null ? 'Nova movimentação' : 'Editar movimentação'),
               content: SingleChildScrollView(
@@ -101,15 +107,17 @@ class _FinanceScreenState extends State<FinanceScreen> {
                     DropdownButtonFormField<String>(
                       isExpanded: true,
                       initialValue: categories.contains(category) ? category : 'Outros',
-                      items: categories
-                          .map((value) => DropdownMenuItem<String>(
-                                value: value,
-                                child: Text(value),
-                              ))
-                          .toList(),
+                      items: categories.map((value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
                       onChanged: (value) {
                         if (value != null) {
-                          setDialogState(() => category = value);
+                          setDialogState(() {
+                            category = value;
+                          });
                         }
                       },
                       decoration: const InputDecoration(labelText: 'Categoria'),
@@ -133,8 +141,13 @@ class _FinanceScreenState extends State<FinanceScreen> {
       },
     );
 
-    final parsed = double.tryParse(amount.text.trim().replaceAll(',', '.'));
-    if (result != true || description.text.trim().isEmpty || parsed == null || parsed <= 0) {
+    final parsed = double.tryParse(
+      amount.text.trim().replaceAll(',', '.'),
+    );
+    if (result != true ||
+        description.text.trim().isEmpty ||
+        parsed == null ||
+        parsed <= 0) {
       return;
     }
 
@@ -150,13 +163,17 @@ class _FinanceScreenState extends State<FinanceScreen> {
     items.removeWhere((item) => item.id == transaction.id);
     items.add(transaction);
     await _save();
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _delete(MoneyTransaction item) async {
     items.removeWhere((value) => value.id == item.id);
     await _save();
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -190,9 +207,11 @@ class _FinanceScreenState extends State<FinanceScreen> {
         child: Row(
           children: <Widget>[
             IconButton(
-              onPressed: () => setState(() {
-                month = DateTime(month.year, month.month - 1);
-              }),
+              onPressed: () {
+                setState(() {
+                  month = DateTime(month.year, month.month - 1);
+                });
+              },
               icon: const Icon(Icons.chevron_left),
             ),
             Expanded(
@@ -203,9 +222,11 @@ class _FinanceScreenState extends State<FinanceScreen> {
               ),
             ),
             IconButton(
-              onPressed: () => setState(() {
-                month = DateTime(month.year, month.month + 1);
-              }),
+              onPressed: () {
+                setState(() {
+                  month = DateTime(month.year, month.month + 1);
+                });
+              },
               icon: const Icon(Icons.chevron_right),
             ),
           ],
@@ -260,10 +281,14 @@ class _FinanceScreenState extends State<FinanceScreen> {
               ),
               trailing: PopupMenuButton<String>(
                 onSelected: (value) {
-                  if (value == 'edit') _edit(item);
-                  if (value == 'delete') _delete(item);
+                  if (value == 'edit') {
+                    _edit(item);
+                  }
+                  if (value == 'delete') {
+                    _delete(item);
+                  }
                 },
-                itemBuilder: (context) => const <PopupMenuEntry<String>>[
+                itemBuilder: (menuContext) => const <PopupMenuEntry<String>>[
                   PopupMenuItem<String>(value: 'edit', child: Text('Editar')),
                   PopupMenuItem<String>(value: 'delete', child: Text('Excluir')),
                 ],
