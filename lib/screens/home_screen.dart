@@ -43,16 +43,23 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (!mounted) return;
-    setState(() => loading = false);
+    setState(() {
+      loading = false;
+    });
   }
 
   double _foodValue(Iterable<Meal> list, int type) {
     var total = 0.0;
     for (final item in list) {
-      if (type == 0) total += item.calories;
-      if (type == 1) total += item.protein;
-      if (type == 2) total += item.carbs;
-      if (type == 3) total += item.fat;
+      if (type == 0) {
+        total += item.calories;
+      } else if (type == 1) {
+        total += item.protein;
+      } else if (type == 2) {
+        total += item.carbs;
+      } else if (type == 3) {
+        total += item.fat;
+      }
     }
     return total;
   }
@@ -60,7 +67,9 @@ class _HomeScreenState extends State<HomeScreen> {
   double _cashValue(Iterable<MoneyTransaction> list, bool income) {
     var total = 0.0;
     for (final item in list) {
-      if (item.income == income) total += item.amount;
+      if (item.income == income) {
+        total += item.amount;
+      }
     }
     return total;
   }
@@ -74,7 +83,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final now = DateTime.now();
     final todayKey = DateFormat('yyyy-MM-dd').format(now);
     final monthKey = DateFormat('yyyy-MM').format(now);
-
     final todayEvents = events.where((item) => item.date == todayKey).toList();
     final todayMeals = meals.where((item) => item.date == todayKey).toList();
     final todayPlans = plans.where((item) => item.weekdays.contains(now.weekday)).toList();
