@@ -21,7 +21,7 @@ class NotificationService {
         _channelId,
         'Agenda',
         description: 'Lembretes dos compromissos do App do Poli',
-        importance: Importance.high,
+        importance: Importance.max,
         playSound: true,
         enableVibration: true,
       ),
@@ -30,13 +30,24 @@ class NotificationService {
     await android?.requestExactAlarmsPermission();
   }
 
+  static Future<bool> notificationsEnabled() async {
+    final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    return await android?.areNotificationsEnabled() ?? true;
+  }
+
+  static Future<bool> exactAlarmsEnabled() async {
+    final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    return await android?.canScheduleExactNotifications() ?? false;
+  }
+
   static Future<void> schedule({
     required int id,
     required DateTime date,
     required String title,
     required String body,
   }) async {
-    if (!date.isAfter(DateTime.now())) return;
+    final now = DateTime.now();
+    if (!date.isAfter(now)) return;
 
     final scheduled = tz.TZDateTime(
       tz.local,
@@ -49,23 +60,51 @@ class NotificationService {
     if (!scheduled.isAfter(tz.TZDateTime.now(tz.local))) return;
 
     await _plugin.cancel(id);
+
+    final details = const NotificationDetails(
+      android: AndroidNotificationDetails(
+        _channelId,
+        'Agenda',
+        channelDescription: 'Lembretes dos compromissos do App do Poli',
+        importance: Importance.max,
+        priority: Priority.max,
+        playSound: true,
+        enableVibration: true,
+        ticker: 'Lembrete da Agenda',
+      ),
+    );
+
+    // Android 14+ may deny exact alarms. In that case, use the inexact
+    // scheduler instead of silently failing to schedule the notification.
+    final exact = await exactAlarmsEnabled();
     await _plugin.zonedSchedule(
       id,
       title,
       body,
       scheduled,
+      details,
+      androidScheduleMode: exact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle,
+    );
+  }
+
+  static Future<void> testNow() async {
+    await _plugin.show(
+      2147483000,
+      'App do Poli',
+      'As notificações da Agenda estão funcionando.',
       const NotificationDetails(
         android: AndroidNotificationDetails(
           _channelId,
           'Agenda',
           channelDescription: 'Lembretes dos compromissos do App do Poli',
-          importance: Importance.high,
-          priority: Priority.high,
+          importance: Importance.max,
+          priority: Priority.max,
           playSound: true,
           enableVibration: true,
         ),
       ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
   }
 
