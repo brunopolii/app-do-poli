@@ -4,26 +4,28 @@ import 'package:timezone/timezone.dart' as tz;
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
+  static const String _channelId = 'app_do_poli_agenda';
 
   static Future<void> initialize() async {
     tz.initializeTimeZones();
-    // The app is intended for the user's local Brazilian time. Keeping the
-    // timezone explicit avoids scheduling notifications in UTC on Android.
     tz.setLocalLocation(tz.getLocation('America/Sao_Paulo'));
 
     const settings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
     );
-
     await _plugin.initialize(settings);
 
     final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    await android?.createNotificationChannel(const AndroidNotificationChannel(
-      'lifetrack_agenda',
-      'Agenda',
-      description: 'Lembretes dos compromissos do App do Poli',
-      importance: Importance.high,
-    ));
+    await android?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _channelId,
+        'Agenda',
+        description: 'Lembretes dos compromissos do App do Poli',
+        importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
+      ),
+    );
     await android?.requestNotificationsPermission();
     await android?.requestExactAlarmsPermission();
   }
@@ -34,8 +36,7 @@ class NotificationService {
     required String title,
     required String body,
   }) async {
-    final now = DateTime.now();
-    if (!date.isAfter(now)) return;
+    if (!date.isAfter(DateTime.now())) return;
 
     final scheduled = tz.TZDateTime(
       tz.local,
@@ -55,17 +56,16 @@ class NotificationService {
       scheduled,
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'lifetrack_agenda',
+          _channelId,
           'Agenda',
           channelDescription: 'Lembretes dos compromissos do App do Poli',
           importance: Importance.high,
           priority: Priority.high,
-          enableVibration: true,
           playSound: true,
+          enableVibration: true,
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
     );
   }
 
