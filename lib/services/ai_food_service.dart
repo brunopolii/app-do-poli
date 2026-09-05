@@ -27,14 +27,21 @@ class AiFoodService {
   AiFoodService({this.endpoint, this.apiKey});
 
   Future<FoodResult> estimateText(String text) async {
-    if (endpoint == null || endpoint!.isEmpty) return _localEstimate(text);
-    final r = await http.post(Uri.parse(endpoint!), headers: {'Content-Type': 'application/json', if (apiKey?.isNotEmpty == true) 'Authorization': 'Bearer $apiKey'}, body: jsonEncode({'text': text}));
-    if (r.statusCode < 200 || r.statusCode >= 300) throw Exception('Falha na análise nutricional.');
-    return _fromJson(Map<String, dynamic>.from(jsonDecode(r.body) as Map));
+    if (endpoint != null && endpoint!.isNotEmpty) {
+      try {
+        final r = await http.post(Uri.parse(endpoint!), headers: {'Content-Type': 'application/json', if (apiKey?.isNotEmpty == true) 'Authorization': 'Bearer $apiKey'}, body: jsonEncode({'text': text}));
+        if (r.statusCode >= 200 && r.statusCode < 300) return _fromJson(Map<String, dynamic>.from(jsonDecode(r.body) as Map));
+      } catch (_) {}
+    }
+    final local = _localEstimate(text);
+    if (local.items.any((i) => i.calories > 0)) return local;
+    final online = await _openFoodFacts(text);
+    if (online != null) return online;
+    return local;
   }
 
   Future<FoodResult> estimateImage(String path) async {
-    if (endpoint == null || endpoint!.isEmpty) return FoodResult(items: [FoodItem(name: 'Foto capturada', grams: 0, calories: 0, protein: 0, carbs: 0, fat: 0)], note: 'A foto foi capturada, mas o app ainda não tem um backend de visão/IA conectado. Nenhum valor foi inventado.');
+    if (endpoint == null || endpoint!.isEmpty) return FoodResult(items: [FoodItem(name: 'Foto capturada', grams: 0, calories: 0, protein: 0, carbs: 0, fat: 0)], note: 'A foto foi capturada, mas não há um backend de visão/IA configurado. Nenhum valor foi inventado.');
     final request = http.MultipartRequest('POST', Uri.parse(endpoint!));
     if (apiKey?.isNotEmpty == true) request.headers['Authorization'] = 'Bearer $apiKey';
     request.files.add(await http.MultipartFile.fromPath('image', path));
@@ -44,67 +51,123 @@ class AiFoodService {
     return _fromJson(Map<String, dynamic>.from(jsonDecode(body) as Map));
   }
 
+  Future<FoodResult?> _openFoodFacts(String text) async {
+    try {
+      final query = text.trim();
+      if (query.isEmpty) return null;
+      final uri = Uri.https('world.openfoodfacts.org', '/api/v2/search', {'search_terms': query, 'fields': 'product_name,nutriments', 'page_size': '5', 'lc': 'pt'});
+      final r = await http.get(uri, headers: {'User-Agent': 'AppDoPoli/1.0'}).timeout(const Duration(seconds: 7));
+      if (r.statusCode != 200) return null;
+      final data = jsonDecode(r.body) as Map<String, dynamic>;
+      final products = (data['products'] as List?) ?? const [];
+      for (final raw in products) {
+        final p = Map<String, dynamic>.from(raw as Map);
+        final n = Map<String, dynamic>.from((p['nutriments'] as Map?) ?? const {});
+        final kcal = _num(n['energy-kcal_100g'] ?? n['energy-kcal']);
+        final protein = _num(n['proteins_100g']);
+        final carbs = _num(n['carbohydrates_100g']);
+        final fat = _num(n['fat_100g']);
+        final name = (p['product_name'] ?? '').toString().trim();
+        if (name.isNotEmpty && kcal != null) {
+          final grams = _quantity(text, 100);
+          final factor = grams / 100;
+          return FoodResult(items: [FoodItem(name: '$name (${grams.toStringAsFixed(0)}g)', grams: grams, calories: kcal * factor, protein: (protein ?? 0) * factor, carbs: (carbs ?? 0) * factor, fat: (fat ?? 0) * factor)], note: 'Encontrado automaticamente no Open Food Facts. Confira o rótulo e a porção para maior precisão.');
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  double? _num(dynamic value) => value is num ? value.toDouble() : double.tryParse(value?.toString() ?? '');
+
   FoodResult _fromJson(Map<String, dynamic> json) {
     final raw = (json['items'] as List?) ?? const [];
-    return FoodResult(items: raw.map((x) {
-      final i = Map<String, dynamic>.from(x as Map);
-      return FoodItem(name: (i['name'] ?? 'Alimento').toString(), grams: (i['grams'] as num?)?.toDouble() ?? 0, calories: (i['calories'] as num?)?.toDouble() ?? 0, protein: (i['protein'] as num?)?.toDouble() ?? 0, carbs: (i['carbs'] as num?)?.toDouble() ?? 0, fat: (i['fat'] as num?)?.toDouble() ?? 0);
-    }).toList(), note: (json['note'] as String?) ?? 'Estimativa nutricional.');
+    return FoodResult(items: raw.map((x) { final i = Map<String, dynamic>.from(x as Map); return FoodItem(name: (i['name'] ?? 'Alimento').toString(), grams: _num(i['grams']) ?? 0, calories: _num(i['calories']) ?? 0, protein: _num(i['protein']) ?? 0, carbs: _num(i['carbs']) ?? 0, fat: _num(i['fat']) ?? 0); }).toList(), note: (json['note'] as String?) ?? 'Estimativa nutricional.');
+  }
+
+  double _quantity(String input, double fallback) {
+    final normalized = input.toLowerCase().replaceAll(',', '.');
+    final m = RegExp(r'(\d+(?:\.\d+)?)\s*(kg|g|gramas?|ml|l)\b').firstMatch(normalized);
+    if (m == null) return fallback;
+    final n = double.tryParse(m.group(1)!) ?? fallback;
+    return (m.group(2) == 'kg' || m.group(2) == 'l') ? n * 1000 : n;
   }
 
   FoodResult _localEstimate(String text) {
     final input = text.toLowerCase().replaceAll(',', '.');
     final specs = <String, List<double>>{
-      'arroz': [130, 2.7, 28, 0.3], 'feijão': [76, 4.8, 13.6, 0.5], 'feijao': [76, 4.8, 13.6, 0.5], 'frango': [165, 31, 0, 3.6],
-      'ovo': [143, 13, 1.1, 9.5], 'carne': [217, 26, 0, 11], 'carne moída': [215, 26, 0, 12], 'carne moida': [215, 26, 0, 12],
-      'macarrão': [157, 5.8, 30.5, 0.9], 'macarrao': [157, 5.8, 30.5, 0.9], 'batata': [77, 2, 17.5, 0.1], 'batata doce': [86, 1.6, 20.1, 0.1],
-      'mandioca': [125, 0.6, 30, 0.3], 'tapioca': [240, 0.2, 59, 0.2], 'pão': [265, 9, 49, 3.2], 'pao': [265, 9, 49, 3.2],
-      'queijo prato': [360, 22, 2, 29], 'queijo': [350, 22, 3, 28], 'presunto': [145, 16, 2, 8], 'hamburguer': [250, 15, 5, 18],
-      'leite': [61, 3.2, 4.8, 3.3], 'iogurte': [63, 3.5, 5, 3], 'aveia': [394, 16.9, 66.3, 8.6], 'banana': [89, 1.1, 22.8, 0.3],
-      'maçã': [52, 0.3, 13.8, 0.2], 'maca': [52, 0.3, 13.8, 0.2], 'laranja': [47, 0.9, 11.8, 0.1], 'mamão': [43, 0.5, 10.8, 0.3], 'mamao': [43, 0.5, 10.8, 0.3],
-      'morango': [32, 0.7, 7.7, 0.3], 'abacate': [160, 2, 8.5, 14.7], 'tomate': [18, 0.9, 3.9, 0.2], 'alface': [15, 1.4, 2.9, 0.2],
-      'cenoura': [41, 0.9, 9.6, 0.2], 'brócolis': [34, 2.8, 6.6, 0.4], 'brocolis': [34, 2.8, 6.6, 0.4], 'milho': [96, 3.4, 21, 1.5],
-      'ervilha': [81, 5.4, 14.5, 0.4], 'lentilha': [116, 9, 20, 0.4], 'grão de bico': [164, 8.9, 27.4, 2.6], 'grao de bico': [164, 8.9, 27.4, 2.6],
-      'atum': [132, 29, 0, 1], 'sardinha': [208, 25, 0, 11], 'salmão': [208, 20, 0, 13], 'salmao': [208, 20, 0, 13], 'peixe': [128, 26, 0, 2.7],
-      'camarão': [99, 24, 0.2, 0.3], 'camarao': [99, 24, 0.2, 0.3], 'carne suína': [242, 27, 0, 14], 'carne suina': [242, 27, 0, 14],
-      'azeite': [884, 0, 0, 100], 'manteiga': [717, 0.9, 0.1, 81], 'requeijão': [257, 9.6, 2.6, 23], 'requeijao': [257, 9.6, 2.6, 23],
-      'chocolate': [535, 7.8, 59, 30], 'biscoito': [480, 6, 68, 20], 'pizza': [266, 11, 33, 10], 'lasanha': [135, 7, 13, 6],
-      'açúcar': [387, 0, 100, 0], 'acucar': [387, 0, 100, 0], 'mel': [304, 0.3, 82.4, 0], 'suco': [45, 0.5, 10, 0.1], 'refrigerante': [42, 0, 10.6, 0],
+      'arroz': [130, 2.7, 28, 0.3], 'feijão': [76, 4.8, 13.6, 0.5], 'feijao': [76, 4.8, 13.6, 0.5],
+      'frango': [165, 31, 0, 3.6], 'ovo': [143, 13, 1.1, 9.5], 'carne': [217, 26, 0, 11], 'carne moída': [215, 26, 0, 12], 'carne moida': [215, 26, 0, 12],
+      'macarrão': [157, 5.8, 30.5, 0.9], 'macarrao': [157, 5.8, 30.5, 0.9], 'nhoque': [160, 4.5, 31, 2.5], 'lasanha': [135, 7, 13, 6],
+      'batata': [77, 2, 17.5, 0.1], 'batata doce': [86, 1.6, 20.1, 0.1], 'mandioca': [125, 0.6, 30, 0.3], 'tapioca': [240, 0.2, 59, 0.2],
+      'pão': [265, 9, 49, 3.2], 'pao': [265, 9, 49, 3.2], 'pão de queijo': [330, 7, 45, 13], 'pao de queijo': [330, 7, 45, 13],
+      'queijo prato': [360, 22, 2, 29], 'queijo': [350, 22, 3, 28], 'presunto': [145, 16, 2, 8], 'hambúrguer': [250, 15, 5, 18], 'hamburguer': [250, 15, 5, 18],
+      'leite': [61, 3.2, 4.8, 3.3], 'leite integral': [61, 3.2, 4.8, 3.3], 'iogurte': [63, 3.5, 5, 3], 'whey': [390, 78, 8, 6],
+      'nescau': [380, 3.5, 88, 2], 'achocolatado': [380, 3.5, 88, 2], 'leite em pó': [500, 26, 38, 27], 'leite em po': [500, 26, 38, 27],
+      'aveia': [394, 16.9, 66.3, 8.6], 'banana': [89, 1.1, 22.8, 0.3], 'maçã': [52, 0.3, 13.8, 0.2], 'maca': [52, 0.3, 13.8, 0.2],
+      'laranja': [47, 0.9, 11.8, 0.1], 'mamão': [43, 0.5, 10.8, 0.3], 'mamao': [43, 0.5, 10.8, 0.3], 'morango': [32, 0.7, 7.7, 0.3], 'abacate': [160, 2, 8.5, 14.7],
+      'tomate': [18, 0.9, 3.9, 0.2], 'alface': [15, 1.4, 2.9, 0.2], 'cenoura': [41, 0.9, 9.6, 0.2], 'brócolis': [34, 2.8, 6.6, 0.4], 'brocolis': [34, 2.8, 6.6, 0.4],
+      'milho': [96, 3.4, 21, 1.5], 'ervilha': [81, 5.4, 14.5, 0.4], 'lentilha': [116, 9, 20, 0.4], 'grão de bico': [164, 8.9, 27.4, 2.6], 'grao de bico': [164, 8.9, 27.4, 2.6],
+      'atum': [132, 29, 0, 1], 'sardinha': [208, 25, 0, 11], 'salmão': [208, 20, 0, 13], 'salmao': [208, 20, 0, 13], 'peixe': [128, 26, 0, 2.7], 'camarão': [99, 24, 0.2, 0.3], 'camarao': [99, 24, 0.2, 0.3],
+      'carne suína': [242, 27, 0, 14], 'carne suina': [242, 27, 0, 14], 'azeite': [884, 0, 0, 100], 'manteiga': [717, 0.9, 0.1, 81], 'requeijão': [257, 9.6, 2.6, 23], 'requeijao': [257, 9.6, 2.6, 23],
+      'chocolate': [535, 7.8, 59, 30], 'biscoito': [480, 6, 68, 20], 'bolacha': [480, 6, 68, 20], 'pizza': [266, 11, 33, 10], 'bolo de chocolate': [380, 5.5, 52, 17], 'bolo': [350, 5, 50, 15],
+      'açúcar': [387, 0, 100, 0], 'acucar': [387, 0, 100, 0], 'mel': [304, 0.3, 82.4, 0], 'suco': [45, 0.5, 10, 0.1], 'suco de laranja': [45, 0.7, 10, 0.2],
+      'refrigerante': [42, 0, 10.6, 0], 'coca cola': [42, 0, 10.6, 0], 'guaraná': [39, 0, 9.8, 0], 'guarana': [39, 0, 9.8, 0], 'café': [2, 0.1, 0, 0], 'cafe': [2, 0.1, 0, 0],
+      'água de coco': [19, 0.7, 3.7, 0.2], 'agua de coco': [19, 0.7, 3.7, 0.2], 'vitamina': [80, 3, 12, 2],
     };
     final aliases = <String, List<String>>{
-      'arroz': ['arroz'], 'feijão': ['feijão', 'feijao'], 'frango': ['frango'], 'ovo': ['ovo', 'ovos'], 'carne moída': ['carne moída', 'carne moida'], 'carne': ['carne bovina', 'carne'],
-      'macarrão': ['macarrão', 'macarrao'], 'batata doce': ['batata doce', 'batata-doce'], 'batata': ['batata'], 'mandioca': ['mandioca', 'aipim', 'macaxeira'], 'tapioca': ['tapioca'],
-      'pão': ['pão', 'pao'], 'queijo prato': ['queijo prato'], 'queijo': ['queijo'], 'presunto': ['presunto'], 'hamburguer': ['hambúrguer', 'hamburguer'], 'leite': ['leite'],
-      'iogurte': ['iogurte'], 'aveia': ['aveia'], 'banana': ['banana'], 'maçã': ['maçã', 'maca'], 'laranja': ['laranja'], 'mamão': ['mamão', 'mamao'], 'morango': ['morango'], 'abacate': ['abacate'],
-      'tomate': ['tomate'], 'alface': ['alface'], 'cenoura': ['cenoura'], 'brócolis': ['brócolis', 'brocolis'], 'milho': ['milho'], 'ervilha': ['ervilha'], 'lentilha': ['lentilha'],
-      'grão de bico': ['grão de bico', 'grao de bico'], 'atum': ['atum'], 'sardinha': ['sardinha'], 'salmão': ['salmão', 'salmao'], 'peixe': ['peixe'], 'camarão': ['camarão', 'camarao'],
-      'carne suína': ['carne suína', 'carne suina'], 'azeite': ['azeite'], 'manteiga': ['manteiga'], 'requeijão': ['requeijão', 'requeijao'], 'chocolate': ['chocolate'], 'biscoito': ['biscoito', 'bolacha'],
-      'pizza': ['pizza'], 'lasanha': ['lasanha'], 'açúcar': ['açúcar', 'acucar'], 'mel': ['mel'], 'suco': ['suco'], 'refrigerante': ['refrigerante'],
+      'bolo de chocolate': ['bolo de chocolate'], 'nhoque': ['nhoque'], 'pão de queijo': ['pão de queijo', 'pao de queijo'], 'leite integral': ['leite integral'],
+      'suco de laranja': ['suco de laranja'], 'água de coco': ['água de coco', 'agua de coco'], 'coca cola': ['coca cola'], 'guaraná': ['guaraná', 'guarana'],
+      'carne moída': ['carne moída', 'carne moida'], 'batata doce': ['batata doce', 'batata-doce'], 'grão de bico': ['grão de bico', 'grao de bico'],
     };
-    final items = <FoodItem>[];
+    for (final key in specs.keys) { aliases.putIfAbsent(key, () => [key]); }
     final keys = aliases.keys.toList()..sort((a, b) => b.length.compareTo(a.length));
+    final items = <FoodItem>[];
+    final used = <String>{};
     for (final key in keys) {
+      if (used.contains(key)) continue;
       final words = aliases[key]!;
-      if (!words.any(input.contains)) continue;
-      final base = specs[key];
-      if (base == null) continue;
-      final defaultGrams = key == 'ovo' ? 50.0 : key == 'pão' ? 50.0 : key == 'queijo prato' ? 20.0 : key == 'leite' ? 250.0 : 100.0;
-      double grams = defaultGrams;
-      for (final word in words) {
-        final e = RegExp.escape(word);
-        final before = RegExp(r'(\d+(?:\.\d+)?)\s*(kg|g|gramas?|ml|l)\s*(?:de\s*)?' + e).firstMatch(input);
-        final after = RegExp(e + r'\s*(?:de\s*)?(\d+(?:\.\d+)?)\s*(kg|g|gramas?|ml|l)').firstMatch(input);
-        final countBefore = RegExp(r'(\d+(?:\.\d+)?)\s*(unidades?|un|x)\s*(?:de\s*)?' + e).firstMatch(input);
-        final countAfter = RegExp(e + r'\s*(?:de\s*)?(\d+(?:\.\d+)?)\s*(unidades?|un|x)').firstMatch(input);
-        if (before != null) { final n = double.tryParse(before.group(1)!) ?? defaultGrams; grams = (before.group(2) == 'kg' || before.group(2) == 'l') ? n * 1000 : n; break; }
-        if (after != null) { final n = double.tryParse(after.group(1)!) ?? defaultGrams; grams = (after.group(2) == 'kg' || after.group(2) == 'l') ? n * 1000 : n; break; }
-        if (countBefore != null) { grams = (double.tryParse(countBefore.group(1)!) ?? 1) * defaultGrams; break; }
-        if (countAfter != null) { grams = (double.tryParse(countAfter.group(1)!) ?? 1) * defaultGrams; break; }
-      }
-      final factor = grams / 100;
-      items.add(FoodItem(name: '${key[0].toUpperCase()}${key.substring(1)} (${grams.toStringAsFixed(0)}g)', grams: grams, calories: base[0] * factor, protein: base[1] * factor, carbs: base[2] * factor, fat: base[3] * factor));
+      final matched = words.any((w) => input.contains(w));
+      if (!matched) continue;
+      final base = specs[key]; if (base == null) continue;
+      final defaultAmount = _defaultAmount(key);
+      final amount = _findAmount(input, words, defaultAmount);
+      final factor = amount / 100;
+      final displayUnit = _isLiquid(key) ? 'ml' : 'g';
+      items.add(FoodItem(name: '${_title(key)} (${amount.toStringAsFixed(0)}$displayUnit)', grams: amount, calories: base[0] * factor, protein: base[1] * factor, carbs: base[2] * factor, fat: base[3] * factor));
+      used.add(key);
     }
     if (items.isEmpty) items.add(FoodItem(name: 'Não identificado', grams: 0, calories: 0, protein: 0, carbs: 0, fat: 0));
-    return FoodResult(items: items, note: 'Reconhece dezenas de alimentos comuns, aceita g/kg/ml/l e unidades e calcula a porção informada proporcionalmente. Os valores são estimativas e devem ser conferidos.');
+    return FoodResult(items: items, note: items.first.name == 'Não identificado' ? 'Não encontrei esse alimento na base local. O app tentará buscar automaticamente no Open Food Facts quando houver internet.' : 'Análise inteligente local: aceita quantidades em g, kg, ml, l e unidades e combina vários alimentos digitados na mesma frase. Os valores são estimativas.');
   }
+
+  double _defaultAmount(String key) {
+    if (_isLiquid(key)) { if (key == 'refrigerante' || key == 'coca cola') return 350; return 250; }
+    if (key == 'ovo') return 50;
+    if (key == 'pão' || key == 'pao') return 50;
+    if (key == 'queijo prato') return 20;
+    if (key == 'whey') return 30;
+    if (key == 'nescau' || key == 'achocolatado') return 20;
+    return 100;
+  }
+
+  bool _isLiquid(String key) => ['leite','leite integral','suco','suco de laranja','refrigerante','coca cola','guaraná','água de coco','café','vitamina'].contains(key);
+
+  double _findAmount(String input, List<String> words, double fallback) {
+    for (final word in words) {
+      final e = RegExp.escape(word);
+      final before = RegExp(r'(\d+(?:\.\d+)?)\s*(kg|g|gramas?|ml|l)\s*(?:de\s*)?' + e).firstMatch(input);
+      final after = RegExp(e + r'\s*(?:de\s*)?(\d+(?:\.\d+)?)\s*(kg|g|gramas?|ml|l)').firstMatch(input);
+      final countBefore = RegExp(r'(\d+(?:\.\d+)?)\s*(unidades?|un|x)\s*(?:de\s*)?' + e).firstMatch(input);
+      final countAfter = RegExp(e + r'\s*(?:de\s*)?(\d+(?:\.\d+)?)\s*(unidades?|un|x)').firstMatch(input);
+      if (before != null) return _convert(before.group(1)!, before.group(2)!);
+      if (after != null) return _convert(after.group(1)!, after.group(2)!);
+      if (countBefore != null) return (double.tryParse(countBefore.group(1)!) ?? 1) * fallback;
+      if (countAfter != null) return (double.tryParse(countAfter.group(1)!) ?? 1) * fallback;
+    }
+    return fallback;
+  }
+
+  double _convert(String number, String unit) { final n = double.tryParse(number) ?? 0; return (unit == 'kg' || unit == 'l') ? n * 1000 : n; }
+  String _title(String s) => s.split(' ').map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
 }
