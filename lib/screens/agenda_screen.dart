@@ -5,20 +5,85 @@ import '../services/storage_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/app_card.dart';
 
-class AgendaScreen extends StatefulWidget{const AgendaScreen({super.key});@override State<AgendaScreen> createState()=>_AgendaScreenState();}
-class _AgendaScreenState extends State<AgendaScreen>{
- DateTime month=DateTime(DateTime.now().year,DateTime.now().month);DateTime selected=DateTime.now();List<AgendaEvent> events=[];
- String key(DateTime d)=>DateFormat('yyyy-MM-dd').format(d);String get selectedKey=>key(selected);
- @override void initState(){super.initState();_load();}
- Future<void> _load()async{events=(await StorageService.read('agenda')).map(AgendaEvent.fromJson).toList();if(mounted)setState((){});}
- Future<void> _save()=>StorageService.write('agenda',events.map((e)=>e.toJson()).toList());
- List<AgendaEvent> get dayEvents{final x=events.where((e)=>e.date==selectedKey).toList()..sort((a,b)=>a.start.compareTo(b.start));return x;}
- bool hasEvent(DateTime d)=>events.any((e)=>e.date==key(d));
- Future<void> _edit({AgendaEvent? existing})async{final title=TextEditingController(text:existing?.title??'');final desc=TextEditingController(text:existing?.description??'');TimeOfDay start=existing==null?TimeOfDay.now():_parse(existing!.start);TimeOfDay end=existing==null?TimeOfDay(hour:TimeOfDay.now().hour+1,minute:TimeOfDay.now().minute):_parse(existing!.end);bool notify=existing?.notify??false;
-  final result=await showDialog<bool>(context:context,builder:(c)=>StatefulBuilder(builder:(c,ss)=>AlertDialog(title:Text(existing==null?'Novo compromisso':'Editar compromisso'),content:SingleChildScrollView(child:Column(children:[TextField(controller:title,autofocus:true,decoration:const InputDecoration(labelText:'Título',prefixIcon:Icon(Icons.event_outlined))),const SizedBox(height:10),TextField(controller:desc,maxLines:3,decoration:const InputDecoration(labelText:'Descrição',prefixIcon:Icon(Icons.notes_outlined))),const SizedBox(height:6),ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.schedule),title:const Text('Início'),trailing:Text(start.format(c)),onTap:()async{final x=await showTimePicker(context:c,initialTime:start);if(x!=null)ss(()=>start=x);}),ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.schedule_outlined),title:const Text('Fim'),trailing:Text(end.format(c)),onTap:()async{final x=await showTimePicker(context:c,initialTime:end);if(x!=null)ss(()=>end=x);}),SwitchListTile(contentPadding:EdgeInsets.zero,value:notify,onChanged:(v)=>ss(()=>notify=v),title:const Text('Lembrete'),subtitle:const Text('Notificar no horário do compromisso'))])),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('Cancelar')),FilledButton(onPressed:()=>Navigator.pop(c,true),child:const Text('Salvar'))])));
-  if(result!=true||title.text.trim().isEmpty)return;final id=existing?.id??DateTime.now().microsecondsSinceEpoch.toString();if(existing!=null&&existing.notify)await NotificationService.cancel(int.tryParse(id)??0);final e=AgendaEvent(id:id,date:selectedKey,title:title.text.trim(),description:desc.text.trim(),start:_fmt(start),end:_fmt(end),notify:notify);setState((){events.removeWhere((x)=>x.id==id);events.add(e);});await _save();if(notify)await NotificationService.schedule(id:int.tryParse(id)??id.hashCode,date:DateTime(selected.year,selected.month,selected.day,start.hour,start.minute),title:e.title,body:e.description.isEmpty?'Compromisso agendado':e.description);}
- TimeOfDay _parse(String s){final p=s.split(':');return TimeOfDay(hour:int.tryParse(p[0])??8,minute:int.tryParse(p.length>1?p[1]:'0')??0);}String _fmt(TimeOfDay t)=>'${t.hour.toString().padLeft(2,'0')}:${t.minute.toString().padLeft(2,'0')}';
- Future<void> _delete(AgendaEvent e)async{await NotificationService.cancel(int.tryParse(e.id)??e.id.hashCode);setState(()=>events.remove(e));await _save();}
- void _changeMonth(int delta){setState(()=>month=DateTime(month.year,month.month+delta));}
- @override Widget build(BuildContext context){final first=DateTime(month.year,month.month,1);final offset=first.weekday-1;final days=DateTime(month.year,month.month+1,0).day;final cells=List.generate(offset+days,(i)=>i<offset?null:DateTime(month.year,month.month,i-offset+1));return SafeArea(child:ListView(padding:const EdgeInsets.fromLTRB(16,12,16,28),children:[Row(children:[Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Agenda',style:Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.bold)),Text('${events.length} compromisso(s) salvo(s)',style:Theme.of(context).textTheme.bodyMedium)])),IconButton(onPressed:()=>_edit(),icon:const Icon(Icons.add_circle_outline),tooltip:'Novo compromisso')]),const SizedBox(height:14),AppCard(child:Column(children:[Row(children:[IconButton(onPressed:()=>_changeMonth(-1),icon:const Icon(Icons.chevron_left)),Expanded(child:Text(DateFormat('MMMM yyyy','pt_BR').format(month),textAlign:TextAlign.center,style:Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold))),IconButton(onPressed:()=>_changeMonth(1),icon:const Icon(Icons.chevron_right))]),const SizedBox(height:8),Row(children:['S','T','Q','Q','S','S','D'].map((d)=>Expanded(child:Center(child:Text(d,style:Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight:FontWeight.bold))))).toList()),const SizedBox(height:8),GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:cells.length,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:7,mainAxisExtent:48),itemBuilder:(c,i){final d=cells[i];if(d==null)return const SizedBox();final selectedDay=key(d)==selectedKey;return InkWell(borderRadius:BorderRadius.circular(14),onTap:(){setState(()=>selected=d);},child:Container(margin:const EdgeInsets.all(3),decoration:BoxDecoration(color:selectedDay?Theme.of(context).colorScheme.primaryContainer:null,borderRadius:BorderRadius.circular(14)),child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[Text('${d.day}',style:TextStyle(fontWeight:selectedDay?FontWeight.bold:FontWeight.normal)),if(hasEvent(d))Container(width:5,height:5,margin:const EdgeInsets.only(top:3),decoration:BoxDecoration(color:Theme.of(context).colorScheme.primary,shape:BoxShape.circle))])));})])),const SizedBox(height:14),Row(children:[Expanded(child:Text(DateFormat("EEEE, dd 'de' MMMM",'pt_BR').format(selected),style:Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold))),FilledButton.icon(onPressed:()=>_edit(),icon:const Icon(Icons.add,size:18),label:const Text('Adicionar'))]),const SizedBox(height:8),if(dayEvents.isEmpty)AppCard(child:Column(children:[Icon(Icons.event_available_outlined,size:40,color:Theme.of(context).colorScheme.primary),const SizedBox(height:8),const Text('Dia livre',style:TextStyle(fontWeight:FontWeight.bold)),const SizedBox(height:4),const Text('Nenhum compromisso cadastrado para esta data.')])),...dayEvents.map((e)=>AppCard(child:ListTile(contentPadding:EdgeInsets.zero,leading:CircleAvatar(child:Text(e.start.substring(0,2))),title:Text(e.title,style:const TextStyle(fontWeight:FontWeight.w600)),subtitle:Text('${e.start}–${e.end}${e.description.isEmpty?'':'\n${e.description}'}${e.notify?'\n🔔 Lembrete ativado':''}'),isThreeLine:e.description.isNotEmpty||e.notify,trailing:PopupMenuButton<String>(onSelected:(v){if(v=='edit')_edit(existing:e);if(v=='delete')_delete(e);},itemBuilder:(_)=>const[PopupMenuItem(value:'edit',child:Text('Editar')),PopupMenuItem(value:'delete',child:Text('Excluir'))]))))]));}
+class AgendaScreen extends StatefulWidget { const AgendaScreen({super.key}); @override State<AgendaScreen> createState() => _AgendaScreenState(); }
+class _AgendaScreenState extends State<AgendaScreen> {
+  DateTime month = DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime selected = DateTime.now();
+  List<AgendaEvent> events = [];
+
+  String key(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
+  String get selectedKey => key(selected);
+  int _notificationId(String id) => id.hashCode & 0x7fffffff;
+
+  @override void initState() { super.initState(); _load(); }
+  Future<void> _load() async { events = (await StorageService.read('agenda')).map(AgendaEvent.fromJson).toList(); if (mounted) setState(() {}); }
+  Future<void> _save() => StorageService.write('agenda', events.map((e) => e.toJson()).toList());
+  List<AgendaEvent> get dayEvents { final x = events.where((e) => e.date == selectedKey).toList()..sort((a,b) => a.start.compareTo(b.start)); return x; }
+  bool hasEvent(DateTime d) => events.any((e) => e.date == key(d));
+
+  Future<void> _testNotification() async {
+    try {
+      final enabled = await NotificationService.notificationsEnabled();
+      if (!enabled) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Permissão de notificações está desativada no Android. Ative-a nas configurações do App do Poli.'))); return; }
+      await NotificationService.testNow();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notificação de teste enviada.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Não foi possível testar: $e')));
+    }
+  }
+
+  Future<void> _edit({AgendaEvent? existing}) async {
+    final title = TextEditingController(text: existing?.title ?? '');
+    final desc = TextEditingController(text: existing?.description ?? '');
+    final now = TimeOfDay.now();
+    TimeOfDay start = existing == null ? now : _parse(existing!.start);
+    TimeOfDay end = existing == null ? TimeOfDay(hour: (now.hour + 1) % 24, minute: now.minute) : _parse(existing!.end);
+    bool notify = existing?.notify ?? false;
+    final result = await showDialog<bool>(context: context, builder: (c) => StatefulBuilder(builder: (c, ss) => AlertDialog(
+      title: Text(existing == null ? 'Novo compromisso' : 'Editar compromisso'),
+      content: SingleChildScrollView(child: Column(children: [
+        TextField(controller: title, autofocus: true, decoration: const InputDecoration(labelText: 'Título', prefixIcon: Icon(Icons.event_outlined))),
+        const SizedBox(height: 10), TextField(controller: desc, maxLines: 3, decoration: const InputDecoration(labelText: 'Descrição', prefixIcon: Icon(Icons.notes_outlined))),
+        const SizedBox(height: 6),
+        ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.schedule), title: const Text('Início'), trailing: Text(start.format(c)), onTap: () async { final x = await showTimePicker(context: c, initialTime: start); if (x != null) ss(() => start = x); }),
+        ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.schedule_outlined), title: const Text('Fim'), trailing: Text(end.format(c)), onTap: () async { final x = await showTimePicker(context: c, initialTime: end); if (x != null) ss(() => end = x); }),
+        SwitchListTile(contentPadding: EdgeInsets.zero, value: notify, onChanged: (v) => ss(() => notify = v), title: const Text('Lembrete'), subtitle: const Text('Notificar no horário do compromisso')),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancelar')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Salvar'))],
+    )));
+    if (result != true || title.text.trim().isEmpty) return;
+    final id = existing?.id ?? DateTime.now().microsecondsSinceEpoch.toString();
+    if (existing != null && existing.notify) await NotificationService.cancel(_notificationId(id));
+    final e = AgendaEvent(id: id, date: selectedKey, title: title.text.trim(), description: desc.text.trim(), start: _fmt(start), end: _fmt(end), notify: notify);
+    setState(() { events.removeWhere((x) => x.id == id); events.add(e); });
+    await _save();
+    if (notify) {
+      try {
+        await NotificationService.schedule(id: _notificationId(id), date: DateTime(selected.year, selected.month, selected.day, start.hour, start.minute), title: e.title, body: e.description.isEmpty ? 'Compromisso agendado' : e.description);
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lembrete programado com sucesso.')));
+      } catch (error) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('O compromisso foi salvo, mas o lembrete falhou: $error')));
+      }
+    }
+  }
+
+  TimeOfDay _parse(String s) { final p = s.split(':'); return TimeOfDay(hour: int.tryParse(p[0]) ?? 8, minute: int.tryParse(p.length > 1 ? p[1] : '0') ?? 0); }
+  String _fmt(TimeOfDay t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  Future<void> _delete(AgendaEvent e) async { await NotificationService.cancel(_notificationId(e.id)); setState(() => events.remove(e)); await _save(); }
+  void _changeMonth(int delta) => setState(() => month = DateTime(month.year, month.month + delta));
+
+  @override Widget build(BuildContext context) {
+    final first = DateTime(month.year, month.month, 1); final offset = first.weekday - 1; final days = DateTime(month.year, month.month + 1, 0).day;
+    final cells = List.generate(offset + days, (i) => i < offset ? null : DateTime(month.year, month.month, i - offset + 1));
+    return SafeArea(child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 28), children: [
+      Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Agenda', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)), Text('${events.length} compromisso(s) salvo(s)')])), IconButton(onPressed: _testNotification, icon: const Icon(Icons.notifications_active_outlined), tooltip: 'Testar notificações'), IconButton(onPressed: () => _edit(), icon: const Icon(Icons.add_circle_outline), tooltip: 'Novo compromisso')]),
+      const SizedBox(height: 14),
+      AppCard(child: Column(children: [Row(children: [IconButton(onPressed: () => _changeMonth(-1), icon: const Icon(Icons.chevron_left)), Expanded(child: Text(DateFormat('MMMM yyyy', 'pt_BR').format(month), textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))), IconButton(onPressed: () => _changeMonth(1), icon: const Icon(Icons.chevron_right))]), const SizedBox(height: 8), Row(children: ['S','T','Q','Q','S','S','D'].map((d) => Expanded(child: Center(child: Text(d, style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))))).toList()), const SizedBox(height: 8), GridView.builder(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: cells.length, gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, mainAxisExtent: 48), itemBuilder: (c, i) { final d = cells[i]; if (d == null) return const SizedBox(); final selectedDay = key(d) == selectedKey; return InkWell(borderRadius: BorderRadius.circular(14), onTap: () => setState(() => selected = d), child: Container(margin: const EdgeInsets.all(3), decoration: BoxDecoration(color: selectedDay ? Theme.of(context).colorScheme.primaryContainer : null, borderRadius: BorderRadius.circular(14)), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text('${d.day}', style: TextStyle(fontWeight: selectedDay ? FontWeight.bold : FontWeight.normal)), if (hasEvent(d)) Container(width: 5, height: 5, margin: const EdgeInsets.only(top: 3), decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, shape: BoxShape.circle))]))); })])),
+      const SizedBox(height: 14),
+      Row(children: [Expanded(child: Text(DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(selected), style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))), FilledButton.icon(onPressed: () => _edit(), icon: const Icon(Icons.add, size: 18), label: const Text('Adicionar'))]),
+      const SizedBox(height: 8),
+      if (dayEvents.isEmpty) AppCard(child: Column(children: [Icon(Icons.event_available_outlined, size: 40, color: Theme.of(context).colorScheme.primary), const SizedBox(height: 8), const Text('Dia livre', style: TextStyle(fontWeight: FontWeight.bold)), const SizedBox(height: 4), const Text('Nenhum compromisso cadastrado para esta data.')])),
+      ...dayEvents.map((e) => AppCard(child: ListTile(contentPadding: EdgeInsets.zero, leading: CircleAvatar(child: Text(e.start.substring(0, 2))), title: Text(e.title, style: const TextStyle(fontWeight: FontWeight.w600)), subtitle: Text('${e.start}–${e.end}${e.description.isEmpty ? '' : '\n${e.description}'}${e.notify ? '\n🔔 Lembrete ativado' : ''}'), isThreeLine: e.description.isNotEmpty || e.notify, trailing: PopupMenuButton<String>(onSelected: (v) { if (v == 'edit') _edit(existing: e); if (v == 'delete') _delete(e); }, itemBuilder: (_) => const [PopupMenuItem(value: 'edit', child: Text('Editar')), PopupMenuItem(value: 'delete', child: Text('Excluir'))])))),
+    ]));
+  }
 }
