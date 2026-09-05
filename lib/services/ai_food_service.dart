@@ -28,11 +28,7 @@ class AiFoodService {
 
   Future<FoodResult> estimateText(String text) async {
     if (endpoint == null || endpoint!.isEmpty) return _localEstimate(text);
-    final r = await http.post(
-      Uri.parse(endpoint!),
-      headers: {'Content-Type': 'application/json', if (apiKey?.isNotEmpty == true) 'Authorization': 'Bearer $apiKey'},
-      body: jsonEncode({'text': text}),
-    );
+    final r = await http.post(Uri.parse(endpoint!), headers: {'Content-Type': 'application/json', if (apiKey?.isNotEmpty == true) 'Authorization': 'Bearer $apiKey'}, body: jsonEncode({'text': text}));
     if (r.statusCode < 200 || r.statusCode >= 300) throw Exception('Falha na análise nutricional.');
     return _fromJson(Map<String, dynamic>.from(jsonDecode(r.body) as Map));
   }
@@ -52,81 +48,76 @@ class AiFoodService {
 
   FoodResult _fromJson(Map<String, dynamic> json) {
     final raw = (json['items'] as List?) ?? const [];
-    return FoodResult(
-      items: raw.map((x) {
-        final i = Map<String, dynamic>.from(x as Map);
-        return FoodItem(
-          name: (i['name'] ?? 'Alimento').toString(),
-          grams: (i['grams'] as num?)?.toDouble() ?? 0,
-          calories: (i['calories'] as num?)?.toDouble() ?? 0,
-          protein: (i['protein'] as num?)?.toDouble() ?? 0,
-          carbs: (i['carbs'] as num?)?.toDouble() ?? 0,
-          fat: (i['fat'] as num?)?.toDouble() ?? 0,
-        );
-      }).toList(),
-      note: (json['note'] as String?) ?? 'Estimativa nutricional.',
-    );
+    return FoodResult(items: raw.map((x) {
+      final i = Map<String, dynamic>.from(x as Map);
+      return FoodItem(name: (i['name'] ?? 'Alimento').toString(), grams: (i['grams'] as num?)?.toDouble() ?? 0, calories: (i['calories'] as num?)?.toDouble() ?? 0, protein: (i['protein'] as num?)?.toDouble() ?? 0, carbs: (i['carbs'] as num?)?.toDouble() ?? 0, fat: (i['fat'] as num?)?.toDouble() ?? 0);
+    }).toList(), note: (json['note'] as String?) ?? 'Estimativa nutricional.');
   }
 
   FoodResult _localEstimate(String text) {
     final input = text.toLowerCase().replaceAll(',', '.');
-    final items = <FoodItem>[];
     final specs = <String, List<double>>{
-      'arroz': [130, 2.7, 28, 0.3],
-      'feijão': [76, 4.8, 13.6, 0.5],
-      'feijao': [76, 4.8, 13.6, 0.5],
-      'frango': [165, 31, 0, 3.6],
-      'ovo': [143, 13, 1.1, 9.5],
-      'carne': [217, 26, 0, 11],
-      'macarrão': [157, 5.8, 30.5, 0.9],
-      'macarrao': [157, 5.8, 30.5, 0.9],
-      'batata': [77, 2, 17.5, 0.1],
-      'leite': [61, 3.2, 4.8, 3.3],
+      'arroz': [130, 2.7, 28, 0.3], 'feijão': [76, 4.8, 13.6, 0.5], 'feijao': [76, 4.8, 13.6, 0.5],
+      'frango': [165, 31, 0, 3.6], 'ovo': [143, 13, 1.1, 9.5], 'carne': [217, 26, 0, 11],
+      'carne moída': [215, 26, 0, 12], 'carne moida': [215, 26, 0, 12], 'macarrão': [157, 5.8, 30.5, 0.9], 'macarrao': [157, 5.8, 30.5, 0.9],
+      'batata': [77, 2, 17.5, 0.1], 'batata doce': [86, 1.6, 20.1, 0.1], 'batata doce': [86, 1.6, 20.1, 0.1],
+      'mandioca': [125, 0.6, 30, 0.3], 'tapioca': [240, 0.2, 59, 0.2], 'pão': [265, 9, 49, 3.2], 'pao': [265, 9, 49, 3.2],
+      'queijo': [350, 22, 3, 28], 'queijo prato': [360, 22, 2, 29], 'presunto': [145, 16, 2, 8], 'hamburguer': [250, 15, 5, 18],
+      'leite': [61, 3.2, 4.8, 3.3], 'iogurte': [63, 3.5, 5, 3], 'aveia': [394, 16.9, 66.3, 8.6],
+      'banana': [89, 1.1, 22.8, 0.3], 'maçã': [52, 0.3, 13.8, 0.2], 'maca': [52, 0.3, 13.8, 0.2], 'laranja': [47, 0.9, 11.8, 0.1],
+      'mamão': [43, 0.5, 10.8, 0.3], 'mamao': [43, 0.5, 10.8, 0.3], 'morango': [32, 0.7, 7.7, 0.3], 'abacate': [160, 2, 8.5, 14.7],
+      'tomate': [18, 0.9, 3.9, 0.2], 'alface': [15, 1.4, 2.9, 0.2], 'cenoura': [41, 0.9, 9.6, 0.2], 'brócolis': [34, 2.8, 6.6, 0.4], 'brocolis': [34, 2.8, 6.6, 0.4],
+      'milho': [96, 3.4, 21, 1.5], 'ervilha': [81, 5.4, 14.5, 0.4], 'lentilha': [116, 9, 20, 0.4], 'grão de bico': [164, 8.9, 27.4, 2.6], 'grao de bico': [164, 8.9, 27.4, 2.6],
+      'atum': [132, 29, 0, 1], 'sardinha': [208, 25, 0, 11], 'salmão': [208, 20, 0, 13], 'salmao': [208, 20, 0, 13], 'peixe': [128, 26, 0, 2.7],
+      'camarão': [99, 24, 0.2, 0.3], 'camarao': [99, 24, 0.2, 0.3], 'carne suína': [242, 27, 0, 14], 'carne suina': [242, 27, 0, 14],
+      'azeite': [884, 0, 0, 100], 'manteiga': [717, 0.9, 0.1, 81], 'requeijão': [257, 9.6, 2.6, 23], 'requeijao': [257, 9.6, 2.6, 23],
+      'chocolate': [535, 7.8, 59, 30], 'biscoito': [480, 6, 68, 20], 'pizza': [266, 11, 33, 10], 'lasanha': [135, 7, 13, 6],
+      'açúcar': [387, 0, 100, 0], 'acucar': [387, 0, 100, 0], 'mel': [304, 0.3, 82.4, 0], 'suco': [45, 0.5, 10, 0.1], 'refrigerante': [42, 0, 10.6, 0],
     };
 
-    double amountFor(String food, double fallback) {
-      final unit = r'(kg|g|gramas?|ml|l)';
-      final number = r'(\d+(?:\.\d+)?)';
-      final patterns = <RegExp>[
-        RegExp('$number\\s*$unit\\s*(?:de\\s*)?${RegExp.escape(food)}'),
-        RegExp('${RegExp.escape(food)}\\s*(?:de\\s*)?$number\\s*$unit'),
-      ];
-      for (final pattern in patterns) {
-        final match = pattern.firstMatch(input);
-        if (match == null) continue;
-        final rawNumber = match.group(1);
-        final rawUnit = match.group(2)?.toLowerCase();
-        final value = double.tryParse(rawNumber ?? '') ?? fallback;
-        if (rawUnit == 'kg' || rawUnit == 'l') return value * 1000;
-        return value;
+    final aliases = <String, List<String>>{
+      'arroz': ['arroz'], 'feijão': ['feijão', 'feijao'], 'frango': ['frango', 'peito de frango'], 'ovo': ['ovo', 'ovos'],
+      'carne moída': ['carne moída', 'carne moida'], 'carne': ['carne bovina', 'carne'], 'macarrão': ['macarrão', 'macarrao'],
+      'batata doce': ['batata doce', 'batata-doce'], 'batata': ['batata'], 'mandioca': ['mandioca', 'aipim', 'macaxeira'], 'tapioca': ['tapioca'],
+      'pão': ['pão', 'pao'], 'queijo prato': ['queijo prato'], 'queijo': ['queijo'], 'presunto': ['presunto'], 'hamburguer': ['hambúrguer', 'hamburguer'],
+      'leite': ['leite'], 'iogurte': ['iogurte'], 'aveia': ['aveia'], 'banana': ['banana'], 'maçã': ['maçã', 'maca'], 'laranja': ['laranja'],
+      'mamão': ['mamão', 'mamao'], 'morango': ['morango'], 'abacate': ['abacate'], 'tomate': ['tomate'], 'alface': ['alface'], 'cenoura': ['cenoura'],
+      'brócolis': ['brócolis', 'brocolis'], 'milho': ['milho'], 'ervilha': ['ervilha'], 'lentilha': ['lentilha'], 'grão de bico': ['grão de bico', 'grao de bico'],
+      'atum': ['atum'], 'sardinha': ['sardinha'], 'salmão': ['salmão', 'salmao'], 'peixe': ['peixe'], 'camarão': ['camarão', 'camarao'],
+      'carne suína': ['carne suína', 'carne suina'], 'azeite': ['azeite'], 'manteiga': ['manteiga'], 'requeijão': ['requeijão', 'requeijao'],
+      'chocolate': ['chocolate'], 'biscoito': ['biscoito', 'bolacha'], 'pizza': ['pizza'], 'lasanha': ['lasanha'], 'açúcar': ['açúcar', 'acucar'], 'mel': ['mel'],
+      'suco': ['suco'], 'refrigerante': ['refrigerante'],
+    };
+
+    double amountFor(List<String> words, double fallback, {double unitGrams = 100}) {
+      for (final word in words) {
+        final escaped = RegExp.escape(word);
+        final match = RegExp(r'(\d+(?:\.\d+)?)\s*(kg|g|gramas?|ml|l|unidades?|un|x)?\s*(?:de\s*)?' + escaped).firstMatch(input) ?? RegExp(escaped + r'\s*(?:de\s*)?(\d+(?:\.\d+)?)\s*(kg|g|gramas?|ml|l|unidades?|un|x)?').firstMatch(input);
+        if (match != null) {
+          final numberText = match.group(1) ?? match.group(2);
+          final unit = (match.group(2) ?? '').toLowerCase();
+          final value = double.tryParse(numberText ?? '') ?? fallback;
+          if (unit == 'kg' || unit == 'l') return value * 1000;
+          if (unit == 'un' || unit.startsWith('unidade') || unit == 'x') return value * unitGrams;
+          return value;
+        }
       }
       return fallback;
     }
 
-    void addFood(String key, String label, double fallback) {
-      final base = specs[key]!;
-      final grams = amountFor(key, fallback);
+    final items = <FoodItem>[];
+    final orderedKeys = aliases.keys.toList()..sort((a, b) => b.length.compareTo(a.length));
+    for (final key in orderedKeys) {
+      final words = aliases[key]!;
+      if (!words.any(input.contains)) continue;
+      final base = specs[key];
+      if (base == null) continue;
+      final fallback = key == 'ovo' ? 50 : (key == 'pão' ? 50 : key == 'queijo prato' ? 20 : 100);
+      final grams = amountFor(words, fallback, unitGrams: fallback);
       final factor = grams / 100;
-      items.add(FoodItem(
-        name: '$label (${grams.toStringAsFixed(0)}g)',
-        grams: grams,
-        calories: base[0] * factor,
-        protein: base[1] * factor,
-        carbs: base[2] * factor,
-        fat: base[3] * factor,
-      ));
+      items.add(FoodItem(name: '${key[0].toUpperCase()}${key.substring(1)} (${grams.toStringAsFixed(0)}g)', grams: grams, calories: base[0] * factor, protein: base[1] * factor, carbs: base[2] * factor, fat: base[3] * factor));
     }
-
-    if (input.contains('arroz')) addFood('arroz', 'Arroz', 100);
-    if (input.contains('feijão') || input.contains('feijao')) addFood(input.contains('feijão') ? 'feijão' : 'feijao', 'Feijão', 100);
-    if (input.contains('frango')) addFood('frango', 'Frango', 100);
-    if (input.contains('ovo')) addFood('ovo', 'Ovo', 50);
-    if (input.contains('carne')) addFood('carne', 'Carne bovina', 100);
-    if (input.contains('macarrão') || input.contains('macarrao')) addFood(input.contains('macarrão') ? 'macarrão' : 'macarrao', 'Macarrão', 100);
-    if (input.contains('batata')) addFood('batata', 'Batata', 100);
-    if (input.contains('leite')) addFood('leite', 'Leite', 250);
-
     if (items.isEmpty) items.add(FoodItem(name: 'Não identificado', grams: 0, calories: 0, protein: 0, carbs: 0, fat: 0));
-    return FoodResult(items: items, note: 'As quantidades informadas em g/kg são convertidas e os valores são escalados proporcionalmente a 100g. Para líquidos, ml/l são tratados como volume aproximado em gramas. Ex.: 200g de carne gera o dobro dos valores de 100g.');
+    return FoodResult(items: items, note: 'A análise reconhece alimentos comuns, interpreta g/kg/ml/l e unidades e escala os valores proporcionalmente à porção. Os valores são estimativas e devem ser conferidos.');
   }
 }
