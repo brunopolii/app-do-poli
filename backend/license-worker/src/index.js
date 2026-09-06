@@ -7,7 +7,10 @@ const json = (data, status = 200) =>
 const cors = (response) => {
   response.headers.set("access-control-allow-origin", "*");
   response.headers.set("access-control-allow-methods", "GET,POST,OPTIONS");
-  response.headers.set("access-control-allow-headers", "content-type,x-webhook-secret");
+  response.headers.set(
+    "access-control-allow-headers",
+    "content-type,x-kiwify-token,x-webhook-secret,authorization"
+  );
   return response;
 };
 
@@ -20,16 +23,30 @@ function makeKey() {
 }
 
 function normalizeEvent(body) {
-  return String(body?.webhook_event_type || body?.event || body?.type || "").toLowerCase();
+  return String(
+    body?.webhook_event_type || body?.event || body?.type || body?.trigger || ""
+  ).toLowerCase();
+}
+
+function getWebhookToken(request) {
+  return (
+    request.headers.get("x-kiwify-token") ||
+    request.headers.get("x-webhook-secret") ||
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
+    ""
+  ).trim();
 }
 
 async function handleWebhook(request, env) {
-  const configuredSecret = env.KIWIFY_WEBHOOK_SECRET;
+  const configuredSecret = String(env.KIWIFY_WEBHOOK_SECRET || "").trim();
   if (!configuredSecret) return json({ error: "Webhook secret not configured" }, 500);
 
-  const suppliedSecret = request.headers.get("x-webhook-secret") ||
-    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (suppliedSecret !== configuredSecret) return json({ error: "Unauthorized" }, 401);
+  // Kiwify's classic webhook configuration has a Token field. The
+  // integration sends that value as x-kiwify-token.
+  const suppliedSecret = getWebhookToken(request);
+  if (!suppliedSecret || suppliedSecret !== configuredSecret) {
+    return json({ error: "Unauthorized" }, 401);
+  }
 
   let body;
   try {
@@ -40,19 +57,36 @@ async function handleWebhook(request, env) {
 
   const event = normalizeEvent(body);
   const transactionId = String(
-    body?.order_id || body?.transaction_id || body?.purchase_id || body?.id || crypto.randomUUID()
+    body?.order_id ||
+      body?.transaction_id ||
+      body?.purchase_id ||
+      body?.id ||
+      crypto.randomUUID()
   );
-  const email = String(body?.Customer?.email || body?.customer?.email || body?.email || "").trim().toLowerCase();
-  const name = String(body?.Customer?.full_name || body?.customer?.name || body?.name || "").trim();
+  const email = String(
+    body?.Customer?.email || body?.customer?.email || body?.email || ""
+  )
+    .trim()
+    .toLowerCase();
+  const name = String(
+    body?.Customer?.full_name || body?.customer?.name || body?.name || ""
+  ).trim();
 
   if (["compra_aprovada", "purchase_approved", "approved", "order_approved"].includes(event)) {
-    const existing = await env.DB.prepare("SELECT license_key FROM licenses WHERE transaction_id = ?1")
-      .bind(transactionId).first();
+    const existing = await env.DB.prepare(
+      "SELECT license_key FROM licenses WHERE transaction_id = ?1"
+    )
+      .bind(transactionId)
+      .first();
     if (existing) return json({ ok: true, license_key: existing.license_key, existing: true });
 
     let licenseKey = makeKey();
     for (let attempt = 0; attempt < 5; attempt++) {
-      const collision = await env.DB.prepare("SELECT id FROM licenses WHERE license_key = ?1").bind(licenseKey).first();
+      const collision = await env.DB.prepare(
+        "SELECT id FROM licenses WHERE license_key = ?1"
+      )
+        .bind(licenseKey)
+        .first();
       if (!collision) break;
       licenseKey = makeKey();
     }
@@ -60,15 +94,30 @@ async function handleWebhook(request, env) {
     await env.DB.prepare(
       `INSERT INTO licenses (license_key, transaction_id, buyer_email, buyer_name, status, created_at)
        VALUES (?1, ?2, ?3, ?4, 'active', datetime('now'))`
-    ).bind(licenseKey, transactionId, email, name).run();
+    )
+      .bind(licenseKey, transactionId, email, name)
+      .run();
 
     return json({ ok: true, license_key: licenseKey, created: true });
   }
 
-  if (["reembolso", "refund", "chargeback", "chargebacked", "compra_reembolsada"].includes(event)) {
+  if (
+    [
+      "reembolso",
+      "refund",
+      "refunded",
+      "order_refunded",
+      "chargeback",
+      "chargebacked",
+      "order_chargeback",
+      "compra_reembolsada",
+    ].includes(event)
+  ) {
     await env.DB.prepare(
       "UPDATE licenses SET status = 'revoked', revoked_at = datetime('now') WHERE transaction_id = ?1"
-    ).bind(transactionId).run();
+    )
+      .bind(transactionId)
+      .run();
     return json({ ok: true, revoked: true });
   }
 
@@ -77,12 +126,22 @@ async function handleWebhook(request, env) {
 
 async function activate(request, env) {
   let body;
-  try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON" }, 400);
+  }
   const key = String(body?.license_key || "").trim().toUpperCase();
   const installationId = String(body?.installation_id || "").trim();
-  if (!key || !installationId) return json({ error: "license_key and installation_id are required" }, 400);
+  if (!key || !installationId) {
+    return json({ error: "license_key and installation_id are required" }, 400);
+  }
 
-  const license = await env.DB.prepare("SELECT * FROM licenses WHERE license_key = ?1").bind(key).first();
+  const license = await env.DB.prepare(
+    "SELECT * FROM licenses WHERE license_key = ?1"
+  )
+    .bind(key)
+    .first();
   if (!license) return json({ error: "invalid_license" }, 404);
   if (license.status !== "active") return json({ error: "license_revoked" }, 403);
 
@@ -93,7 +152,9 @@ async function activate(request, env) {
   if (!license.installation_id) {
     await env.DB.prepare(
       "UPDATE licenses SET installation_id = ?1, activated_at = datetime('now') WHERE id = ?2"
-    ).bind(installationId, license.id).run();
+    )
+      .bind(installationId, license.id)
+      .run();
   }
 
   return json({ ok: true, activated: true, license_key: key });
