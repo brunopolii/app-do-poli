@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Polirotinas — várias rotinas em um só lugar. Agenda, academia, alimentação e finanças.">
+  <meta name="theme-color" content="#6750A4">
+  <title>Polirotinas — Várias rotinas. Um só lugar.</title>
+  <style>
+    :root { --primary:#6750A4; --primary-dark:#4F378B; --bg:#F7F5FA; --text:#201A24; --muted:#665F6D; --card:#FFFFFF; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
+    .wrap { width:min(1080px,92%); margin:auto; }
+    header { padding:22px 0; background:rgba(247,245,250,.92); position:sticky; top:0; z-index:10; backdrop-filter:blur(12px); border-bottom:1px solid #e7e1eb; }
+    nav { display:flex; align-items:center; justify-content:space-between; gap:20px; }
+    .brand { font-weight:900; font-size:1.35rem; letter-spacing:-.03em; color:var(--primary-dark); }
+    nav a { color:var(--text); text-decoration:none; font-weight:700; }
+    .hero { padding:82px 0 70px; text-align:center; background:radial-gradient(circle at top, #eee8fa 0, var(--bg) 58%); }
+    .badge { display:inline-block; padding:7px 13px; border-radius:999px; background:#ebe4f8; color:var(--primary-dark); font-weight:800; font-size:.9rem; }
+    h1 { font-size:clamp(2.5rem,7vw,5rem); line-height:1.02; letter-spacing:-.06em; margin:20px auto 18px; max-width:850px; }
+    .hero p { max-width:680px; margin:0 auto 30px; color:var(--muted); font-size:1.15rem; }
+    .cta { display:inline-flex; align-items:center; justify-content:center; padding:15px 26px; border-radius:16px; background:var(--primary); color:white; text-decoration:none; font-weight:900; box-shadow:0 10px 28px rgba(103,80,164,.24); }
+    .cta:hover { background:var(--primary-dark); }
+    .price { margin-top:16px; color:var(--muted); font-weight:700; }
+    section { padding:72px 0; }
+    .section-title { text-align:center; max-width:680px; margin:0 auto 34px; }
+    .section-title h2 { font-size:2rem; margin:0 0 8px; letter-spacing:-.03em; }
+    .section-title p { color:var(--muted); margin:0; }
+    .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:18px; }
+    .card { background:var(--card); border:1px solid #e7e1eb; border-radius:22px; padding:25px; box-shadow:0 8px 24px rgba(40,25,55,.05); }
+    .icon { font-size:2rem; margin-bottom:10px; }
+    .card h3 { margin:0 0 7px; }
+    .card p { margin:0; color:var(--muted); font-size:.95rem; }
+    .highlight { background:#201A24; color:white; border-radius:28px; padding:44px; display:grid; grid-template-columns:1.3fr .7fr; gap:30px; align-items:center; }
+    .highlight p { color:#d8d0df; }
+    .highlight .cta { background:white; color:var(--primary-dark); box-shadow:none; }
+    footer { padding:32px 0 45px; color:var(--muted); text-align:center; font-size:.9rem; }
+    @media(max-width:800px){ .grid{grid-template-columns:repeat(2,1fr)} .highlight{grid-template-columns:1fr} nav a{display:none} }
+    @media(max-width:520px){ .grid{grid-template-columns:1fr} .hero{padding:62px 0 55px} .highlight{padding:30px 24px} }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <nav>
+        <div class="brand">POLIROTINAS</div>
+        <a href="#recursos">Recursos</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap">
+        <span class="badge">📱 Organização pessoal</span>
+        <h1>Várias rotinas.<br>Um só lugar.</h1>
+        <p>Organize seus compromissos, treinos, alimentação e finanças em um único aplicativo, com uma interface simples e prática para o dia a dia.</p>
+        <a class="cta" href="#comprar">Quero o Polirotinas</a>
+        <div class="price">Licença vitalícia • Pagamento único</div>
+      </div>
+    </section>
+
+    <section id="recursos">
+      <div class="wrap">
+        <div class="section-title">
+          <h2>Tudo o que você precisa para se organizar</h2>
+          <p>Quatro áreas essenciais reunidas em um aplicativo.</p>
+        </div>
+        <div class="grid">
+          <article class="card"><div class="icon">📅</div><h3>Agenda</h3><p>Organize compromissos, horários e lembretes para não perder o que importa.</p></article>
+          <article class="card"><div class="icon">🏋️</div><h3>Academia</h3><p>Monte seus treinos, registre séries, repetições e cargas e acompanhe sua evolução.</p></article>
+          <article class="card"><div class="icon">🍽️</div><h3>Alimentação</h3><p>Registre refeições e acompanhe calorias e macronutrientes ao longo dos dias.</p></article>
+          <article class="card"><div class="icon">💰</div><h3>Finanças</h3><p>Controle entradas, despesas, categorias, saldo e evolução dos seus gastos.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="highlight" id="comprar">
+          <div>
+            <h2>Comece a organizar sua vida hoje.</h2>
+            <p>Uma compra única para ter acesso ao Polirotinas. Depois da ativação, o aplicativo foi pensado para continuar útil mesmo sem internet.</p>
+          </div>
+          <div style="text-align:center">
+            <!-- O link de checkout da Kiwify será colocado aqui após a criação do produto. -->
+            <a class="cta" href="#" onclick="alert('Checkout em configuração. Em breve!'); return false;">Comprar agora</a>
+            <div style="margin-top:12px;color:#d8d0df;font-weight:800">R$ 19,90 • pagamento único</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">© 2026 Polirotinas. Todos os direitos reservados.</div>
+  </footer>
+</body>
+</html>
