@@ -41,8 +41,6 @@ async function handleWebhook(request, env) {
   const configuredSecret = String(env.KIWIFY_WEBHOOK_SECRET || "").trim();
   if (!configuredSecret) return json({ error: "Webhook secret not configured" }, 500);
 
-  // Kiwify's classic webhook configuration has a Token field. The
-  // integration sends that value as x-kiwify-token.
   const suppliedSecret = getWebhookToken(request);
   if (!suppliedSecret || suppliedSecret !== configuredSecret) {
     return json({ error: "Unauthorized" }, 401);
@@ -165,10 +163,17 @@ export default {
     if (request.method === "OPTIONS") return cors(new Response(null, { status: 204 }));
     const url = new URL(request.url);
     let response;
-    if (url.pathname === "/health") response = json({ ok: true, service: "polirotinas-license" });
-    else if (url.pathname === "/webhook" && request.method === "POST") response = await handleWebhook(request, env);
-    else if (url.pathname === "/activate" && request.method === "POST") response = await activate(request, env);
-    else response = json({ error: "not_found" }, 404);
+    if (url.pathname === "/health") {
+      response = json({ ok: true, service: "polirotinas-license", version: "2" });
+    } else if (url.pathname === "/webhook" && request.method === "POST") {
+      response = await handleWebhook(request, env);
+    } else if (url.pathname === "/activate" && request.method === "POST") {
+      response = await activate(request, env);
+    } else if (url.pathname === "/" || url.pathname === "") {
+      response = json({ ok: true, service: "polirotinas-license", status: "online", endpoints: ["/health", "/webhook", "/activate"] });
+    } else {
+      response = json({ error: "not_found" }, 404);
+    }
     return cors(response);
   },
 };
