@@ -5,4 +5,4 @@ compatibility_date = "2026-09-05"
 [[d1_databases]]
 binding = "DB"
 database_name = "polirotinas-licenses"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "c1818b78-eb16-4956-8e16-8cb117471ccb"
