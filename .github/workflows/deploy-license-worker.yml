@@ -19,7 +19,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Apply D1 schema
-        working-directory: backend/license-worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -28,10 +27,23 @@ jobs:
           command: d1 execute polirotinas-licenses --remote --file=./schema.sql
 
       - name: Deploy Worker
-        working-directory: backend/license-worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: backend/license-worker
           command: deploy
+
+      - name: Smoke test Worker
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4 5; do
+            body=$(curl -fsS --max-time 15 https://polirotinas-license.brunopoli95.workers.dev/health || true)
+            echo "$body"
+            if echo "$body" | grep -q '"service":"polirotinas-license"'; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Worker did not expose the expected health response.'
+          exit 1
