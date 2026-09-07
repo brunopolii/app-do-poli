@@ -12,6 +12,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_SYNC_TEST: "1"
+
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -42,6 +45,7 @@ jobs:
           token=$(echo "$token_json" | jq -r '.access_token // empty')
           test -n "$token"
           printf '%s' "$token" > /tmp/kiwify_token
+          echo 'Kiwify OAuth authentication succeeded.'
 
       - name: Find Polirotinas product
         id: product
@@ -58,7 +62,7 @@ jobs:
           product_id=$(echo "$products" | jq -r '.data[] | select(.name == "Polirotinas") | .id' | head -n1)
           test -n "$product_id"
           echo "product_id=$product_id" >> "$GITHUB_OUTPUT"
-          echo "Polirotinas product found: $product_id"
+          echo 'Polirotinas product found.'
 
       - name: Download recent sales
         env:
@@ -95,46 +99,29 @@ jobs:
           python3 - <<'PY'
           import json, secrets
           from pathlib import Path
-
           alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
           def key():
               raw = ''.join(secrets.choice(alphabet) for _ in range(12))
               return f"POLI-{raw[:4]}-{raw[4:8]}-{raw[8:12]}"
-
           def q(value):
-              if value is None:
-                  return "NULL"
+              if value is None: return "NULL"
               return "'" + str(value).replace("'", "''") + "'"
-
-          statements = []
-          seen = set()
-          source = Path('/tmp/sales.jsonl')
-          for line in source.read_text().splitlines():
-              if not line.strip():
-                  continue
-              sale = json.loads(line)
-              transaction_id = str(sale.get('id') or '').strip()
-              if not transaction_id or transaction_id in seen:
-                  continue
+          statements=[]; seen=set()
+          for line in Path('/tmp/sales.jsonl').read_text().splitlines():
+              if not line.strip(): continue
+              sale=json.loads(line)
+              transaction_id=str(sale.get('id') or '').strip()
+              if not transaction_id or transaction_id in seen: continue
               seen.add(transaction_id)
-              customer = sale.get('customer') or {}
-              email = str(customer.get('email') or '').strip().lower()
-              name = str(customer.get('name') or '').strip()
-              status = str(sale.get('status') or '').lower()
-
-              if status in {'paid', 'approved'}:
-                  license_key = key()
-                  statements.append(
-                      "INSERT INTO licenses (license_key, transaction_id, buyer_email, buyer_name, status, created_at) "
-                      f"VALUES ({q(license_key)}, {q(transaction_id)}, {q(email)}, {q(name)}, 'active', datetime('now')) "
-                      "ON CONFLICT(transaction_id) DO UPDATE SET buyer_email=excluded.buyer_email, buyer_name=excluded.buyer_name, status='active', revoked_at=NULL;"
-                  )
-              elif status in {'refunded', 'chargedback', 'pending_refund', 'refund_requested'}:
-                  statements.append(
-                      f"UPDATE licenses SET status='revoked', revoked_at=datetime('now') WHERE transaction_id={q(transaction_id)};"
-                  )
-
-          Path('/tmp/sync.sql').write_text('\n'.join(statements) + ('\n' if statements else ''))
+              customer=sale.get('customer') or {}
+              email=str(customer.get('email') or '').strip().lower()
+              name=str(customer.get('name') or '').strip()
+              status=str(sale.get('status') or '').lower()
+              if status in {'paid','approved'}:
+                  statements.append("INSERT INTO licenses (license_key, transaction_id, buyer_email, buyer_name, status, created_at) VALUES (%s, %s, %s, %s, 'active', datetime('now')) ON CONFLICT(transaction_id) DO UPDATE SET buyer_email=excluded.buyer_email, buyer_name=excluded.buyer_name, status='active', revoked_at=NULL;" % (q(key()),q(transaction_id),q(email),q(name)))
+              elif status in {'refunded','chargedback','pending_refund','refund_requested'}:
+                  statements.append(f"UPDATE licenses SET status='revoked', revoked_at=datetime('now') WHERE transaction_id={q(transaction_id)};")
+          Path('/tmp/sync.sql').write_text('\n'.join(statements)+('\n' if statements else ''))
           print(f'Generated {len(statements)} D1 statements.')
           PY
 
@@ -149,3 +136,4 @@ jobs:
           else
             echo 'No license changes to apply.'
           fi
+          echo 'Kiwify license synchronization test completed.'
