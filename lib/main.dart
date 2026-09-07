@@ -28,10 +28,16 @@ class AppDoPoli extends StatefulWidget {
 }
 
 class _AppDoPoliState extends State<AppDoPoli> {
-  late bool activated = widget.initiallyActivated;
+  late bool activated;
   int selectedIndex = 2;
   ThemeMode themeMode = ThemeMode.system;
   int homeRefresh = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    activated = widget.initiallyActivated;
+  }
 
   void _finishActivation() {
     setState(() => activated = true);
