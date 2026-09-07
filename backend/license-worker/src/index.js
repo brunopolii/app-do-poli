@@ -1,7 +1,10 @@
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8" },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    },
   });
 
 const cors = (response) => {
@@ -158,19 +161,68 @@ async function activate(request, env) {
   return json({ ok: true, activated: true, license_key: key });
 }
 
+async function claim(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON" }, 400);
+  }
+
+  const email = String(body?.email || "").trim().toLowerCase();
+  const orderId = String(body?.order_id || "").trim();
+  if (!email || !orderId) return json({ error: "email_and_order_id_required" }, 400);
+
+  const license = await env.DB.prepare(
+    "SELECT license_key, status FROM licenses WHERE transaction_id = ?1 AND lower(buyer_email) = ?2"
+  )
+    .bind(orderId, email)
+    .first();
+
+  if (!license) return json({ error: "purchase_not_found" }, 404);
+  if (license.status !== "active") return json({ error: "license_revoked" }, 403);
+
+  return json({ ok: true, license_key: license.license_key });
+}
+
+const claimPage = `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ativar Polirotinas</title>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#f7f5fa;margin:0;min-height:100vh;display:grid;place-items:center;color:#222}
+.card{width:min(92vw,460px);background:#fff;border-radius:24px;padding:28px;box-shadow:0 12px 40px #0001;box-sizing:border-box}
+h1{margin:0 0 8px}p{color:#666;line-height:1.5}label{display:block;margin:16px 0 6px;font-weight:600}input{width:100%;box-sizing:border-box;padding:14px;border:1px solid #ddd;border-radius:12px;font-size:16px}button{width:100%;margin-top:20px;padding:14px;border:0;border-radius:12px;background:#6750a4;color:white;font-size:16px;font-weight:700;cursor:pointer}.key{margin-top:20px;padding:18px;border-radius:14px;background:#f0ecf8;text-align:center;font-size:20px;font-weight:800;letter-spacing:1px;word-break:break-word}.error{color:#b3261e;margin-top:14px}.small{font-size:13px;color:#777}
+</style></head>
+<body><main class="card"><h1>Chave do Polirotinas</h1><p>Informe o e-mail usado na compra e o ID do pedido para consultar sua chave de ativação.</p>
+<label for="email">E-mail da compra</label><input id="email" type="email" autocomplete="email" placeholder="seu@email.com">
+<label for="order">ID do pedido</label><input id="order" autocomplete="off" placeholder="Ex.: 123456789">
+<button id="btn" onclick="claim()">Mostrar minha chave</button><div id="result"></div>
+<p class="small">A chave é vinculada ao primeiro aparelho em que for ativada.</p></main>
+<script>
+async function claim(){const btn=document.getElementById('btn'),result=document.getElementById('result');btn.disabled=true;result.textContent='Consultando...';try{const r=await fetch('/claim',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:document.getElementById('email').value,order_id:document.getElementById('order').value})});const d=await r.json();if(!r.ok)throw new Error(d.error==='purchase_not_found'?'Compra não encontrada. Confira o e-mail e o ID do pedido.':d.error||'Não foi possível consultar a compra.');result.innerHTML='<div class="key">'+d.license_key+'</div>';}catch(e){result.innerHTML='<div class="error">'+e.message+'</div>';}finally{btn.disabled=false;}}
+</script></body></html>`;
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return cors(new Response(null, { status: 204 }));
     const url = new URL(request.url);
     let response;
     if (url.pathname === "/health") {
-      response = json({ ok: true, service: "polirotinas-license", version: "2" });
+      response = json({ ok: true, service: "polirotinas-license", version: "3" });
     } else if (url.pathname === "/webhook" && request.method === "POST") {
       response = await handleWebhook(request, env);
     } else if (url.pathname === "/activate" && request.method === "POST") {
       response = await activate(request, env);
+    } else if (url.pathname === "/claim" && request.method === "GET") {
+      response = new Response(claimPage, {
+        headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+      });
+    } else if (url.pathname === "/claim" && request.method === "POST") {
+      response = await claim(request, env);
     } else if (url.pathname === "/" || url.pathname === "") {
-      response = json({ ok: true, service: "polirotinas-license", status: "online", endpoints: ["/health", "/webhook", "/activate"] });
+      response = json({ ok: true, service: "polirotinas-license", status: "online", endpoints: ["/health", "/webhook", "/activate", "/claim"] });
     } else {
       response = json({ error: "not_found" }, 404);
     }
