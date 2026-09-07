@@ -24,7 +24,6 @@ jobs:
         run: npm install --global wrangler@latest
 
       - name: Authenticate with Kiwify
-        id: auth
         env:
           KIWIFY_CLIENT_ID: ${{ secrets.KIWIFY_CLIENT_ID }}
           KIWIFY_CLIENT_SECRET: ${{ secrets.KIWIFY_CLIENT_SECRET }}
@@ -38,7 +37,6 @@ jobs:
             --data-urlencode "client_secret=$KIWIFY_CLIENT_SECRET")
           token=$(echo "$token_json" | jq -r '.access_token // empty')
           test -n "$token"
-          echo 'token_available=true' >> "$GITHUB_OUTPUT"
           printf '%s' "$token" > /tmp/kiwify_token
 
       - name: Find Polirotinas product
@@ -137,7 +135,6 @@ jobs:
           PY
 
       - name: Apply licenses to D1
-        if: ${{ hashFiles('/tmp/sync.sql') != '' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
