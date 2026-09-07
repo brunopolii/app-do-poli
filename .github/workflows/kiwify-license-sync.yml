@@ -1,0 +1,150 @@
+name: Sync Kiwify licenses
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Wrangler
+        run: npm install --global wrangler@latest
+
+      - name: Authenticate with Kiwify
+        id: auth
+        env:
+          KIWIFY_CLIENT_ID: ${{ secrets.KIWIFY_CLIENT_ID }}
+          KIWIFY_CLIENT_SECRET: ${{ secrets.KIWIFY_CLIENT_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          token_json=$(curl -fsS --max-time 30 \
+            -X POST 'https://public-api.kiwify.com/v1/oauth/token' \
+            -H 'Content-Type: application/x-www-form-urlencoded' \
+            --data-urlencode "client_id=$KIWIFY_CLIENT_ID" \
+            --data-urlencode "client_secret=$KIWIFY_CLIENT_SECRET")
+          token=$(echo "$token_json" | jq -r '.access_token // empty')
+          test -n "$token"
+          echo 'token_available=true' >> "$GITHUB_OUTPUT"
+          printf '%s' "$token" > /tmp/kiwify_token
+
+      - name: Find Polirotinas product
+        id: product
+        env:
+          KIWIFY_ACCOUNT_ID: ${{ secrets.KIWIFY_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          token=$(cat /tmp/kiwify_token)
+          products=$(curl -fsS --max-time 30 \
+            -H "Authorization: Bearer $token" \
+            -H "x-kiwify-account-id: $KIWIFY_ACCOUNT_ID" \
+            'https://public-api.kiwify.com/v1/products?page_size=100&page_number=1')
+          product_id=$(echo "$products" | jq -r '.data[] | select(.name == "Polirotinas") | .id' | head -n1)
+          test -n "$product_id"
+          echo "product_id=$product_id" >> "$GITHUB_OUTPUT"
+          echo "Polirotinas product found: $product_id"
+
+      - name: Download recent sales
+        env:
+          KIWIFY_ACCOUNT_ID: ${{ secrets.KIWIFY_ACCOUNT_ID }}
+          PRODUCT_ID: ${{ steps.product.outputs.product_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          token=$(cat /tmp/kiwify_token)
+          start_date=$(date -u -d '90 days ago' +%Y-%m-%d)
+          end_date=$(date -u +%Y-%m-%d)
+          : > /tmp/sales.jsonl
+          for page in $(seq 1 10); do
+            response=$(curl -fsS --max-time 30 \
+              -G 'https://public-api.kiwify.com/v1/sales' \
+              -H "Authorization: Bearer $token" \
+              -H "x-kiwify-account-id: $KIWIFY_ACCOUNT_ID" \
+              --data-urlencode "start_date=$start_date" \
+              --data-urlencode "end_date=$end_date" \
+              --data-urlencode "product_id=$PRODUCT_ID" \
+              --data-urlencode 'page_size=100' \
+              --data-urlencode "page_number=$page" \
+              --data-urlencode 'view_full_sale_details=true')
+            count=$(echo "$response" | jq '.data | length')
+            echo "$response" | jq -c '.data[]' >> /tmp/sales.jsonl
+            if [ "$count" -lt 100 ]; then break; fi
+          done
+          echo "Downloaded $(wc -l < /tmp/sales.jsonl) Polirotinas sales records."
+
+      - name: Build D1 synchronization SQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, secrets
+          from pathlib import Path
+
+          alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+          def key():
+              raw = ''.join(secrets.choice(alphabet) for _ in range(12))
+              return f"POLI-{raw[:4]}-{raw[4:8]}-{raw[8:12]}"
+
+          def q(value):
+              if value is None:
+                  return "NULL"
+              return "'" + str(value).replace("'", "''") + "'"
+
+          statements = []
+          seen = set()
+          source = Path('/tmp/sales.jsonl')
+          for line in source.read_text().splitlines():
+              if not line.strip():
+                  continue
+              sale = json.loads(line)
+              transaction_id = str(sale.get('id') or '').strip()
+              if not transaction_id or transaction_id in seen:
+                  continue
+              seen.add(transaction_id)
+              customer = sale.get('customer') or {}
+              email = str(customer.get('email') or '').strip().lower()
+              name = str(customer.get('name') or '').strip()
+              status = str(sale.get('status') or '').lower()
+
+              if status in {'paid', 'approved'}:
+                  license_key = key()
+                  statements.append(
+                      "INSERT INTO licenses (license_key, transaction_id, buyer_email, buyer_name, status, created_at) "
+                      f"VALUES ({q(license_key)}, {q(transaction_id)}, {q(email)}, {q(name)}, 'active', datetime('now')) "
+                      "ON CONFLICT(transaction_id) DO UPDATE SET buyer_email=excluded.buyer_email, buyer_name=excluded.buyer_name, status='active', revoked_at=NULL;"
+                  )
+              elif status in {'refunded', 'chargedback', 'pending_refund', 'refund_requested'}:
+                  statements.append(
+                      f"UPDATE licenses SET status='revoked', revoked_at=datetime('now') WHERE transaction_id={q(transaction_id)};"
+                  )
+
+          Path('/tmp/sync.sql').write_text('\n'.join(statements) + ('\n' if statements else ''))
+          print(f'Generated {len(statements)} D1 statements.')
+          PY
+
+      - name: Apply licenses to D1
+        if: ${{ hashFiles('/tmp/sync.sql') != '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: backend/license-worker
+        run: |
+          if [ -s /tmp/sync.sql ]; then
+            wrangler d1 execute polirotinas-licenses --remote --file=/tmp/sync.sql
+          else
+            echo 'No license changes to apply.'
+          fi
