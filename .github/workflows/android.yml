@@ -41,9 +41,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-${{ github.run_number }}
-          name: App do Poli APK ${{ github.run_number }}
+          name: Polirotinas APK ${{ github.run_number }}
           body: |
-            APK pronto para instalar no Android.
+            APK do Polirotinas pronto para instalar no Android.
             Baixe o arquivo app-release.apk abaixo e instale no celular.
           files: build/app/outputs/flutter-apk/app-release.apk
           make_latest: true
