@@ -28,7 +28,39 @@ function makeKey() {
 function normalizeEvent(body) {
   return String(
     body?.webhook_event_type || body?.event || body?.type || body?.trigger || ""
-  ).toLowerCase();
+  )
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeStatus(body) {
+  return String(body?.order_status || body?.status || "")
+    .trim()
+    .toLowerCase();
+}
+
+function isApprovedEvent(event, status) {
+  return (
+    ["compra_aprovada", "purchase_approved", "approved", "order_approved"].includes(event) ||
+    (event === "" && status === "paid") ||
+    status === "paid"
+  );
+}
+
+function isRevokedEvent(event, status) {
+  return (
+    [
+      "reembolso",
+      "refund",
+      "refunded",
+      "order_refunded",
+      "chargeback",
+      "chargebacked",
+      "order_chargeback",
+      "compra_reembolsada",
+    ].includes(event) ||
+    ["refunded", "chargeback", "charged_back", "cancelled", "canceled"].includes(status)
+  );
 }
 
 function getWebhookToken(request) {
@@ -57,13 +89,14 @@ async function handleWebhook(request, env) {
   }
 
   const event = normalizeEvent(body);
+  const status = normalizeStatus(body);
   const transactionId = String(
     body?.order_id ||
       body?.transaction_id ||
       body?.purchase_id ||
       body?.id ||
       crypto.randomUUID()
-  );
+  ).trim();
   const email = String(
     body?.Customer?.email || body?.customer?.email || body?.email || ""
   )
@@ -73,13 +106,27 @@ async function handleWebhook(request, env) {
     body?.Customer?.full_name || body?.customer?.name || body?.name || ""
   ).trim();
 
-  if (["compra_aprovada", "purchase_approved", "approved", "order_approved"].includes(event)) {
+  // Kiwify's documented payload uses webhook_event_type=order_approved and
+  // order_status=paid for approved sales. We accept both so the integration
+  // remains resilient if one of those fields is omitted by a test/event.
+  if (isRevokedEvent(event, status)) {
+    await env.DB.prepare(
+      "UPDATE licenses SET status = 'revoked', revoked_at = datetime('now') WHERE transaction_id = ?1"
+    )
+      .bind(transactionId)
+      .run();
+    return json({ ok: true, revoked: true });
+  }
+
+  if (isApprovedEvent(event, status)) {
     const existing = await env.DB.prepare(
       "SELECT license_key FROM licenses WHERE transaction_id = ?1"
     )
       .bind(transactionId)
       .first();
-    if (existing) return json({ ok: true, license_key: existing.license_key, existing: true });
+    if (existing) {
+      return json({ ok: true, license_key: existing.license_key, existing: true });
+    }
 
     let licenseKey = makeKey();
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -102,27 +149,7 @@ async function handleWebhook(request, env) {
     return json({ ok: true, license_key: licenseKey, created: true });
   }
 
-  if (
-    [
-      "reembolso",
-      "refund",
-      "refunded",
-      "order_refunded",
-      "chargeback",
-      "chargebacked",
-      "order_chargeback",
-      "compra_reembolsada",
-    ].includes(event)
-  ) {
-    await env.DB.prepare(
-      "UPDATE licenses SET status = 'revoked', revoked_at = datetime('now') WHERE transaction_id = ?1"
-    )
-      .bind(transactionId)
-      .run();
-    return json({ ok: true, revoked: true });
-  }
-
-  return json({ ok: true, ignored: true, event });
+  return json({ ok: true, ignored: true, event, status });
 }
 
 async function activate(request, env) {
@@ -210,7 +237,7 @@ export default {
     const url = new URL(request.url);
     let response;
     if (url.pathname === "/health") {
-      response = json({ ok: true, service: "polirotinas-license", version: "3" });
+      response = json({ ok: true, service: "polirotinas-license", version: "4" });
     } else if (url.pathname === "/webhook" && request.method === "POST") {
       response = await handleWebhook(request, env);
     } else if (url.pathname === "/activate" && request.method === "POST") {
