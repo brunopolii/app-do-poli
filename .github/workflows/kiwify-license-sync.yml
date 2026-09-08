@@ -134,14 +134,9 @@ jobs:
         run: |
           set -euo pipefail
           TEST_TRANSACTION_ID='POLIROTINAS-INTERNAL-TEST'
-          existing=$(wrangler d1 execute polirotinas-licenses --remote --command "SELECT license_key FROM licenses WHERE transaction_id='$TEST_TRANSACTION_ID' LIMIT 1" --json | jq -r '.[0].results[0].license_key // empty')
-          if [ -n "$existing" ]; then
-            echo 'Internal test license already exists.'
-            exit 0
-          fi
           TEST_LICENSE_KEY="POLI-TEST-$(openssl rand -hex 4 | tr '[:lower:]' '[:upper:]')-$(openssl rand -hex 4 | tr '[:lower:]' '[:upper:]')"
-          wrangler d1 execute polirotinas-licenses --remote --command "INSERT INTO licenses (license_key, transaction_id, buyer_email, buyer_name, status, created_at) VALUES ('$TEST_LICENSE_KEY','$TEST_TRANSACTION_ID','teste@polirotinas.local','Teste Polirotinas','active',datetime('now'));"
-          echo 'Internal test license created.'
+          wrangler d1 execute polirotinas-licenses --remote --command "INSERT INTO licenses (license_key, transaction_id, buyer_email, buyer_name, status, created_at) VALUES ('$TEST_LICENSE_KEY','$TEST_TRANSACTION_ID','teste@polirotinas.local','Teste Polirotinas','active',datetime('now')) ON CONFLICT(transaction_id) DO NOTHING;"
+          echo 'Internal test license verified.'
 
       - name: Apply licenses to D1
         env:
