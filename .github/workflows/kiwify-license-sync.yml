@@ -134,12 +134,12 @@ jobs:
         run: |
           set -euo pipefail
           TEST_TRANSACTION_ID='POLIROTINAS-INTERNAL-TEST'
-          TEST_LICENSE_KEY='POLI-TEST-2026-0001'
           existing=$(wrangler d1 execute polirotinas-licenses --remote --command "SELECT license_key FROM licenses WHERE transaction_id='$TEST_TRANSACTION_ID' LIMIT 1" --json | jq -r '.[0].results[0].license_key // empty')
           if [ -n "$existing" ]; then
             echo "TEST_LICENSE_KEY=$existing"
             exit 0
           fi
+          TEST_LICENSE_KEY="POLI-TEST-$(openssl rand -hex 4 | tr '[:lower:]' '[:upper:]')-$(openssl rand -hex 4 | tr '[:lower:]' '[:upper:]')"
           wrangler d1 execute polirotinas-licenses --remote --command "INSERT INTO licenses (license_key, transaction_id, buyer_email, buyer_name, status, created_at) VALUES ('$TEST_LICENSE_KEY','$TEST_TRANSACTION_ID','teste@polirotinas.local','Teste Polirotinas','active',datetime('now'));"
           echo "TEST_LICENSE_KEY=$TEST_LICENSE_KEY"
 
@@ -149,9 +149,23 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         working-directory: backend/license-worker
         run: |
+          set -euo pipefail
           if [ -s /tmp/sync.sql ]; then
             wrangler d1 execute polirotinas-licenses --remote --file=/tmp/sync.sql
           else
             echo 'No license changes to apply.'
           fi
-          echo 'Kiwify license synchronization test completed.'
+
+      - name: Verify D1 population
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: backend/license-worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          result=$(wrangler d1 execute polirotinas-licenses --remote --command "SELECT COUNT(*) AS total, SUM(CASE WHEN status='active' THEN 1 ELSE 0 END) AS active FROM licenses" --json)
+          echo "$result" | jq -r '.[0].results[0] | "D1 licenses total=\(.total) active=\(.active // 0)"'
+          total=$(echo "$result" | jq -r '.[0].results[0].total // 0')
+          test "$total" -gt 0
+          echo 'D1 verification passed.'
