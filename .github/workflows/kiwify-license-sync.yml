@@ -125,6 +125,24 @@ jobs:
           print(f'Generated {len(statements)} D1 statements.')
           PY
 
+      - name: Generate test license
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: backend/license-worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          TEST_TRANSACTION_ID='POLIROTINAS-INTERNAL-TEST'
+          existing=$(wrangler d1 execute polirotinas-licenses --remote --command "SELECT license_key FROM licenses WHERE transaction_id='$TEST_TRANSACTION_ID' LIMIT 1" --json | jq -r '.[0].results[0].license_key // empty')
+          if [ -n "$existing" ]; then
+            echo "TEST_LICENSE_KEY=$existing"
+            exit 0
+          fi
+          key="POLI-TEST-$(openssl rand -hex 4 | tr '[:lower:]' '[:upper:]')-$(openssl rand -hex 4 | tr '[:lower:]' '[:upper:]')"
+          wrangler d1 execute polirotinas-licenses --remote --command "INSERT INTO licenses (license_key, transaction_id, buyer_email, buyer_name, status, created_at) VALUES ('$key','$TEST_TRANSACTION_ID','teste@polirotinas.local','Teste Polirotinas','active',datetime('now'));"
+          echo "TEST_LICENSE_KEY=$key"
+
       - name: Apply licenses to D1
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
