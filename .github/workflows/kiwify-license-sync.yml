@@ -125,6 +125,17 @@ jobs:
           print(f'Generated {len(statements)} D1 statements.')
           PY
 
+      - name: Ensure D1 schema
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: backend/license-worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          wrangler d1 execute polirotinas-licenses --remote --file=schema.sql
+          echo 'D1 schema is ready.'
+
       - name: Generate test license
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
