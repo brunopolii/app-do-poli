@@ -1,0 +1,37 @@
+name: Create Polirotinas test license
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  create-test-license:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Wrangler
+        run: npm install --global wrangler@latest
+
+      - name: Create test license in D1
+        working-directory: backend/license-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          key="POLI-TEST-$(openssl rand -hex 4 | tr '[:lower:]' '[:upper:]')-$(openssl rand -hex 4 | tr '[:lower:]' '[:upper:]')"
+          transaction="POLIROTINAS-MANUAL-TEST-$(date +%s)"
+          wrangler d1 execute polirotinas-licenses --remote --command "INSERT INTO licenses (license_key, transaction_id, buyer_email, buyer_name, status, created_at) VALUES ('$key','$transaction','teste@polirotinas.local','Teste Polirotinas','active',datetime('now'));"
+          echo "## Chave de teste" >> "$GITHUB_STEP_SUMMARY"
+          echo "**$key**" >> "$GITHUB_STEP_SUMMARY"
+          echo "Test license created successfully."
