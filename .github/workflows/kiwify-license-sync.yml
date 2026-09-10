@@ -145,9 +145,11 @@ jobs:
         run: |
           set -euo pipefail
           TEST_TRANSACTION_ID='POLIROTINAS-INTERNAL-TEST'
-          TEST_LICENSE_KEY="POLI-TEST-$(openssl rand -hex 4 | tr '[:lower:]' '[:upper:]')-$(openssl rand -hex 4 | tr '[:lower:]' '[:upper:]')"
-          wrangler d1 execute polirotinas-licenses --remote --command "INSERT INTO licenses (license_key, transaction_id, buyer_email, buyer_name, status, created_at) VALUES ('$TEST_LICENSE_KEY','$TEST_TRANSACTION_ID','teste@polirotinas.local','Teste Polirotinas','active',datetime('now')) ON CONFLICT(transaction_id) DO NOTHING;"
-          echo 'Internal test license verified.'
+          TEST_LICENSE_KEY='POLI-TEST-APK133-2026'
+          wrangler d1 execute polirotinas-licenses --remote --command "INSERT INTO licenses (license_key, transaction_id, buyer_email, buyer_name, status, created_at) VALUES ('$TEST_LICENSE_KEY','$TEST_TRANSACTION_ID','teste@polirotinas.local','Teste Polirotinas','active',datetime('now')) ON CONFLICT(transaction_id) DO UPDATE SET license_key=excluded.license_key, status='active', revoked_at=NULL;"
+          echo "TEST_LICENSE_KEY=$TEST_LICENSE_KEY"
+          echo "TEST_LICENSE_KEY=$TEST_LICENSE_KEY" >> "$GITHUB_ENV"
+          echo 'Internal test license is active.'
 
       - name: Apply licenses to D1
         env:
@@ -175,3 +177,10 @@ jobs:
           total=$(echo "$result" | jq -r '.[0].results[0].total // 0')
           test "$total" -gt 0
           echo 'D1 verification passed.'
+
+      - name: Show test license for manual activation
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          echo "=========================================="
+          echo "POLIROTINAS TEST LICENSE: $TEST_LICENSE_KEY"
+          echo "=========================================="
