@@ -13,3 +13,13 @@ CREATE TABLE IF NOT EXISTS licenses (
 
 CREATE INDEX IF NOT EXISTS idx_licenses_transaction_id ON licenses(transaction_id);
 CREATE INDEX IF NOT EXISTS idx_licenses_status ON licenses(status);
+
+CREATE TABLE IF NOT EXISTS license_deliveries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  transaction_id TEXT NOT NULL UNIQUE,
+  email TEXT NOT NULL,
+  license_key TEXT NOT NULL,
+  sent_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_license_deliveries_transaction_id ON license_deliveries(transaction_id);
