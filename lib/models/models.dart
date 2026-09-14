@@ -57,6 +57,24 @@ class MoneyTransaction {
   factory MoneyTransaction.fromJson(Map<String,dynamic> j)=>MoneyTransaction(id:j['id'] as String,date:j['date'] as String,description:j['description'] as String,category:(j['category'] as String?)??'Outros',amount:(j['amount'] as num).toDouble(),income:j['income']==true);
 }
 
+/// A repeating income or expense.  It is deliberately kept separate from
+/// [MoneyTransaction] so existing, already recorded movements are never
+/// duplicated when a projection is calculated.
+class RecurringTransaction {
+  String id; String description; String category; double amount; bool income; String startDate; int dayOfMonth;
+  RecurringTransaction({required this.id, required this.description, required this.category, required this.amount, required this.income, required this.startDate, required this.dayOfMonth});
+  Map<String, dynamic> toJson() => {'id': id, 'description': description, 'category': category, 'amount': amount, 'income': income, 'startDate': startDate, 'dayOfMonth': dayOfMonth};
+  factory RecurringTransaction.fromJson(Map<String, dynamic> j) => RecurringTransaction(id: j['id'] as String, description: j['description'] as String, category: (j['category'] as String?) ?? 'Outros', amount: (j['amount'] as num).toDouble(), income: j['income'] == true, startDate: (j['startDate'] as String?) ?? DateTime.now().toIso8601String(), dayOfMonth: ((j['dayOfMonth'] as num?)?.toInt() ?? 1).clamp(1, 31).toInt());
+}
+
+class InstallmentPurchase {
+  String id; String description; String category; double totalAmount; int installments; String firstDate;
+  InstallmentPurchase({required this.id, required this.description, required this.category, required this.totalAmount, required this.installments, required this.firstDate});
+  double get installmentAmount => totalAmount / installments;
+  Map<String, dynamic> toJson() => {'id': id, 'description': description, 'category': category, 'totalAmount': totalAmount, 'installments': installments, 'firstDate': firstDate};
+  factory InstallmentPurchase.fromJson(Map<String, dynamic> j) => InstallmentPurchase(id: j['id'] as String, description: j['description'] as String, category: (j['category'] as String?) ?? 'Compras', totalAmount: (j['totalAmount'] as num).toDouble(), installments: (j['installments'] as num).toInt(), firstDate: j['firstDate'] as String);
+}
+
 class AgendaEvent {
   String id; String date; String title; String description; String start; String end; bool notify;
   AgendaEvent({required this.id,required this.date,required this.title,required this.description,required this.start,required this.end,this.notify=false});
