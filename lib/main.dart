@@ -67,96 +67,104 @@ class _AppDoPoliState extends State<AppDoPoli> {
 
   Widget _globalBackground(Widget child) {
     final settings = themeSettings;
-    final imagePath = settings.imagePath;
     final backgroundColor = Color(settings.backgroundColorValue);
+    final imagePath = settings.imagePath;
 
-    if (imagePath != null) {
-      final file = File(imagePath);
-      if (file.existsSync()) {
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned.fill(child: ColoredBox(color: backgroundColor)),
-            Positioned.fill(
-              child: IgnorePointer(
-                child: Opacity(
-                  opacity: settings.opacity,
-                  child: Transform.translate(
-                    offset: Offset(settings.x * 40, settings.y * 40),
-                    child: Transform.scale(
-                      scale: settings.scale,
-                      child: Image.file(
-                        file,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned.fill(child: child),
-          ],
-        );
-      }
+    if (imagePath == null) {
+      return ColoredBox(color: backgroundColor, child: child);
+    }
+
+    final file = File(imagePath);
+    if (!file.existsSync()) {
+      return ColoredBox(color: backgroundColor, child: child);
     }
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        Positioned.fill(child: ColoredBox(color: backgroundColor)),
-        Positioned.fill(child: child),
+        ColoredBox(color: backgroundColor),
+        IgnorePointer(
+          child: ClipRect(
+            child: Opacity(
+              opacity: settings.opacity,
+              child: Transform.translate(
+                offset: Offset(settings.x * 40, settings.y * 40),
+                child: Transform.scale(
+                  scale: settings.scale,
+                  child: Image.file(
+                    file,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        child,
       ],
+    );
+  }
+
+  ThemeData _buildLightTheme() {
+    const seed = Color(0xFF6750A4);
+    return ThemeData(
+      useMaterial3: true,
+      colorSchemeSeed: seed,
+      scaffoldBackgroundColor: Colors.transparent,
+      appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+          borderSide: BorderSide(width: 2, color: seed),
+        ),
+      ),
+    );
+  }
+
+  ThemeData _buildDarkTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorSchemeSeed: const Color(0xFF9B82DB),
+      scaffoldBackgroundColor: Colors.transparent,
+      appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    const seed = Color(0xFF6750A4);
-
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Polirotinas',
       themeMode: themeMode,
+      theme: _buildLightTheme(),
+      darkTheme: _buildDarkTheme(),
       builder: (context, child) => _globalBackground(
         child ?? const SizedBox.shrink(),
-      ),
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: seed,
-        scaffoldBackgroundColor: Colors.transparent,
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(width: 2, color: seed),
-          ),
-        ),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorSchemeSeed: const Color(0xFF9B82DB),
-        scaffoldBackgroundColor: Colors.transparent,
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-        ),
       ),
       home: activated
           ? Scaffold(
               backgroundColor: Colors.transparent,
+              extendBody: true,
+              extendBodyBehindAppBar: true,
               appBar: AppBar(
-                backgroundColor: Colors.transparent,
                 title: const Text(
                   'Polirotinas',
                   style: TextStyle(fontWeight: FontWeight.bold),
