@@ -65,17 +65,18 @@ class _AppDoPoliState extends State<AppDoPoli> {
     setState(() => themeSettings = result);
   }
 
-  Widget _globalBackground(BuildContext context, Widget child) {
+  Widget _globalBackground(Widget child) {
     final settings = themeSettings;
-    if (settings.imagePath != null) {
-      final file = File(settings.imagePath!);
+    final imagePath = settings.imagePath;
+    final backgroundColor = Color(settings.backgroundColorValue);
+
+    if (imagePath != null) {
+      final file = File(imagePath);
       if (file.existsSync()) {
         return Stack(
           fit: StackFit.expand,
           children: [
-            Positioned.fill(
-              child: ColoredBox(color: settings.backgroundColor),
-            ),
+            Positioned.fill(child: ColoredBox(color: backgroundColor)),
             Positioned.fill(
               child: IgnorePointer(
                 child: Opacity(
@@ -103,7 +104,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Positioned.fill(child: ColoredBox(color: settings.backgroundColor)),
+        Positioned.fill(child: ColoredBox(color: backgroundColor)),
         Positioned.fill(child: child),
       ],
     );
@@ -118,7 +119,6 @@ class _AppDoPoliState extends State<AppDoPoli> {
       title: 'Polirotinas',
       themeMode: themeMode,
       builder: (context, child) => _globalBackground(
-        context,
         child ?? const SizedBox.shrink(),
       ),
       theme: ThemeData(
