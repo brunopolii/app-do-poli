@@ -21,6 +21,8 @@ class ThemeSettings {
     this.y = 0.0,
   });
 
+  Color? get backgroundColor => null;
+
   ThemeSettings copyWith({
     int? backgroundColorValue,
     String? imagePath,
@@ -51,13 +53,14 @@ class ThemeService {
 
   static Future<ThemeSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
+    final image = prefs.getString(_imageKey);
     return ThemeSettings(
       backgroundColorValue: prefs.getInt(_colorKey) ?? 0xFFF7F5FA,
-      imagePath: prefs.getString(_imageKey),
-      opacity: (prefs.getDouble(_opacityKey) ?? 0.35).clamp(0.05, 1.0),
-      scale: (prefs.getDouble(_scaleKey) ?? 1.0).clamp(0.5, 3.0),
-      x: (prefs.getDouble(_xKey) ?? 0.0).clamp(-5.0, 5.0),
-      y: (prefs.getDouble(_yKey) ?? 0.0).clamp(-5.0, 5.0),
+      imagePath: image != null && File(image).existsSync() ? image : null,
+      opacity: ((prefs.getDouble(_opacityKey) ?? 0.35)).clamp(0.05, 1.0).toDouble(),
+      scale: ((prefs.getDouble(_scaleKey) ?? 1.0)).clamp(0.5, 3.0).toDouble(),
+      x: ((prefs.getDouble(_xKey) ?? 0.0)).clamp(-5.0, 5.0).toDouble(),
+      y: ((prefs.getDouble(_yKey) ?? 0.0)).clamp(-5.0, 5.0).toDouble(),
     );
   }
 
