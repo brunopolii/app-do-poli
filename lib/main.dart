@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -7,21 +9,29 @@ import 'screens/finance_screen.dart';
 import 'screens/food_screen.dart';
 import 'screens/gym_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/theme_screen.dart';
 import 'services/license_service.dart';
 import 'services/notification_service.dart';
+import 'services/theme_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('pt_BR');
   await NotificationService.initialize();
   final activated = await LicenseService().isActivated();
-  runApp(AppDoPoli(initiallyActivated: activated));
+  final themeSettings = await ThemeService.load();
+  runApp(AppDoPoli(initiallyActivated: activated, initialTheme: themeSettings));
 }
 
 class AppDoPoli extends StatefulWidget {
   final bool initiallyActivated;
+  final ThemeSettings initialTheme;
 
-  const AppDoPoli({super.key, required this.initiallyActivated});
+  const AppDoPoli({
+    super.key,
+    required this.initiallyActivated,
+    required this.initialTheme,
+  });
 
   @override
   State<AppDoPoli> createState() => _AppDoPoliState();
@@ -29,6 +39,7 @@ class AppDoPoli extends StatefulWidget {
 
 class _AppDoPoliState extends State<AppDoPoli> {
   late bool activated;
+  late ThemeSettings themeSettings;
   int selectedIndex = 2;
   ThemeMode themeMode = ThemeMode.system;
   int homeRefresh = 0;
@@ -37,10 +48,65 @@ class _AppDoPoliState extends State<AppDoPoli> {
   void initState() {
     super.initState();
     activated = widget.initiallyActivated;
+    themeSettings = widget.initialTheme;
   }
 
   void _finishActivation() {
     setState(() => activated = true);
+  }
+
+  Future<void> _openTheme() async {
+    final result = await Navigator.of(context).push<ThemeSettings>(
+      MaterialPageRoute(
+        builder: (_) => ThemeScreen(initialSettings: themeSettings),
+      ),
+    );
+    if (!mounted || result == null) return;
+    setState(() => themeSettings = result);
+  }
+
+  Widget _globalBackground(BuildContext context, Widget child) {
+    final settings = themeSettings;
+    if (settings.imagePath != null) {
+      final file = File(settings.imagePath!);
+      if (file.existsSync()) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: ColoredBox(color: settings.backgroundColor),
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: settings.opacity,
+                  child: Transform.translate(
+                    offset: Offset(settings.x * 40, settings.y * 40),
+                    child: Transform.scale(
+                      scale: settings.scale,
+                      child: Image.file(
+                        file,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fill(child: child),
+          ],
+        );
+      }
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned.fill(child: ColoredBox(color: settings.backgroundColor)),
+        Positioned.fill(child: child),
+      ],
+    );
   }
 
   @override
@@ -51,10 +117,14 @@ class _AppDoPoliState extends State<AppDoPoli> {
       debugShowCheckedModeBanner: false,
       title: 'Polirotinas',
       themeMode: themeMode,
+      builder: (context, child) => _globalBackground(
+        context,
+        child ?? const SizedBox.shrink(),
+      ),
       theme: ThemeData(
         useMaterial3: true,
         colorSchemeSeed: seed,
-        scaffoldBackgroundColor: const Color(0xFFF7F5FA),
+        scaffoldBackgroundColor: Colors.transparent,
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
@@ -76,6 +146,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
         useMaterial3: true,
         brightness: Brightness.dark,
         colorSchemeSeed: const Color(0xFF9B82DB),
+        scaffoldBackgroundColor: Colors.transparent,
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
@@ -83,12 +154,19 @@ class _AppDoPoliState extends State<AppDoPoli> {
       ),
       home: activated
           ? Scaffold(
+              backgroundColor: Colors.transparent,
               appBar: AppBar(
+                backgroundColor: Colors.transparent,
                 title: const Text(
                   'Polirotinas',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 actions: [
+                  IconButton(
+                    tooltip: 'Personalizar tema',
+                    onPressed: _openTheme,
+                    icon: const Icon(Icons.palette_outlined),
+                  ),
                   IconButton(
                     tooltip: 'Alternar tema',
                     onPressed: () => setState(
@@ -111,6 +189,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
                 ],
               ),
               bottomNavigationBar: NavigationBar(
+                backgroundColor: Theme.of(context).colorScheme.surface.withValues(alpha: .92),
                 selectedIndex: selectedIndex,
                 onDestinationSelected: (i) => setState(() {
                   selectedIndex = i;
