@@ -55,19 +55,27 @@ class _AppDoPoliState extends State<AppDoPoli> {
     setState(() => activated = true);
   }
 
-  Future<void> _openTheme() async {
-    final result = await Navigator.of(context).push<ThemeSettings>(
+  Future<void> _openTheme(BuildContext navigationContext) async {
+    final result = await Navigator.of(navigationContext).push<ThemeSettings>(
       MaterialPageRoute(
-        builder: (_) => ThemeScreen(initialSettings: themeSettings),
+        builder: (_) => ThemeScreen(
+          initialSettings: themeSettings,
+          onSettingsChanged: (settings) {
+            if (mounted) setState(() => themeSettings = settings);
+          },
+        ),
       ),
     );
     if (!mounted || result == null) return;
     setState(() => themeSettings = result);
   }
 
-  Widget _globalBackground(Widget child) {
+  Widget _globalBackground(BuildContext context, Widget child) {
     final settings = themeSettings;
-    final backgroundColor = Color(settings.backgroundColorValue);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDark
+        ? Color.alphaBlend(Colors.black.withValues(alpha: .72), Color(settings.backgroundColorValue))
+        : Color(settings.backgroundColorValue);
     final imagePath = settings.imagePath;
 
     if (imagePath == null) {
@@ -101,6 +109,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
             ),
           ),
         ),
+        if (isDark) IgnorePointer(child: ColoredBox(color: Colors.black.withValues(alpha: .38))),
         child,
       ],
     );
@@ -108,11 +117,14 @@ class _AppDoPoliState extends State<AppDoPoli> {
 
   ThemeData _buildLightTheme() {
     const seed = Color(0xFF6750A4);
-    return ThemeData(
-      useMaterial3: true,
-      colorSchemeSeed: seed,
+    final base = ThemeData.light(useMaterial3: true);
+    return base.copyWith(
+      colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light),
       scaffoldBackgroundColor: Colors.transparent,
-      appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0),
+      appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0, surfaceTintColor: Colors.transparent),
+      cardTheme: CardThemeData(color: Colors.white.withValues(alpha: .93), elevation: 1, surfaceTintColor: Colors.transparent),
+      dialogTheme: DialogThemeData(backgroundColor: Colors.white.withValues(alpha: .98)),
+      popupMenuTheme: const PopupMenuThemeData(color: Color(0xFFFFFBFF)),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
@@ -133,14 +145,18 @@ class _AppDoPoliState extends State<AppDoPoli> {
   }
 
   ThemeData _buildDarkTheme() {
-    return ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      colorSchemeSeed: const Color(0xFF9B82DB),
+    final base = ThemeData.dark(useMaterial3: true);
+    final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF9B82DB), brightness: Brightness.dark);
+    return base.copyWith(
+      colorScheme: scheme,
       scaffoldBackgroundColor: Colors.transparent,
-      appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0),
+      appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0, surfaceTintColor: Colors.transparent),
+      cardTheme: CardThemeData(color: const Color(0xFF1D1B20).withValues(alpha: .96), elevation: 1, surfaceTintColor: Colors.transparent),
+      dialogTheme: DialogThemeData(backgroundColor: const Color(0xFF242127), surfaceTintColor: Colors.transparent),
+      popupMenuTheme: const PopupMenuThemeData(color: Color(0xFF242127)),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
+        fillColor: const Color(0xFF2B2930),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.all(Radius.circular(16)),
         ),
@@ -156,11 +172,8 @@ class _AppDoPoliState extends State<AppDoPoli> {
       themeMode: themeMode,
       theme: _buildLightTheme(),
       darkTheme: _buildDarkTheme(),
-      builder: (context, child) => _globalBackground(
-        child ?? const SizedBox.shrink(),
-      ),
-      home: activated
-          ? Scaffold(
+      builder: (context, child) => _globalBackground(context, child ?? const SizedBox.shrink()),
+      home: activated ? Builder(builder: (appContext) => Scaffold(
               backgroundColor: Colors.transparent,
               extendBody: true,
               extendBodyBehindAppBar: true,
@@ -172,7 +185,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
                 actions: [
                   IconButton(
                     tooltip: 'Personalizar tema',
-                    onPressed: _openTheme,
+                    onPressed: () => _openTheme(appContext),
                     icon: const Icon(Icons.palette_outlined),
                   ),
                   IconButton(
@@ -197,7 +210,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
                 ],
               ),
               bottomNavigationBar: NavigationBar(
-                backgroundColor: Theme.of(context).colorScheme.surface.withValues(alpha: .92),
+                backgroundColor: Theme.of(appContext).colorScheme.surface.withValues(alpha: .92),
                 selectedIndex: selectedIndex,
                 onDestinationSelected: (i) => setState(() {
                   selectedIndex = i;
@@ -231,7 +244,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
                   ),
                 ],
               ),
-            )
+            ))
           : ActivationScreen(onActivated: _finishActivation),
     );
   }

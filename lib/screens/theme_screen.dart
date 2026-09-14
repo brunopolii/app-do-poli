@@ -3,7 +3,8 @@ import '../services/theme_service.dart';
 
 class ThemeScreen extends StatefulWidget {
   final ThemeSettings initialSettings;
-  const ThemeScreen({super.key, required this.initialSettings});
+  final ValueChanged<ThemeSettings>? onSettingsChanged;
+  const ThemeScreen({super.key, required this.initialSettings, this.onSettingsChanged});
 
   @override
   State<ThemeScreen> createState() => _ThemeScreenState();
@@ -26,6 +27,7 @@ class _ThemeScreenState extends State<ThemeScreen> {
 
   Future<void> _save(ThemeSettings next) async {
     setState(() => settings = next);
+    widget.onSettingsChanged?.call(next);
     await ThemeService.save(next);
   }
 
@@ -42,8 +44,13 @@ class _ThemeScreenState extends State<ThemeScreen> {
   @override
   Widget build(BuildContext context) {
     final hasImage = settings.imagePath != null;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Personalizar tema')),
+    return PopScope<ThemeSettings>(
+      onPopInvokedWithResult: (_, __) => widget.onSettingsChanged?.call(settings),
+      child: Scaffold(
+      appBar: AppBar(
+        title: const Text('Personalizar tema'),
+        leading: IconButton(onPressed: () => Navigator.pop(context, settings), icon: const Icon(Icons.arrow_back)),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -104,7 +111,7 @@ class _ThemeScreenState extends State<ThemeScreen> {
           const Card(child: ListTile(leading: Icon(Icons.info_outline), title: Text('Tema aplicado no app inteiro'), subtitle: Text('O tema é salvo automaticamente e usado em todas as áreas do Polirotinas.'))),
         ],
       ),
-    );
+    ));
   }
 
   Widget _slider(String label, double value, double min, double max, ThemeSettings Function(double) next) {

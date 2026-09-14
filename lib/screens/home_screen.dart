@@ -69,6 +69,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final today = DateFormat('yyyy-MM-dd').format(now);
     final month = DateFormat('yyyy-MM').format(now);
     final todayEvents = events.where((e) => e.date == today).toList();
+    final upcomingEvents = events.where((event) {
+      final date = DateTime.tryParse(event.date);
+      if (date == null) return false;
+      final pieces = event.start.split(':');
+      final start = DateTime(date.year, date.month, date.day,
+          int.tryParse(pieces.first) ?? 0,
+          pieces.length > 1 ? int.tryParse(pieces[1]) ?? 0 : 0);
+      return !start.isBefore(now);
+    }).toList()
+      ..sort((a, b) => '${a.date} ${a.start}'.compareTo('${b.date} ${b.start}'));
     final todayMeals = meals.where((e) => e.date == today).toList();
     final todayPlans = plans.where((e) => e.weekdays.contains(now.weekday)).toList();
     final monthMoney = money.where((e) => e.date.startsWith(month)).toList();
@@ -89,12 +99,17 @@ class _HomeScreenState extends State<HomeScreen> {
             _counter(context, Icons.fitness_center, 'Treinos', todayPlans.length.toString()),
             _counter(context, Icons.restaurant_outlined, 'Refeições', todayMeals.length.toString()),
           ])),
-          _card(context, 'Próximo compromisso', todayEvents.isEmpty ? const Text('Nada agendado para hoje.') : ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const CircleAvatar(child: Icon(Icons.event)),
-            title: Text(todayEvents.first.title),
-            subtitle: Text('${todayEvents.first.start} • ${todayEvents.first.end}'),
-          )),
+          _card(context, 'Próximos compromissos', upcomingEvents.isEmpty
+              ? const Text('Nenhum compromisso próximo.')
+              : Column(children: upcomingEvents.take(4).map((event) {
+                  final date = DateTime.parse(event.date);
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const CircleAvatar(child: Icon(Icons.event_outlined)),
+                    title: Text(event.title),
+                    subtitle: Text('${DateFormat('dd/MM', 'pt_BR').format(date)}${event.start.isEmpty ? '' : ' • ${event.start}'}'),
+                  );
+                }).toList())),
           _card(context, 'Alimentação de hoje', Row(children: <Widget>[
             _stat(context, _food(todayMeals, 0).toStringAsFixed(0), 'kcal'),
             _stat(context, '${_food(todayMeals, 1).toStringAsFixed(0)}g', 'proteína'),

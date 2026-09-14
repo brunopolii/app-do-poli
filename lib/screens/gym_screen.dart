@@ -27,6 +27,7 @@ class GymScreen extends StatefulWidget {
 class _GymScreenState extends State<GymScreen> {
   List<WorkoutPlan> plans = [];
   List<List<String>> customExercises = [];
+  int historyVersion = 0;
 
   @override
   void initState() {
@@ -182,7 +183,7 @@ class _GymScreenState extends State<GymScreen> {
       );
       return;
     }
-    await Navigator.push(
+    final finished = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => WorkoutPlayer(
@@ -192,6 +193,7 @@ class _GymScreenState extends State<GymScreen> {
         ),
       ),
     );
+    if (finished == true && mounted) setState(() => historyVersion++);
   }
 
   @override
@@ -258,7 +260,7 @@ class _GymScreenState extends State<GymScreen> {
                 ],
               ),
             ),
-          const GymHistorySection(),
+          GymHistorySection(key: ValueKey('gym-history-$historyVersion')),
           if (plans.isEmpty)
             const AppCard(
               child: Column(
@@ -922,7 +924,7 @@ class _WorkoutPlayerState extends State<WorkoutPlayer> {
       ).toJson(),
     );
     await StorageService.write('workout_history', history);
-    if (mounted) Navigator.pop(context);
+    if (mounted) Navigator.pop(context, true);
   }
 
   @override

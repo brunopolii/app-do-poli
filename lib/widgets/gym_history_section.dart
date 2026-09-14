@@ -151,13 +151,23 @@ class _GymHistorySectionState extends State<GymHistorySection> {
             else
               SizedBox(height: 240, child: _LineChart(points: points)),
             if (points.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  '${points.first.kg.toStringAsFixed(1)} kg → ${points.last.kg.toStringAsFixed(1)} kg • ${points.length} treino(s)',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
+              _progressSummary(context),
+            if (points.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text('Histórico de cargas', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+              ...matchingWorkouts.reversed.expand((workout) => workout.exercises.where((exercise) => exercise.name == selectedExercise).map((exercise) {
+                final max = exercise.weights.fold<double>(0, (value, weight) => math.max(value, weight).toDouble());
+                if (max <= 0) return const SizedBox.shrink();
+                final date = DateTime.tryParse(workout.date);
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: Text(date == null ? workout.date : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}'),
+                  subtitle: Text('${exercise.sets} séries • ${exercise.reps} repetições'),
+                  trailing: Text('${max.toStringAsFixed(1)} kg', style: const TextStyle(fontWeight: FontWeight.bold)),
+                );
+              })),
+            ],
           ],
         ),
       ),
@@ -167,6 +177,21 @@ class _GymHistorySectionState extends State<GymHistorySection> {
   String _dayName(int day) => const [
         'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'
       ][day - 1];
+
+  Widget _progressSummary(BuildContext context) {
+    final latest = points.last.kg;
+    final previous = points.length > 1 ? points[points.length - 2].kg : null;
+    final best = points.map((point) => point.kg).reduce((value, point) => math.max(value, point).toDouble());
+    final percent = previous == null || previous == 0 ? null : (latest - previous) / previous * 100;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Wrap(spacing: 16, runSpacing: 6, children: [
+        Text('Melhor: ${best.toStringAsFixed(1)} kg'),
+        Text(previous == null ? 'Primeiro registro' : 'Anterior: ${previous.toStringAsFixed(1)} kg'),
+        if (percent != null) Text('${percent >= 0 ? '+' : ''}${percent.toStringAsFixed(1)}% desde o treino anterior', style: TextStyle(color: percent >= 0 ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold)),
+      ]),
+    );
+  }
 }
 
 class _Point {
