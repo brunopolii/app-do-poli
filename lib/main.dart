@@ -1,8 +1,7 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
-
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/activation_screen.dart';
 import 'screens/agenda_screen.dart';
 import 'screens/finance_screen.dart';
@@ -20,219 +19,31 @@ Future<void> main() async {
   await NotificationService.initialize();
   final activated = await LicenseService().isActivated();
   final themeSettings = await ThemeService.load();
-  runApp(AppDoPoli(initiallyActivated: activated, initialTheme: themeSettings));
+  final prefs = await SharedPreferences.getInstance();
+  final mode = prefs.getString('theme_mode') ?? 'system';
+  runApp(AppDoPoli(initiallyActivated: activated, initialTheme: themeSettings, initialThemeMode: mode));
 }
 
 class AppDoPoli extends StatefulWidget {
   final bool initiallyActivated;
   final ThemeSettings initialTheme;
-
-  const AppDoPoli({
-    super.key,
-    required this.initiallyActivated,
-    required this.initialTheme,
-  });
-
-  @override
-  State<AppDoPoli> createState() => _AppDoPoliState();
+  final String initialThemeMode;
+  const AppDoPoli({super.key, required this.initiallyActivated, required this.initialTheme, required this.initialThemeMode});
+  @override State<AppDoPoli> createState() => _AppDoPoliState();
 }
 
 class _AppDoPoliState extends State<AppDoPoli> {
   late bool activated;
   late ThemeSettings themeSettings;
-  int selectedIndex = 2;
-  ThemeMode themeMode = ThemeMode.system;
-  int homeRefresh = 0;
+  late ThemeMode themeMode;
+  int selectedIndex = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    activated = widget.initiallyActivated;
-    themeSettings = widget.initialTheme;
-  }
+  @override void initState() { super.initState(); activated=widget.initiallyActivated; themeSettings=widget.initialTheme; themeMode=switch(widget.initialThemeMode){'dark'=>ThemeMode.dark,'light'=>ThemeMode.light,_=>ThemeMode.system}; }
+  void _finishActivation()=>setState(()=>activated=true);
+  Future<void> _openTheme() async { final result=await Navigator.of(context).push<ThemeSettings>(MaterialPageRoute(builder:(_)=>ThemeScreen(initialSettings:themeSettings))); if(mounted&&result!=null)setState(()=>themeSettings=result); }
+  Future<void> _toggleTheme() async { final next=themeMode==ThemeMode.dark?ThemeMode.light:ThemeMode.dark; final prefs=await SharedPreferences.getInstance(); await prefs.setString('theme_mode',next==ThemeMode.dark?'dark':'light'); if(mounted)setState(()=>themeMode=next); }
 
-  void _finishActivation() {
-    setState(() => activated = true);
-  }
-
-  Future<void> _openTheme() async {
-    final result = await Navigator.of(context).push<ThemeSettings>(
-      MaterialPageRoute(
-        builder: (_) => ThemeScreen(initialSettings: themeSettings),
-      ),
-    );
-    if (!mounted || result == null) return;
-    setState(() => themeSettings = result);
-  }
-
-  Widget _globalBackground(Widget child) {
-    final settings = themeSettings;
-    final backgroundColor = Color(settings.backgroundColorValue);
-    final imagePath = settings.imagePath;
-
-    if (imagePath == null) {
-      return ColoredBox(color: backgroundColor, child: child);
-    }
-
-    final file = File(imagePath);
-    if (!file.existsSync()) {
-      return ColoredBox(color: backgroundColor, child: child);
-    }
-
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        ColoredBox(color: backgroundColor),
-        IgnorePointer(
-          child: ClipRect(
-            child: Opacity(
-              opacity: settings.opacity,
-              child: Transform.translate(
-                offset: Offset(settings.x * 40, settings.y * 40),
-                child: Transform.scale(
-                  scale: settings.scale,
-                  child: Image.file(
-                    file,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        child,
-      ],
-    );
-  }
-
-  ThemeData _buildLightTheme() {
-    const seed = Color(0xFF6750A4);
-    return ThemeData(
-      useMaterial3: true,
-      colorSchemeSeed: seed,
-      scaffoldBackgroundColor: Colors.transparent,
-      appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
-          borderSide: BorderSide(width: 2, color: seed),
-        ),
-      ),
-    );
-  }
-
-  ThemeData _buildDarkTheme() {
-    return ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      colorSchemeSeed: const Color(0xFF9B82DB),
-      scaffoldBackgroundColor: Colors.transparent,
-      appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Polirotinas',
-      themeMode: themeMode,
-      theme: _buildLightTheme(),
-      darkTheme: _buildDarkTheme(),
-      builder: (context, child) => _globalBackground(
-        child ?? const SizedBox.shrink(),
-      ),
-      home: activated
-          ? Scaffold(
-              backgroundColor: Colors.transparent,
-              extendBody: true,
-              extendBodyBehindAppBar: true,
-              appBar: AppBar(
-                title: const Text(
-                  'Polirotinas',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                actions: [
-                  IconButton(
-                    tooltip: 'Personalizar tema',
-                    onPressed: _openTheme,
-                    icon: const Icon(Icons.palette_outlined),
-                  ),
-                  IconButton(
-                    tooltip: 'Alternar tema',
-                    onPressed: () => setState(
-                      () => themeMode = themeMode == ThemeMode.dark
-                          ? ThemeMode.light
-                          : ThemeMode.dark,
-                    ),
-                    icon: const Icon(Icons.dark_mode_outlined),
-                  ),
-                ],
-              ),
-              body: IndexedStack(
-                index: selectedIndex,
-                children: [
-                  const AgendaScreen(),
-                  const GymScreen(),
-                  HomeScreen(key: ValueKey('home-$homeRefresh')),
-                  const FoodScreen(),
-                  const FinanceScreen(),
-                ],
-              ),
-              bottomNavigationBar: NavigationBar(
-                backgroundColor: Theme.of(context).colorScheme.surface.withValues(alpha: .92),
-                selectedIndex: selectedIndex,
-                onDestinationSelected: (i) => setState(() {
-                  selectedIndex = i;
-                  homeRefresh++;
-                }),
-                destinations: const [
-                  NavigationDestination(
-                    icon: Icon(Icons.calendar_month_outlined),
-                    selectedIcon: Icon(Icons.calendar_month),
-                    label: 'Agenda',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.fitness_center_outlined),
-                    selectedIcon: Icon(Icons.fitness_center),
-                    label: 'Academia',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.home_outlined),
-                    selectedIcon: Icon(Icons.home),
-                    label: 'Início',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.restaurant_outlined),
-                    selectedIcon: Icon(Icons.restaurant),
-                    label: 'Alimentação',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.account_balance_wallet_outlined),
-                    selectedIcon: Icon(Icons.account_balance_wallet),
-                    label: 'Financeiro',
-                  ),
-                ],
-              ),
-            )
-          : ActivationScreen(onActivated: _finishActivation),
-    );
-  }
+  Widget _background(Widget child){ final s=themeSettings; final base=Color(s.backgroundColorValue); final path=s.imagePath; if(path==null||!File(path).existsSync())return ColoredBox(color:base,child:child); return Stack(fit:StackFit.expand,children:[ColoredBox(color:base),IgnorePointer(child:ClipRect(child:Opacity(opacity:s.opacity,child:Transform.translate(offset:Offset(s.x*40,s.y*40),child:Transform.scale(scale:s.scale,child:Image.file(File(path),fit:BoxFit.cover,errorBuilder:(_,__,___)=>const SizedBox.shrink())))))),child]); }
+  ThemeData _theme(Brightness b){ final dark=b==Brightness.dark; return ThemeData(useMaterial3:true,brightness:b,colorSchemeSeed:dark?const Color(0xFF9B82DB):const Color(0xFF6750A4),scaffoldBackgroundColor:Colors.transparent,canvasColor:Colors.transparent,appBarTheme:const AppBarTheme(backgroundColor:Colors.transparent,elevation:0),cardTheme:CardThemeData(color:dark?const Color(0xCC1F1F24):const Color(0xE6FFFFFF),elevation:1,shape:RoundedRectangleBorder(borderRadius:BorderRadius.all(Radius.circular(20)))),inputDecorationTheme:InputDecorationTheme(filled:true,fillColor:dark?const Color(0xFF2A2A31):Colors.white,border:OutlineInputBorder(borderRadius:BorderRadius.all(Radius.circular(16)),borderSide:BorderSide.none),enabledBorder:OutlineInputBorder(borderRadius:BorderRadius.all(Radius.circular(16)),borderSide:BorderSide.none),focusedBorder:OutlineInputBorder(borderRadius:BorderRadius.all(Radius.circular(16)),borderSide:BorderSide(width:2,color:dark?const Color(0xFFB69BFF):const Color(0xFF6750A4))))); }
+  @override Widget build(BuildContext context)=>MaterialApp(debugShowCheckedModeBanner:false,title:'Polirotinas',theme:_theme(Brightness.light),darkTheme:_theme(Brightness.dark),themeMode:themeMode,builder:(context,child)=>_background(child??const SizedBox.shrink()),home:activated?Scaffold(backgroundColor:Colors.transparent,extendBody:true,extendBodyBehindAppBar:true,appBar:AppBar(title:const Text('Polirotinas',style:TextStyle(fontWeight:FontWeight.bold)),actions:[IconButton(tooltip:'Personalizar tema',onPressed:_openTheme,icon:const Icon(Icons.palette_outlined)),IconButton(tooltip:'Modo claro/escuro',onPressed:_toggleTheme,icon:Icon(themeMode==ThemeMode.dark?Icons.light_mode_outlined:Icons.dark_mode_outlined))]),body:IndexedStack(index:selectedIndex,children:[HomeScreen(key:ValueKey('home-$selectedIndex')),const AgendaScreen(),const GymScreen(),const FoodScreen(),const FinanceScreen()]),bottomNavigationBar:NavigationBar(backgroundColor:Theme.of(context).colorScheme.surface.withValues(alpha:.92),selectedIndex:selectedIndex,onDestinationSelected:(i)=>setState(()=>selectedIndex=i),destinations:const[NavigationDestination(icon:Icon(Icons.home_outlined),selectedIcon:Icon(Icons.home),label:'Início'),NavigationDestination(icon:Icon(Icons.calendar_month_outlined),selectedIcon:Icon(Icons.calendar_month),label:'Agenda'),NavigationDestination(icon:Icon(Icons.fitness_center_outlined),selectedIcon:Icon(Icons.fitness_center),label:'Academia'),NavigationDestination(icon:Icon(Icons.restaurant_outlined),selectedIcon:Icon(Icons.restaurant),label:'Alimentação'),NavigationDestination(icon:Icon(Icons.account_balance_wallet_outlined),selectedIcon:Icon(Icons.account_balance_wallet),label:'Financeiro')])):ActivationScreen(onActivated:_finishActivation));
 }
