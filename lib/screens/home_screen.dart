@@ -4,13 +4,177 @@ import '../models/models.dart';
 import '../services/storage_service.dart';
 import '../widgets/app_card.dart';
 
-class HomeScreen extends StatefulWidget{final VoidCallback? onOpenTheme;const HomeScreen({super.key,this.onOpenTheme});@override State<HomeScreen> createState()=>_HomeScreenState();}
-class _HomeScreenState extends State<HomeScreen>{List<AgendaEvent> events=[];List<Meal> meals=[];List<MoneyTransaction> money=[];List<Workout> workouts=[];bool loading=true;
- @override void initState(){super.initState();_load();}
- Future<void> _load()async{events=(await StorageService.read('agenda')).map(AgendaEvent.fromJson).toList();meals=(await StorageService.read('meals')).map(Meal.fromJson).toList();money=(await StorageService.read('finance')).map(MoneyTransaction.fromJson).toList();workouts=(await StorageService.read('workout_history')).map(Workout.fromJson).toList();if(mounted)setState(()=>loading=false);}
- double _food(Iterable<Meal>x,int t)=>x.fold(0.0,(s,m)=>s+(t==0?m.calories:t==1?m.protein:t==2?m.carbs:m.fat));
- double _cash(Iterable<MoneyTransaction>x,bool income,{bool paid=false})=>x.where((m)=>m.income==income&&(!paid||m.isPaid)&&!m.isCancelled).fold(0.0,(s,m)=>s+m.amount);
- String _money(double v)=>'R\$ ${v.toStringAsFixed(2).replaceAll('.',',')}';
- @override Widget build(BuildContext context){if(loading)return const Center(child:CircularProgressIndicator());final now=DateTime.now();final today=DateFormat('yyyy-MM-dd').format(now);final upcoming=events.where((e){final d=DateTime.tryParse(e.date);return d!=null&&!d.isBefore(DateTime(now.year,now.month,now.day));}).toList()..sort((a,b)=>'${a.date} ${a.start}'.compareTo('${b.date} ${b.start}'));final todayMeals=meals.where((e)=>e.date==today);final currentMonth=money.where((x)=>x.date.startsWith(DateFormat('yyyy-MM').format(now)));final income=_cash(currentMonth,true,paid:true);final expense=_cash(currentMonth,false,paid:true);final balance=_cash(money,true,paid:true)-_cash(money,false,paid:true);return SafeArea(child:ListView(padding:const EdgeInsets.all(16),children:[Row(children:[Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Olá! 👋',style:Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.bold)),Text(DateFormat("EEEE, dd 'de' MMMM",'pt_BR').format(now))])),IconButton(tooltip:'Personalizar tema',onPressed:widget.onOpenTheme,icon:const Icon(Icons.palette_outlined))]),_card('Resumo',Row(children:[_counter(Icons.event_outlined,'Compromissos',events.where((e)=>e.date==today).length),_counter(Icons.fitness_center,'Treinos',workouts.length),_counter(Icons.restaurant_outlined,'Refeições',todayMeals.length)])),_card('Próximos compromissos',upcoming.isEmpty?const Text('Nada agendado.') :Column(children:upcoming.take(4).map((e)=>ListTile(contentPadding:EdgeInsets.zero,leading:const CircleAvatar(child:Icon(Icons.event)),title:Text(e.title),subtitle:Text('${e.date} • ${e.start}–${e.end}'))).toList())),_card('Alimentação de hoje',Row(children:[_stat(_food(todayMeals,0).toStringAsFixed(0),'kcal'),_stat('${_food(todayMeals,1).toStringAsFixed(0)}g','proteína'),_stat('${_food(todayMeals,2).toStringAsFixed(0)}g','carboidratos'),_stat('${_food(todayMeals,3).toStringAsFixed(0)}g','gorduras')])),_card('Financeiro do mês',Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[_stat(_money(income),'entradas'),_stat(_money(expense),'despesas'),_stat(_money(income-expense),'resultado')]),const SizedBox(height:8),Text('Saldo atual: ${_money(balance)}')]))]));}
- Widget _card(String t,Widget c)=>AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(t,style:Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold)),const SizedBox(height:10),c]));Widget _counter(IconData i,String l,int v)=>Expanded(child:Column(children:[Icon(i),const SizedBox(height:4),Text('$v',style:const TextStyle(fontWeight:FontWeight.bold)),Text(l,style:Theme.of(context).textTheme.bodySmall)]));Widget _stat(String v,String l)=>Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(v,style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.bold)),Text(l,style:Theme.of(context).textTheme.bodySmall)]));
+class HomeScreen extends StatefulWidget {
+  final VoidCallback? onOpenTheme;
+  const HomeScreen({super.key, this.onOpenTheme});
+  @override State<HomeScreen> createState() => HomeScreenState();
+}
+
+class HomeScreenState extends State<HomeScreen> {
+  List<AgendaEvent> events = [];
+  List<Meal> meals = [];
+  List<MoneyTransaction> money = [];
+  List<Workout> workouts = [];
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final loadedEvents = (await StorageService.read('agenda')).map(AgendaEvent.fromJson).toList();
+    final loadedMeals = (await StorageService.read('meals')).map(Meal.fromJson).toList();
+    final loadedMoney = (await StorageService.read('finance')).map(MoneyTransaction.fromJson).toList();
+    final loadedWorkouts = (await StorageService.read('workout_history')).map(Workout.fromJson).toList();
+    if (!mounted) return;
+    setState(() {
+      events = loadedEvents;
+      meals = loadedMeals;
+      money = loadedMoney;
+      workouts = loadedWorkouts;
+      loading = false;
+    });
+  }
+
+  Future<void> refresh() async {
+    if (mounted) setState(() => loading = true);
+    await _load();
+  }
+
+  double _food(Iterable<Meal> x, int t) => x.fold(
+    0.0,
+    (s, m) => s + (t == 0 ? m.calories : t == 1 ? m.protein : t == 2 ? m.carbs : m.fat),
+  );
+
+  double _cash(Iterable<MoneyTransaction> x, bool income, {bool paid = false}) => x
+      .where((m) => m.income == income && (!paid || m.isPaid) && !m.isCancelled)
+      .fold(0.0, (s, m) => s + m.amount);
+
+  String _money(double v) => 'R\$ ${v.toStringAsFixed(2).replaceAll('.', ',')}';
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) return const Center(child: CircularProgressIndicator());
+    final now = DateTime.now();
+    final today = DateFormat('yyyy-MM-dd').format(now);
+    final upcoming = events.where((e) {
+      final d = DateTime.tryParse(e.date);
+      return d != null && !d.isBefore(DateTime(now.year, now.month, now.day));
+    }).toList()
+      ..sort((a, b) => '${a.date} ${a.start}'.compareTo('${b.date} ${b.start}'));
+    final todayMeals = meals.where((e) => e.date == today);
+    final currentMonth = money.where((x) => x.date.startsWith(DateFormat('yyyy-MM').format(now)));
+    final income = _cash(currentMonth, true, paid: true);
+    final expense = _cash(currentMonth, false, paid: true);
+    final balance = _cash(money, true, paid: true) - _cash(money, false, paid: true);
+
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Olá! 👋', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(now)),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Personalizar tema',
+                onPressed: widget.onOpenTheme,
+                icon: const Icon(Icons.palette_outlined),
+              ),
+            ],
+          ),
+          _card(
+            'Resumo',
+            Row(
+              children: [
+                _counter(Icons.event_outlined, 'Compromissos', events.where((e) => e.date == today).length),
+                _counter(Icons.fitness_center, 'Treinos', workouts.length),
+                _counter(Icons.restaurant_outlined, 'Refeições', todayMeals.length),
+              ],
+            ),
+          ),
+          _card(
+            'Próximos compromissos',
+            upcoming.isEmpty
+                ? const Text('Nada agendado.')
+                : Column(
+                    children: upcoming.take(4).map((e) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const CircleAvatar(child: Icon(Icons.event)),
+                      title: Text(e.title),
+                      subtitle: Text('${e.date} • ${e.start}–${e.end}'),
+                    )).toList(),
+                  ),
+          ),
+          _card(
+            'Alimentação de hoje',
+            Row(
+              children: [
+                _stat(_food(todayMeals, 0).toStringAsFixed(0), 'kcal'),
+                _stat('${_food(todayMeals, 1).toStringAsFixed(0)}g', 'proteína'),
+                _stat('${_food(todayMeals, 2).toStringAsFixed(0)}g', 'carboidratos'),
+                _stat('${_food(todayMeals, 3).toStringAsFixed(0)}g', 'gorduras'),
+              ],
+            ),
+          ),
+          _card(
+            'Financeiro do mês',
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  _stat(_money(income), 'entradas'),
+                  _stat(_money(expense), 'despesas'),
+                  _stat(_money(income - expense), 'resultado'),
+                ]),
+                const SizedBox(height: 8),
+                Text('Saldo atual: ${_money(balance)}'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _card(String t, Widget c) => AppCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(t, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        c,
+      ],
+    ),
+  );
+
+  Widget _counter(IconData i, String l, int v) => Expanded(
+    child: Column(
+      children: [
+        Icon(i),
+        const SizedBox(height: 4),
+        Text('$v', style: const TextStyle(fontWeight: FontWeight.bold)),
+        Text(l, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    ),
+  );
+
+  Widget _stat(String v, String l) => Expanded(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(v, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        Text(l, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    ),
+  );
 }
