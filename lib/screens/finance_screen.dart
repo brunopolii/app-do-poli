@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/models.dart';
@@ -251,7 +252,7 @@ class _FinanceChart extends CustomPainter{
    final p1=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke;final p2=Paint()..color=Colors.grey..strokeWidth=3..style=PaintingStyle.stroke;
    void line(List<double> values,Paint p){final path=Path();for(var i=0;i<values.length;i++){final x=values.length==1?left+w/2:left+i*w/(values.length-1);final y=top+h-values[i]/range*h;if(i==0)path.moveTo(x,y);else path.lineTo(x,y);c.drawCircle(Offset(x,y),4,Paint()..color=p.color);}c.drawPath(path,p);}
    line(inc,p1);line(out,p2);
-   for(var i=0;i<months.length;i++){final x=left+i*w/(months.length-1);final tp=TextPainter(text:TextSpan(text:DateFormat('MMM','pt_BR').format(months[i]),style:const TextStyle(fontSize:10)),textDirection:TextDirection.ltr)..layout();tp.paint(c,Offset(x-tp.width/2,s.height-18));}
+   for(var i=0;i<months.length;i++){final x=left+i*w/(months.length-1);final tp=TextPainter(text:TextSpan(text:DateFormat('MMM','pt_BR').format(months[i]),style:const TextStyle(fontSize:10)),textDirection:ui.TextDirection.ltr)..layout();tp.paint(c,Offset(x-tp.width/2,s.height-18));}
  }
  @override bool shouldRepaint(covariant _FinanceChart old)=>old.months!=months||old.items!=items||old.color!=color;
 }
