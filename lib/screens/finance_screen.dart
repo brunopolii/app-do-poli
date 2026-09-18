@@ -60,7 +60,7 @@ class _FinanceScreenState extends State<FinanceScreen>{
             recurrenceFrequency:'monthly',recurrenceStartDate:master.recurrenceStartDate,dueDate:date,
           ));
         }
-        cursor=DateTime(cursor.year,cursor.month+1,math.min(start.day,DateTime(cursor.year,cursor.month+2,0).day));
+        cursor=DateTime(cursor.year,cursor.month+1,math.min(start.day,DateTime(cursor.year,cursor.month+2,0).day).toInt());
       }
     }
   }
@@ -136,7 +136,7 @@ class _FinanceScreenState extends State<FinanceScreen>{
     }
     final group=DateTime.now().microsecondsSinceEpoch.toString();final total=mode=='total'?raw:raw*count;final each=mode=='total'?raw/count:raw;double used=0;
     for(var i=1;i<=count;i++){
-      final dd=DateTime(due.year,due.month+i-1,math.min(due.day,DateTime(due.year,due.month+i,0).day));
+      final dd=DateTime(due.year,due.month+i-1,math.min(due.day,DateTime(due.year,due.month+i,0).day).toInt());
       final value=i==count?double.parse((total-used).toStringAsFixed(2)):double.parse(each.toStringAsFixed(2));used+=value;
       final ds=DateFormat('yyyy-MM-dd').format(dd);
       final x=MoneyTransaction(id:'$group-$i',date:ds,description:desc,category:cat,amount:value,income:false,paymentStatus:'pending',isInstallment:true,installmentGroupId:group,totalInstallments:count,installmentNumber:i,totalAmount:total,installmentAmount:value,dueDate:ds);
@@ -247,7 +247,7 @@ class _FinanceChart extends CustomPainter{
  @override void paint(Canvas c,Size s){
    final inc=<double>[],out=<double>[];
    for(final m in months){final k=DateFormat('yyyy-MM').format(m);inc.add(items.where((x)=>!x.isCancelled&&x.income&&x.date.startsWith(k)).fold(0.0,(a,x)=>a+x.amount));out.add(items.where((x)=>!x.isCancelled&&!x.income&&x.dueDate.startsWith(k)).fold(0.0,(a,x)=>a+x.amount));}
-   final maxV=[...inc,...out].fold(0.0,math.max);final range=maxV<=0?1.0:maxV;final left=24.0,right=12.0,top=20.0,bottom=28.0;final w=math.max(1,s.width-left-right),h=math.max(1,s.height-top-bottom);
+   final maxV=[...inc,...out].fold<double>(0.0,(a,b)=>math.max(a,b).toDouble());final range=maxV<=0?1.0:maxV;final left=24.0,right=12.0,top=20.0,bottom=28.0;final w=math.max(1.0,s.width-left-right).toDouble(),h=math.max(1.0,s.height-top-bottom).toDouble();
    final p1=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke;final p2=Paint()..color=Colors.grey..strokeWidth=3..style=PaintingStyle.stroke;
    void line(List<double> values,Paint p){final path=Path();for(var i=0;i<values.length;i++){final x=values.length==1?left+w/2:left+i*w/(values.length-1);final y=top+h-values[i]/range*h;if(i==0)path.moveTo(x,y);else path.lineTo(x,y);c.drawCircle(Offset(x,y),4,Paint()..color=p.color);}c.drawPath(path,p);}
    line(inc,p1);line(out,p2);
