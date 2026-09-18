@@ -27,16 +27,16 @@ class AppCard extends StatelessWidget {
   }
 }
 
-class _PoliThemeExtension extends ThemeExtension<_PoliThemeExtension> {
+class PoliThemeExtension extends ThemeExtension<PoliThemeExtension> {
   final Color cardColor;
   final double cardOpacity;
   final Color cardBorderColor;
-  const _PoliThemeExtension({required this.cardColor, required this.cardOpacity, required this.cardBorderColor});
-  @override _PoliThemeExtension copyWith({Color? cardColor,double? cardOpacity,Color? cardBorderColor}) =>
-      _PoliThemeExtension(cardColor:cardColor??this.cardColor,cardOpacity:cardOpacity??this.cardOpacity,cardBorderColor:cardBorderColor??this.cardBorderColor);
-  @override _PoliThemeExtension lerp(covariant _PoliThemeExtension? other,double t){
+  const PoliThemeExtension({required this.cardColor, required this.cardOpacity, required this.cardBorderColor});
+  @override PoliThemeExtension copyWith({Color? cardColor,double? cardOpacity,Color? cardBorderColor}) =>
+      PoliThemeExtension(cardColor:cardColor??this.cardColor,cardOpacity:cardOpacity??this.cardOpacity,cardBorderColor:cardBorderColor??this.cardBorderColor);
+  @override PoliThemeExtension lerp(covariant PoliThemeExtension? other,double t){
     if(other==null)return this;
-    return _PoliThemeExtension(
+    return PoliThemeExtension(
       cardColor:Color.lerp(cardColor,other.cardColor,t)!,
       cardOpacity:cardOpacity+(other.cardOpacity-cardOpacity)*t,
       cardBorderColor:Color.lerp(cardBorderColor,other.cardBorderColor,t)!,
