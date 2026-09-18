@@ -80,15 +80,15 @@ class _GymChartState extends State<_GymChart>{
   @override Widget build(BuildContext context)=>GestureDetector(
     onTapUp:(d){final w=MediaQuery.sizeOf(context).width;final chartW=(w-48).clamp(1.0,10000.0).toDouble();final x=(d.localPosition.dx-36).clamp(0.0,chartW);final i=widget.data.length==1?0:(x/chartW*(widget.data.length-1)).round().clamp(0,widget.data.length-1);setState(()=>selected=i);},
     child:SizedBox(height:235,child:Stack(children:[
-      Positioned.fill(child:CustomPaint(painter:GymChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,selected,Directionality.of(context)))),
+      Positioned.fill(child:CustomPaint(painter:_GymChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,selected,Directionality.of(context)))),
       if(selected!=null&&selected!>=0&&selected!<widget.data.length)Align(alignment:Alignment.topCenter,child:Container(margin:const EdgeInsets.only(top:2),padding:const EdgeInsets.symmetric(horizontal:10,vertical:6),decoration:BoxDecoration(color:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(10)),child:Text(_label(widget.data[selected!]),style:Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight:FontWeight.bold)))),
     ])),
   );
   String _label(_Point p)=>'${DateFormat('dd/MM','pt_BR').format(p.date)} • ${p.value.toStringAsFixed(p.value.truncateToDouble()==p.value?0:1)} kg';
 }
-class GymChartPainter extends CustomPainter{
+class _GymChartPainter extends CustomPainter{
   final List<_Point> data;final Color color;final Color labelColor;final int? selected;final ui.TextDirection textDirection;
-  GymChartPainter(this.data,this.color,this.labelColor,[this.selected,this.textDirection=ui.TextDirection.ltr]);
+  _GymChartPainter(this.data,this.color,this.labelColor,[this.selected,this.textDirection=ui.TextDirection.ltr]);
   @override void paint(Canvas c,Size s){
     if(data.isEmpty)return;
     const left=42.0,right=12.0,top=26.0,bottom=40.0;
