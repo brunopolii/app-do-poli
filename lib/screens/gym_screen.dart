@@ -99,7 +99,7 @@ class GymChartPainter extends CustomPainter{
     final path=Path();
     for(var i=0;i<data.length;i++){
       final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);
-      final normalized=rawRange.abs()<.01?.5:(data[i].value-min)/range;
+      final normalized=(rawRange.abs()<.01) ? .5 : (data[i].value-min)/range;
       final y=top+chartH-normalized*chartH;
       if(i==0)path.moveTo(x,y);else path.lineTo(x,y);
       c.drawCircle(Offset(x,y),i==selected?7:4,Paint()..color=color);
