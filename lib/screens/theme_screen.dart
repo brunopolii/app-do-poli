@@ -82,7 +82,6 @@ class _ThemeScreenState extends State<ThemeScreen> {
         _colorRow('Cards — preenchimento',card,()=>_pickColor('Cor do preenchimento dos cards',card,(c)=>_save(settings.copyWith(cardColorValue:c.value)))),
         _slider('Transparência do preenchimento',settings.cardOpacity,.05,1,(v)=>settings.copyWith(cardOpacity:v)),
         _colorRow('Cards — contorno',Color(settings.cardBorderColorValue),()=>_pickColor('Cor do contorno dos cards',Color(settings.cardBorderColorValue),(c)=>_save(settings.copyWith(cardBorderColorValue:c.value)))),
-        _slider('Visibilidade do contorno',1,1,1,(v)=>settings),
         _colorRow('Barra de navegação',nav,()=>_pickColor('Cor da barra de navegação',nav,(c)=>_save(settings.copyWith(navColorValue:c.value)))),
         _slider('Transparência da barra',settings.navOpacity,.05,1,(v)=>settings.copyWith(navOpacity:v)),
         _colorRow('Elementos de destaque',Color(settings.accentColorValue),()=>_pickColor('Cor dos elementos de destaque',Color(settings.accentColorValue),(c)=>_save(settings.copyWith(accentColorValue:c.value)))),
