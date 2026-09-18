@@ -74,7 +74,7 @@ class _FinanceScreenState extends State<FinanceScreen>{
   double _sum(Iterable<MoneyTransaction> xs,{bool income=false,bool paidOnly=false})=>xs.where((x)=>x.income==income&&(!paidOnly||x.isPaid)).fold(0.0,(a,x)=>a+x.amount);
   double _balance()=>items.where((x)=>x.isPaid&&!x.isCancelled).fold(0.0,(a,x)=>a+(x.income?x.amount:-x.amount));
 
-  Future<DateTime?> _pickDate(DateTime initial)async=>showDatePicker(context:context,initialDate:initial,firstDate:DateTime(2020),lastDate:DateTime(2100);
+  Future<DateTime?> _pickDate(DateTime initial)async=>showDatePicker(context:context,initialDate:initial,firstDate:DateTime(2020),lastDate:DateTime(2100));
 
   Future<void> _single(bool income,{MoneyTransaction? editing})async{
     final d=TextEditingController(text:editing?.description??'');
