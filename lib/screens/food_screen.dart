@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
@@ -44,7 +45,7 @@ class _WeightChartState extends State<_WeightChart>{
   String _label(WeightEntry e){final d=DateTime.tryParse(e.date);return d==null?'${e.weight.toStringAsFixed(1)} kg':'${DateFormat('dd/MM','pt_BR').format(d)} • ${e.weight.toStringAsFixed(1)} kg';}
 }
 class _WeightPainter extends CustomPainter{
-  final List<WeightEntry> data; final Color color; final int? selected; final TextDirection textDirection;
+  final List<WeightEntry> data; final Color color; final int? selected; final ui.TextDirection textDirection;
   _WeightPainter(this.data,this.color,this.selected,this.textDirection);
   @override void paint(Canvas c,Size s){
     if(data.isEmpty)return;
