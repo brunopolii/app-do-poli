@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
@@ -24,7 +25,91 @@ class ExerciseSettings extends StatefulWidget{final Exercise initial;const Exerc
 class _ExerciseSettingsState extends State<ExerciseSettings>{late int sets,reps;@override void initState(){super.initState();sets=widget.initial.sets;reps=widget.initial.reps;}@override Widget build(BuildContext context)=>AlertDialog(title:Text(widget.initial.name),content:Column(mainAxisSize:MainAxisSize.min,children:[Text('Séries: $sets'),Slider(value:sets.toDouble(),min:1,max:12,divisions:11,onChanged:(v)=>setState(()=>sets=v.round())),Text('Repetições: $reps'),Slider(value:reps.toDouble(),min:1,max:30,divisions:29,onChanged:(v)=>setState(()=>reps=v.round()))]),actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('CANCELAR')),FilledButton(onPressed:()=>Navigator.pop(context,Exercise(id:widget.initial.id,name:widget.initial.name,muscle:widget.initial.muscle,sets:sets,reps:reps)),child:const Text('SALVAR'))]);}
 class WorkoutExecution extends StatefulWidget{final String name;final int weekday;final List<Exercise> exercises;const WorkoutExecution({super.key,required this.name,required this.weekday,required this.exercises});@override State<WorkoutExecution> createState()=>_WorkoutExecutionState();}
 class _WorkoutExecutionState extends State<WorkoutExecution>{late List<List<TextEditingController>> controllers;late List<List<bool>> done;@override void initState(){super.initState();controllers=widget.exercises.map((e)=>List.generate(e.sets,(_)=>TextEditingController())).toList();done=widget.exercises.map((e)=>List<bool>.filled(e.sets,false)).toList();}@override void dispose(){for(final row in controllers){for(final c in row){c.dispose();}}super.dispose();}double? kg(int i,int s)=>double.tryParse(controllers[i][s].text.replaceAll(',','.').trim());Future<void> finish()async{for(var i=0;i<widget.exercises.length;i++){for(var s=0;s<widget.exercises[i].sets;s++){final v=kg(i,s);if(!done[i][s]||v==null||v<0){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Informe a carga e conclua todas as séries.')));return;}}}final completed=<Exercise>[];for(var i=0;i<widget.exercises.length;i++){final e=widget.exercises[i].copy();e.weights=List.generate(e.sets,(s)=>kg(i,s)!);e.done=[...done[i]];completed.add(e);}final history=await StorageService.read('workout_history');history.add(Workout(id:DateTime.now().microsecondsSinceEpoch.toString(),name:widget.name,date:DateTime.now().toIso8601String(),weekday:widget.weekday,exercises:completed).toJson());await StorageService.write('workout_history',history);if(mounted)Navigator.pop(context);}@override Widget build(BuildContext context){final children=<Widget>[Text('Execução do treino',style:Theme.of(context).textTheme.headlineSmall)];for(var i=0;i<widget.exercises.length;i++){final rows=<Widget>[Text(widget.exercises[i].name,style:Theme.of(context).textTheme.titleLarge),Text(widget.exercises[i].muscle)];for(var s=0;s<widget.exercises[i].sets;s++){rows.add(Row(children:[SizedBox(width:60,child:Text('Série ${s+1}')),SizedBox(width:85,child:TextField(controller:controllers[i][s],keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(hintText:'kg'))),Expanded(child:Text('${widget.exercises[i].reps} reps')),Checkbox(value:done[i][s],onChanged:(v)=>setState(()=>done[i][s]=v==true))]));}children.add(AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:rows)));}children.add(FilledButton(onPressed:finish,child:const Text('FINALIZAR TREINO')));return Scaffold(appBar:AppBar(title:Text(widget.name)),body:ListView(padding:const EdgeInsets.all(16),children:children));}}
-class HistorySection extends StatefulWidget{const HistorySection({super.key});@override State<HistorySection> createState()=>_HistorySectionState();}
-class _HistorySectionState extends State<HistorySection>{List<Workout> history=[];String? exercise;@override void initState(){super.initState();load();}Future<void> load()async{history=(await StorageService.read('workout_history')).map(Workout.fromJson).toList();history.sort((a,b)=>a.date.compareTo(b.date));if(mounted)setState((){});}List<_Point> points(){if(exercise==null)return[];final out=<_Point>[];for(final w in history){for(final e in w.exercises.where((e)=>e.name==exercise)){final valid=e.weights.where((v)=>v.isFinite&&v>0).toList();if(valid.isEmpty)continue;final max=valid.reduce((a,b)=>a>b?a:b);out.add(_Point(DateTime.tryParse(w.date)??DateTime.now(),max.toDouble()));}}return out;}@override Widget build(BuildContext context){if(history.isEmpty)return AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Evolução de carga',style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:8),const Text('Conclua um treino com cargas registradas para começar a acompanhar sua evolução.') ]));final names=history.expand((w)=>w.exercises.map((e)=>e.name)).where((n)=>n.trim().isNotEmpty).toSet().toList()..sort();exercise=names.contains(exercise)?exercise:(names.isEmpty?null:names.first);final pts=points();return AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Evolução de carga',style:Theme.of(context).textTheme.titleLarge),DropdownButtonFormField<String>(initialValue:exercise,items:names.map((n)=>DropdownMenuItem(value:n,child:Text(n))).toList(),onChanged:(v)=>setState(()=>exercise=v)),const SizedBox(height:8),if(pts.isNotEmpty)SizedBox(height:220,child:CustomPaint(painter:GymChartPainter(pts,Theme.of(context).colorScheme.primary,Theme.of(context).colorScheme.onSurfaceVariant),child:const SizedBox.expand()))else Padding(padding:const EdgeInsets.symmetric(vertical:24),child:Text('Nenhum registro de carga para este exercício.')),if(pts.isNotEmpty)Padding(padding:const EdgeInsets.only(top:8),child:Text('${pts.length} ponto(s) • maior carga por sessão')),Text('${history.length} treino(s) concluído(s).')]));}}
+class HistorySection extends StatefulWidget{
+  const HistorySection({super.key});
+  @override State<HistorySection> createState()=>_HistorySectionState();
+}
+class _HistorySectionState extends State<HistorySection>{
+  List<Workout> history=[];String? exercise;bool showAll=false;
+  @override void initState(){super.initState();load();}
+  Future<void> load()async{history=(await StorageService.read('workout_history')).map(Workout.fromJson).toList();history.sort((a,b)=>a.date.compareTo(b.date));if(mounted)setState((){});}
+  List<_Point> points(){
+    if(exercise==null)return[];
+    final now=DateTime.now(),today=DateTime(now.year,now.month,now.day),start=today.subtract(const Duration(days:6));
+    final bySession=<String,_Point>{};
+    for(final w in history){
+      final d=DateTime.tryParse(w.date);if(d==null)continue;
+      if(!showAll&&(d.isBefore(start)||!d.isBefore(today.add(const Duration(days:1)))))continue;
+      double? best;
+      for(final e in w.exercises.where((e)=>e.name==exercise)){
+        for(final v in e.weights){if(v.isFinite&&v>0&&(best==null||v>best))best=v;}
+      }
+      if(best!=null)bySession[w.id]=_Point(d,best);
+    }
+    final out=bySession.values.toList()..sort((a,b)=>a.date.compareTo(b.date));
+    return out;
+  }
+  @override Widget build(BuildContext context){
+    if(history.isEmpty)return AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Evolução de carga',style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:8),const Text('Conclua um treino com cargas registradas para começar a acompanhar sua evolução.')]));
+    final names=history.expand((w)=>w.exercises.map((e)=>e.name)).where((n)=>n.trim().isNotEmpty).toSet().toList()..sort();
+    exercise=names.contains(exercise)?exercise:(names.isEmpty?null:names.first);
+    final pts=points();
+    return AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Text('Evolução de carga',style:Theme.of(context).textTheme.titleLarge),
+      DropdownButtonFormField<String>(initialValue:exercise,items:names.map((n)=>DropdownMenuItem(value:n,child:Text(n))).toList(),onChanged:(v)=>setState(()=>exercise=v)),
+      const SizedBox(height:4),
+      Text(showAll?'Histórico completo':'Últimos 7 dias',style:Theme.of(context).textTheme.bodySmall),
+      const SizedBox(height:6),
+      if(pts.isNotEmpty)_GymChart(data:pts,color:Theme.of(context).colorScheme.primary)
+      else Padding(padding:const EdgeInsets.symmetric(vertical:24),child:Text(showAll?'Nenhum registro de carga para este exercício.':'Nenhum registro de carga nos últimos 7 dias.')),
+      if(pts.isNotEmpty)Text('${pts.length} sessão(ões) • maior carga real por sessão'),
+      TextButton.icon(onPressed:()=>setState(()=>showAll=!showAll),icon:Icon(showAll?Icons.history_toggle_off:Icons.history),label:Text(showAll?'Mostrar últimos 7 dias':'Ver histórico completo')),
+      Text('${history.length} treino(s) concluído(s).'),
+    ]));
+  }
+}
 class _Point{final DateTime date;final double value;_Point(this.date,this.value);}
-class GymChartPainter extends CustomPainter{final List<_Point> data;final Color color;final Color labelColor;GymChartPainter(this.data,this.color,this.labelColor);@override void paint(Canvas c,Size s){if(data.isEmpty)return;final left=42.0,right=12.0,top=18.0,bottom=34.0;final chartW=(s.width-left-right).clamp(1.0,double.infinity).toDouble();final chartH=(s.height-top-bottom).clamp(1.0,double.infinity).toDouble();final min=data.map((p)=>p.value).reduce((a,b)=>a<b?a:b);final max=data.map((p)=>p.value).reduce((a,b)=>a>b?a:b);final range=(max-min).abs()<.01?1.0:max-min;final axis=Paint()..color=labelColor.withValues(alpha:.35)..strokeWidth=1;final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke;final path=Path();for(var i=0;i<data.length;i++){final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);final y=top+chartH-((data[i].value-min)/range)*chartH;if(i==0)path.moveTo(x,y);else path.lineTo(x,y);c.drawCircle(Offset(x,y),4,Paint()..color=color);_drawLabel(c,'${data[i].value.toStringAsFixed(data[i].value.truncateToDouble()==data[i].value?0:1)} kg',Offset(x,y-8),TextAlign.center);if(data.length<=6||i==0||i==data.length-1){_drawLabel(c,'${data[i].date.day.toString().padLeft(2,'0')}/${data[i].date.month.toString().padLeft(2,'0')}',Offset(x,s.height-bottom+8),TextAlign.center);}}c.drawPath(path,line);_drawLabel(c,'${max.toStringAsFixed(max.truncateToDouble()==max?0:1)} kg',Offset(2,top),TextAlign.left);if((max-min).abs()>.01)_drawLabel(c,'${min.toStringAsFixed(min.truncateToDouble()==min?0:1)} kg',Offset(2,s.height-bottom),TextAlign.left);}void _drawLabel(Canvas c,String text,Offset center,TextAlign align){final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(color:labelColor,fontSize:10,fontWeight:FontWeight.w500)),textDirection:TextDirection.ltr,textAlign:align)..layout(maxWidth:90);final dx=(align==TextAlign.center?center.dx-tp.width/2:center.dx).toDouble();final dy=(align==TextAlign.center?center.dy-tp.height/2:center.dy).toDouble();tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),dy.clamp(0.0,10000.0).toDouble()));}@override bool shouldRepaint(covariant GymChartPainter old)=>old.data!=data||old.color!=color||old.labelColor!=labelColor;}
+class _GymChart extends StatefulWidget{
+  final List<_Point> data;final Color color;
+  const _GymChart({required this.data,required this.color});
+  @override State<_GymChart> createState()=>_GymChartState();
+}
+class _GymChartState extends State<_GymChart>{
+  int? selected;
+  @override Widget build(BuildContext context)=>GestureDetector(
+    onTapUp:(d){final w=MediaQuery.sizeOf(context).width;final chartW=(w-48).clamp(1.0,10000.0).toDouble();final x=(d.localPosition.dx-36).clamp(0.0,chartW);final i=widget.data.length==1?0:(x/chartW*(widget.data.length-1)).round().clamp(0,widget.data.length-1);setState(()=>selected=i);},
+    child:SizedBox(height:235,child:Stack(children:[
+      Positioned.fill(child:CustomPaint(painter:GymChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,selected))),
+      if(selected!=null&&selected!>=0&&selected!<widget.data.length)Align(alignment:Alignment.topCenter,child:Container(margin:const EdgeInsets.only(top:2),padding:const EdgeInsets.symmetric(horizontal:10,vertical:6),decoration:BoxDecoration(color:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(10)),child:Text(_label(widget.data[selected!]),style:Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight:FontWeight.bold)))),
+    ])),
+  );
+  String _label(_Point p)=>'${DateFormat('dd/MM','pt_BR').format(p.date)} • ${p.value.toStringAsFixed(p.value.truncateToDouble()==p.value?0:1)} kg';
+}
+class GymChartPainter extends CustomPainter{
+  final List<_Point> data;final Color color;final Color labelColor;final int? selected;
+  GymChartPainter(this.data,this.color,this.labelColor,[this.selected]);
+  @override void paint(Canvas c,Size s){
+    if(data.isEmpty)return;
+    const left=42.0,right=12.0,top=26.0,bottom=40.0;
+    final chartW=(s.width-left-right).clamp(1.0,10000.0).toDouble(),chartH=(s.height-top-bottom).clamp(1.0,10000.0).toDouble();
+    final min=data.map((p)=>p.value).reduce((a,b)=>a<b?a:b),max=data.map((p)=>p.value).reduce((a,b)=>a>b?a:b),rawRange=max-min;
+    final range=rawRange.abs()<.01?1.0:rawRange;
+    final axis=Paint()..color=labelColor.withValues(alpha:.35)..strokeWidth=1;
+    final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke;
+    final path=Path();
+    for(var i=0;i<data.length;i++){
+      final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);
+      final normalized=rawRange.abs()<.01?.5:(data[i].value-min)/range;
+      final y=top+chartH-normalized*chartH;
+      if(i==0)path.moveTo(x,y);else path.lineTo(x,y);
+      c.drawCircle(Offset(x,y),i==selected?7:4,Paint()..color=color);
+      _drawLabel(c,'${data[i].value.toStringAsFixed(data[i].value.truncateToDouble()==data[i].value?0:1)} kg',Offset(x,y-12),TextAlign.center);
+      if(data.length<=6||i==0||i==data.length-1)_drawLabel(c,DateFormat('dd/MM').format(data[i].date),Offset(x,s.height-bottom+8),TextAlign.center);
+    }
+    c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);c.drawPath(path,line);
+    _drawLabel(c,'${max.toStringAsFixed(max.truncateToDouble()==max?0:1)} kg',Offset(2,top),TextAlign.left);
+    if(rawRange.abs()>.01)_drawLabel(c,'${min.toStringAsFixed(min.truncateToDouble()==min?0:1)} kg',Offset(2,s.height-bottom),TextAlign.left);
+  }
+  void _drawLabel(Canvas c,String text,Offset center,TextAlign align){final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(color:labelColor,fontSize:10,fontWeight:FontWeight.w500)),textDirection:TextDirection.ltr,textAlign:align)..layout(maxWidth:90);final dx=(align==TextAlign.center?center.dx-tp.width/2:center.dx).toDouble();final dy=(align==TextAlign.center?center.dy-tp.height/2:center.dy).toDouble();tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),dy.clamp(0.0,10000.0).toDouble()));}
+  @override bool shouldRepaint(covariant GymChartPainter old)=>old.data!=data||old.color!=color||old.labelColor!=labelColor||old.selected!=selected;
+}
