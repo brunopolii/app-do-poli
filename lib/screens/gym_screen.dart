@@ -44,7 +44,7 @@ class _HistorySectionState extends State<HistorySection>{
       for(final e in w.exercises.where((e)=>e.name==exercise)){
         for(final v in e.weights){if(v.isFinite&&v>0&&(best==null||v>best))best=v;}
       }
-      if(best!=null)bySession[w.id]=_Point(d,best);
+      if(best!=null){final key=w.id.isNotEmpty?w.id:'${w.date}|${w.name}|${d.microsecondsSinceEpoch}';bySession[key]=_Point(d,best);}
     }
     final out=bySession.values.toList()..sort((a,b)=>a.date.compareTo(b.date));
     return out;
