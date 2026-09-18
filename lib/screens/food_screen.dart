@@ -36,7 +36,7 @@ class _WeightChartState extends State<_WeightChart>{
     return GestureDetector(
       onTapUp:(d){if(widget.data.isEmpty)return;final width=MediaQuery.sizeOf(context).width;final chartW=(width-48).clamp(1.0,10000.0).toDouble();final x=(d.localPosition.dx-36).clamp(0.0,chartW);final i=widget.data.length==1?0:(x/chartW*(widget.data.length-1)).round().clamp(0,widget.data.length-1);setState(()=>selected=i);},
       child:SizedBox(height:210,child:Stack(children:[
-        Positioned.fill(child:CustomPaint(painter:_WeightPainter(widget.data,widget.color,selected))),
+        Positioned.fill(child:CustomPaint(painter:_WeightPainter(widget.data,widget.color,selected,Directionality.of(context)))),
         if(selected!=null&&selected!>=0&&selected!<widget.data.length)Align(alignment:Alignment.topCenter,child:Container(margin:const EdgeInsets.only(top:2),padding:const EdgeInsets.symmetric(horizontal:10,vertical:6),decoration:BoxDecoration(color:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(10)),child:Text(_label(widget.data[selected!]),style:Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight:FontWeight.bold)))),
       ])),
     );
@@ -44,8 +44,8 @@ class _WeightChartState extends State<_WeightChart>{
   String _label(WeightEntry e){final d=DateTime.tryParse(e.date);return d==null?'${e.weight.toStringAsFixed(1)} kg':'${DateFormat('dd/MM','pt_BR').format(d)} • ${e.weight.toStringAsFixed(1)} kg';}
 }
 class _WeightPainter extends CustomPainter{
-  final List<WeightEntry> data; final Color color; final int? selected;
-  _WeightPainter(this.data,this.color,this.selected);
+  final List<WeightEntry> data; final Color color; final int? selected; final TextDirection textDirection;
+  _WeightPainter(this.data,this.color,this.selected,this.textDirection);
   @override void paint(Canvas c,Size s){
     if(data.isEmpty)return;
     const left=36.0,right=10.0,top=26.0,bottom=38.0;
@@ -55,6 +55,6 @@ class _WeightPainter extends CustomPainter{
     for(var i=0;i<data.length;i++){final x=data.length==1?left+w/2:left+i*w/(data.length-1);final y=top+h-((data[i].weight-min)/range)*h;if(i==0)path.moveTo(x,y);else path.lineTo(x,y);c.drawCircle(Offset(x,y),i==selected?7:4,Paint()..color=color);_draw(c,'${data[i].weight.toStringAsFixed(1)} kg',Offset(x,y-12),TextAlign.center);if(data.length<=6||i==0||i==data.length-1)_draw(c,DateFormat('dd/MM').format(DateTime.tryParse(data[i].date)??DateTime.now()),Offset(x,s.height-bottom+8),TextAlign.center);}
     c.drawPath(path,line);_draw(c,'${max.toStringAsFixed(1)} kg',Offset(2,top),TextAlign.left);if((max-min).abs()>.01)_draw(c,'${min.toStringAsFixed(1)} kg',Offset(2,s.height-bottom),TextAlign.left);
   }
-  void _draw(Canvas c,String text,Offset center,TextAlign align){final tp=TextPainter(text:TextSpan(text:text,style:const TextStyle(fontSize:10)),textDirection:TextDirection.values.first,textAlign:align)..layout(maxWidth:80);final dx=align==TextAlign.center?center.dx-tp.width/2:center.dx;tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),center.dy));}
+  void _draw(Canvas c,String text,Offset center,TextAlign align){final tp=TextPainter(text:TextSpan(text:text,style:const TextStyle(fontSize:10)),textDirection:textDirection,textAlign:align)..layout(maxWidth:80);final dx=align==TextAlign.center?center.dx-tp.width/2:center.dx;tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),center.dy));}
   @override bool shouldRepaint(covariant _WeightPainter old)=>old.data!=data||old.color!=color||old.selected!=selected;
 }
