@@ -270,6 +270,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
                 );
               },
             ),
+          ),
         : ActivationScreen(onActivated: _finishActivation),
   );
 }
