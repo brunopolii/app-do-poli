@@ -4,7 +4,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
-  static const String _channelId = 'app_do_poli_finance';
+  static const String _channelId = 'app_do_poli_agenda';
 
   static Future<void> initialize() async {
     tz.initializeTimeZones();
