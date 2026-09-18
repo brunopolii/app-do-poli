@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -86,8 +87,8 @@ class _GymChartState extends State<_GymChart>{
   String _label(_Point p)=>'${DateFormat('dd/MM','pt_BR').format(p.date)} • ${p.value.toStringAsFixed(p.value.truncateToDouble()==p.value?0:1)} kg';
 }
 class GymChartPainter extends CustomPainter{
-  final List<_Point> data;final Color color;final Color labelColor;final int? selected;final TextDirection textDirection;
-  GymChartPainter(this.data,this.color,this.labelColor,[this.selected,this.textDirection=TextDirection.ltr]);
+  final List<_Point> data;final Color color;final Color labelColor;final int? selected;final ui.TextDirection textDirection;
+  GymChartPainter(this.data,this.color,this.labelColor,[this.selected,this.textDirection=ui.TextDirection.ltr]);
   @override void paint(Canvas c,Size s){
     if(data.isEmpty)return;
     const left=42.0,right=12.0,top=26.0,bottom=40.0;
