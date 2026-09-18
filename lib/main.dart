@@ -12,7 +12,6 @@ import 'screens/theme_screen.dart';
 import 'services/license_service.dart';
 import 'services/notification_service.dart';
 import 'services/theme_service.dart';
-import 'widgets/app_card.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -131,13 +130,6 @@ class _AppDoPoliState extends State<AppDoPoli> {
       useMaterial3: true,
       brightness: b,
       colorSchemeSeed: themeSettings.accentColorValue == 0 ? seed : Color(themeSettings.accentColorValue),
-      extensions: [
-        PoliThemeExtension(
-          cardColor: cardBase,
-          cardOpacity: themeSettings.cardOpacity,
-          cardBorderColor: Color(themeSettings.cardBorderColorValue),
-        ),
-      ],
       scaffoldBackgroundColor: Colors.transparent,
       canvasColor: Colors.transparent,
       appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0),
