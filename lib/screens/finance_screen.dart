@@ -109,7 +109,7 @@ class _FinanceScreenState extends State<FinanceScreen>{
 
   Future<void> _installment({MoneyTransaction? editing})async{
     final d=TextEditingController(text:editing?.description??'');
-    final amount=TextEditingController(text:editing==null?'':editing.totalAmount.toStringAsFixed(2));
+    final amount=TextEditingController(text:editing==null?'':editing.installmentAmount.toStringAsFixed(2));
     final n=TextEditingController(text:editing?.totalInstallments.toString()??'2');
     String mode='total';String cat=editing?.category??'Outros';bool paid=editing?.isPaid??false;
     DateTime due=editing==null?DateTime.now():_date(editing.dueDate);
@@ -131,7 +131,7 @@ class _FinanceScreenState extends State<FinanceScreen>{
     if(ok!=true||raw==null||raw<=0||count==null||count<2||desc.isEmpty)return;
     if(editing!=null){
       editing.description=desc;editing.category=cat;editing.totalInstallments=count;editing.dueDate=DateFormat('yyyy-MM-dd').format(due);editing.date=editing.dueDate;
-      editing.amount=mode=='total'?raw:raw;editing.installmentAmount=mode=='total'?raw/count:raw;editing.totalAmount=mode=='total'?raw:raw*count;editing.paymentStatus=paid?'paid':'pending';editing.paidDate=paid?DateFormat('yyyy-MM-dd').format(DateTime.now()):null;
+      editing.installmentAmount=mode=='total'?raw/count:raw;editing.amount=editing.installmentAmount;editing.totalAmount=mode=='total'?raw:raw*count;editing.paymentStatus=paid?'paid':'pending';editing.paidDate=paid?DateFormat('yyyy-MM-dd').format(DateTime.now()):null;
       await _save();if(mounted)setState((){});return;
     }
     final group=DateTime.now().microsecondsSinceEpoch.toString();final total=mode=='total'?raw:raw*count;final each=mode=='total'?raw/count:raw;double used=0;
