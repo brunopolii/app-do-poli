@@ -256,7 +256,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
             extendBody: true,
             extendBodyBehindAppBar: true,
             appBar: AppBar(
-              title: const Text('Polirotinas', style: TextStyle(fontWeight: FontWeight.bold)),
+              title: const Text('Poliroutines', style: TextStyle(fontWeight: FontWeight.bold)),
               actions: [
                 IconButton(
                   tooltip: 'Personalizar tema',
