@@ -219,7 +219,7 @@ class _ChartPainter extends CustomPainter {
     }
 
     final grid = Paint()
-      ..color = scheme.outlineVariant.withOpacity(0.45)
+      ..color = scheme.outlineVariant.withValues(alpha:0.45)
       ..strokeWidth = 1;
     final line = Paint()
       ..color = scheme.primary
