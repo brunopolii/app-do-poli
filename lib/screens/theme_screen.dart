@@ -102,6 +102,12 @@ class _ThemeScreenState extends State<ThemeScreen> {
           if(has)...[TextButton.icon(onPressed:_clearImage,icon:const Icon(Icons.close),label:const Text('Remover foto')),_slider('Zoom',settings.scale,.5,3,(v)=>settings.copyWith(scale:v)),_slider('Posição horizontal',settings.x,-5,5,(v)=>settings.copyWith(x:v)),_slider('Posição vertical',settings.y,-5,5,(v)=>settings.copyWith(y:v)),_slider('Transparência da foto',settings.opacity,.05,1,(v)=>settings.copyWith(opacity:v))]
         ]))),
         const SizedBox(height:12),
+        OutlinedButton.icon(
+          onPressed: () async { await _save(const ThemeSettings()); await _mode(ThemeMode.system); },
+          icon: const Icon(Icons.restore),
+          label: const Text('Restaurar padrão'),
+        ),
+        const SizedBox(height:8),
         const Card(child:ListTile(leading:Icon(Icons.info_outline),title:Text('Tema salvo automaticamente'),subtitle:Text('As configurações permanecem após fechar e abrir o Polirotinas.')))
       ]),
       ),
