@@ -55,6 +55,6 @@ class _WeightPainter extends CustomPainter{
     for(var i=0;i<data.length;i++){final x=data.length==1?left+w/2:left+i*w/(data.length-1);final y=top+h-((data[i].weight-min)/range)*h;if(i==0)path.moveTo(x,y);else path.lineTo(x,y);c.drawCircle(Offset(x,y),i==selected?7:4,Paint()..color=color);_draw(c,'${data[i].weight.toStringAsFixed(1)} kg',Offset(x,y-12),TextAlign.center);if(data.length<=6||i==0||i==data.length-1)_draw(c,DateFormat('dd/MM').format(DateTime.tryParse(data[i].date)??DateTime.now()),Offset(x,s.height-bottom+8),TextAlign.center);}
     c.drawPath(path,line);_draw(c,'${max.toStringAsFixed(1)} kg',Offset(2,top),TextAlign.left);if((max-min).abs()>.01)_draw(c,'${min.toStringAsFixed(1)} kg',Offset(2,s.height-bottom),TextAlign.left);
   }
-  void _draw(Canvas c,String text,Offset center,TextAlign align){final tp=TextPainter(text:TextSpan(text:text,style:const TextStyle(fontSize:10)),textDirection:TextDirection.ltr,textAlign:align)..layout(maxWidth:80);final dx=align==TextAlign.center?center.dx-tp.width/2:center.dx;tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),center.dy));}
+  void _draw(Canvas c,String text,Offset center,TextAlign align){final tp=TextPainter(text:TextSpan(text:text,style:const TextStyle(fontSize:10)),textDirection:TextDirection.values.first,textAlign:align)..layout(maxWidth:80);final dx=align==TextAlign.center?center.dx-tp.width/2:center.dx;tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),center.dy));}
   @override bool shouldRepaint(covariant _WeightPainter old)=>old.data!=data||old.color!=color||old.selected!=selected;
 }
