@@ -202,13 +202,18 @@ class _AppDoPoliState extends State<AppDoPoli> {
               final navBase = themeSettings.navColorValue == 0 ? Theme.of(context).colorScheme.surface : Color(themeSettings.navColorValue);
               final navContent = navBase.computeLuminance() > .48 ? Colors.black87 : Colors.white;
               final accent = Color(themeSettings.accentColorValue == 0 ? (Theme.of(context).brightness == Brightness.dark ? 0xFF9B82DB : 0xFF6750A4) : themeSettings.accentColorValue);
-              final selectedContent = accent.computeLuminance() > .48 ? Colors.black87 : Colors.white;
               return NavigationBarTheme(
                 data: NavigationBarThemeData(
                   backgroundColor: navBase.withValues(alpha: themeSettings.navOpacity),
                   indicatorColor: accent,
-                  iconTheme: WidgetStatePropertyAll(IconThemeData(color: navContent)),
-                  labelTextStyle: WidgetStatePropertyAll(TextStyle(color: navContent)),
+                  iconTheme: WidgetStateProperty.resolveWith((states) {
+                    final selected = states.contains(WidgetState.selected);
+                    return IconThemeData(color: selected ? (accent.computeLuminance() > .48 ? Colors.black87 : Colors.white) : navContent);
+                  }),
+                  labelTextStyle: WidgetStateProperty.resolveWith((states) {
+                    final selected = states.contains(WidgetState.selected);
+                    return TextStyle(color: selected ? (accent.computeLuminance() > .48 ? Colors.black87 : Colors.white) : navContent);
+                  }),
                   overlayColor: WidgetStatePropertyAll(navContent.withValues(alpha: .08)),
                 ),
                 child: NavigationBar(
