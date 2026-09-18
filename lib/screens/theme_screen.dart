@@ -69,7 +69,9 @@ class _ThemeScreenState extends State<ThemeScreen> {
 
   @override Widget build(BuildContext context){
     final has=settings.imagePath!=null; final card=_resolveCardColor(context); final nav=_resolveNavColor(context);
-    return Scaffold(appBar:AppBar(title:const Text('Personalizar tema'),leading:IconButton(icon:const Icon(Icons.close),onPressed:()=>Navigator.pop(context,ThemeEditResult(settings,mode)))),
+    return WillPopScope(
+      onWillPop: () async { Navigator.pop(context, ThemeEditResult(settings, mode)); return false; },
+      child: Scaffold(appBar:AppBar(title:const Text('Personalizar tema'),leading:IconButton(icon:const Icon(Icons.close),onPressed:()=>Navigator.pop(context,ThemeEditResult(settings,mode)))),
       body:ListView(padding:const EdgeInsets.all(16),children:[
         Text('Modo do aplicativo',style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:8),
         SegmentedButton<ThemeMode>(segments:const[
@@ -101,7 +103,9 @@ class _ThemeScreenState extends State<ThemeScreen> {
         ]))),
         const SizedBox(height:12),
         const Card(child:ListTile(leading:Icon(Icons.info_outline),title:Text('Tema salvo automaticamente'),subtitle:Text('As configurações permanecem após fechar e abrir o Polirotinas.')))
-      ]);
+      ]),
+      ),
+    );
   }
 
   Widget _slider(String label,double value,double min,double max,ThemeSettings Function(double) next)=>Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
