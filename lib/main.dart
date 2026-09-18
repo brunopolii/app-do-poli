@@ -127,13 +127,10 @@ class _AppDoPoliState extends State<AppDoPoli> {
     final cardBase = themeSettings.cardColorValue == 0
         ? (dark ? const Color(0xFF1F1F24) : const Color(0xFFFFFFFF))
         : Color(themeSettings.cardColorValue);
-    final navBase = themeSettings.navColorValue == 0
-        ? (dark ? theme.colorScheme.surface : const Color(0xFFFFFFFF))
-        : Color(themeSettings.navColorValue);
     return ThemeData(
       useMaterial3: true,
       brightness: b,
-      colorSchemeSeed: Color(themeSettings.accentColorValue == 0 ? seed.value : themeSettings.accentColorValue),
+      colorSchemeSeed: themeSettings.accentColorValue == 0 ? seed : Color(themeSettings.accentColorValue),
       extensions: [
         PoliThemeExtension(
           cardColor: cardBase,
