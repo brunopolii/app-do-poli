@@ -68,9 +68,7 @@ class _ThemeScreenState extends State<ThemeScreen> {
 
   @override Widget build(BuildContext context){
     final has=settings.imagePath!=null; final card=_resolveCardColor(context); final nav=_resolveNavColor(context);
-    return PopScope(canPop: false, onPopInvokedWithResult: (_, __) { Navigator.pop(context, ThemeEditResult(settings, mode)); },
-      onWillPop: () async { Navigator.pop(context, ThemeEditResult(settings, mode)); return false; },
-      child: Scaffold(appBar:AppBar(title:const Text('Personalizar tema'),leading:IconButton(icon:const Icon(Icons.close),onPressed:()=>Navigator.pop(context,ThemeEditResult(settings,mode)))),
+    return PopScope(canPop: false, onPopInvokedWithResult: (_, __) { Navigator.pop(context, ThemeEditResult(settings, mode)); }, child: Scaffold(appBar:AppBar(title:const Text('Personalizar tema'),leading:IconButton(icon:const Icon(Icons.close),onPressed:()=>Navigator.pop(context,ThemeEditResult(settings,mode)))),
       body:ListView(padding:const EdgeInsets.all(16),children:[
         Text('Modo do aplicativo',style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:8),
         SegmentedButton<ThemeMode>(segments:const[
