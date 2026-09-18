@@ -34,7 +34,7 @@ class _ThemeScreenState extends State<ThemeScreen> {
 
   Future<void> _pickColor(String title, Color current, Future<void> Function(Color) onChanged) async {
     var value=current;
-    final hexController=TextEditingController(text:value.value.toRadixString(16).padLeft(8,'0').substring(2).toUpperCase());
+    final hexController=TextEditingController(text:value.toARGB32().toRadixString(16).padLeft(8,'0').substring(2).toUpperCase());
     final result=await showDialog<Color>(context:context,builder:(dialogContext)=>StatefulBuilder(builder:(context,setDialog)=>AlertDialog(
       title:Text(title),
       content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
@@ -45,7 +45,7 @@ class _ThemeScreenState extends State<ThemeScreen> {
           if(parsed!=null&&raw.length==6)setDialog(()=>value=Color(parsed));
         }),
         const SizedBox(height:12),
-        Wrap(spacing:8,runSpacing:8,children:colors.map((c)=>InkWell(onTap:(){setDialog(()=>value=c);hexController.text=c.value.toRadixString(16).padLeft(8,'0').substring(2).toUpperCase();},child:Container(width:34,height:34,decoration:BoxDecoration(color:c,shape:BoxShape.circle,border:Border.all(color:value.value==c.value?Theme.of(context).colorScheme.primary:Colors.black26,width:value.value==c.value?3:1))))).toList()),
+        Wrap(spacing:8,runSpacing:8,children:colors.map((c)=>InkWell(onTap:(){setDialog(()=>value=c);hexController.text=c.toARGB32().toRadixString(16).padLeft(8,'0').substring(2).toUpperCase();},child:Container(width:34,height:34,decoration:BoxDecoration(color:c,shape:BoxShape.circle,border:Border.all(color:value.toARGB32()==c.toARGB32()?Theme.of(context).colorScheme.primary:Colors.black26,width:value.toARGB32()==c.toARGB32()?3:1))))).toList()),
       ])),
       actions:[TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('Cancelar')),FilledButton(onPressed:()=>Navigator.pop(dialogContext,value),child:const Text('Aplicar'))],
     )));
@@ -61,14 +61,14 @@ class _ThemeScreenState extends State<ThemeScreen> {
     contentPadding:EdgeInsets.zero,
     leading:Container(width:42,height:42,decoration:BoxDecoration(color:color,shape:BoxShape.circle,border:Border.all(color:Theme.of(context).colorScheme.outline))),
     title:Text(title),
-    subtitle:Text('#${color.value.toRadixString(16).padLeft(8,'0').substring(2).toUpperCase()}'),
+    subtitle:Text('#${color.toARGB32().toRadixString(16).padLeft(8,'0').substring(2).toUpperCase()}'),
     trailing:const Icon(Icons.chevron_right),
     onTap:onTap,
   );
 
   @override Widget build(BuildContext context){
     final has=settings.imagePath!=null; final card=_resolveCardColor(context); final nav=_resolveNavColor(context);
-    return WillPopScope(
+    return PopScope(canPop: false, onPopInvokedWithResult: (_, __) { Navigator.pop(context, ThemeEditResult(settings, mode)); },
       onWillPop: () async { Navigator.pop(context, ThemeEditResult(settings, mode)); return false; },
       child: Scaffold(appBar:AppBar(title:const Text('Personalizar tema'),leading:IconButton(icon:const Icon(Icons.close),onPressed:()=>Navigator.pop(context,ThemeEditResult(settings,mode)))),
       body:ListView(padding:const EdgeInsets.all(16),children:[
