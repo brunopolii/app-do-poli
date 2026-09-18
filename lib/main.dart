@@ -12,6 +12,7 @@ import 'screens/theme_screen.dart';
 import 'services/license_service.dart';
 import 'services/notification_service.dart';
 import 'services/theme_service.dart';
+import 'widgets/app_card.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -123,15 +124,28 @@ class _AppDoPoliState extends State<AppDoPoli> {
   ThemeData _theme(Brightness b) {
     final dark = b == Brightness.dark;
     final seed = dark ? const Color(0xFF9B82DB) : const Color(0xFF6750A4);
+    final cardBase = themeSettings.cardColorValue == 0
+        ? (dark ? const Color(0xFF1F1F24) : const Color(0xFFFFFFFF))
+        : Color(themeSettings.cardColorValue);
+    final navBase = themeSettings.navColorValue == 0
+        ? (dark ? theme.colorScheme.surface : const Color(0xFFFFFFFF))
+        : Color(themeSettings.navColorValue);
     return ThemeData(
       useMaterial3: true,
       brightness: b,
-      colorSchemeSeed: seed,
+      colorSchemeSeed: Color(themeSettings.accentColorValue == 0 ? seed.value : themeSettings.accentColorValue),
+      extensions: [
+        PoliThemeExtension(
+          cardColor: cardBase,
+          cardOpacity: themeSettings.cardOpacity,
+          cardBorderColor: Color(themeSettings.cardBorderColorValue),
+        ),
+      ],
       scaffoldBackgroundColor: Colors.transparent,
       canvasColor: Colors.transparent,
       appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0),
       cardTheme: CardThemeData(
-        color: dark ? const Color(0xE61F1F24) : const Color(0xE6FFFFFF),
+        color: cardBase.withValues(alpha: themeSettings.cardOpacity),
         elevation: 1,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(20))),
       ),
@@ -188,7 +202,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
               ],
             ),
             bottomNavigationBar: NavigationBar(
-              backgroundColor: Theme.of(context).colorScheme.surface.withValues(alpha: .92),
+              backgroundColor: (themeSettings.navColorValue == 0 ? Theme.of(context).colorScheme.surface : Color(themeSettings.navColorValue)).withValues(alpha: themeSettings.navOpacity),
               selectedIndex: selectedIndex,
               onDestinationSelected: (i) {
                 setState(() => selectedIndex = i);
