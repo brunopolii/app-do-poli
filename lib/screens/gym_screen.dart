@@ -112,5 +112,5 @@ class _GymChartPainter extends CustomPainter{
     if(rawRange.abs()>.01)_drawLabel(c,'${min.toStringAsFixed(min.truncateToDouble()==min?0:1)} kg',Offset(2,s.height-bottom),TextAlign.left);
   }
   void _drawLabel(Canvas c,String text,Offset center,TextAlign align){final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(color:labelColor,fontSize:10,fontWeight:FontWeight.w500)),textDirection:textDirection,textAlign:align)..layout(maxWidth:90);final dx=(align==TextAlign.center?center.dx-tp.width/2:center.dx).toDouble();final dy=(align==TextAlign.center?center.dy-tp.height/2:center.dy).toDouble();tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),dy.clamp(0.0,10000.0).toDouble()));}
-  @override bool shouldRepaint(covariant GymChartPainter old)=>old.data!=data||old.color!=color||old.labelColor!=labelColor||old.selected!=selected;
+  @override bool shouldRepaint(covariant _GymChartPainter old)=>old.data!=data||old.color!=color||old.labelColor!=labelColor||old.selected!=selected;
 }
