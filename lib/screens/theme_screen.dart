@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/theme_service.dart';
-import '../widgets/app_card.dart';
 
 class ThemeEditResult {
   final ThemeSettings settings;
