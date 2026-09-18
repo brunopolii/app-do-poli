@@ -8,7 +8,7 @@ class AppCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final settings = theme.extension<_PoliThemeExtension>();
+    final settings = theme.extension<PoliThemeExtension>();
     final cardColor = settings?.cardColor ?? theme.colorScheme.surfaceContainer;
     final borderColor = settings?.cardBorderColor ?? theme.colorScheme.outline;
     final cardOpacity = settings?.cardOpacity ?? .90;
