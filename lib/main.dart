@@ -144,7 +144,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
       cardTheme: CardThemeData(
         color: cardBase.withValues(alpha: themeSettings.cardOpacity),
         elevation: 1,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(20))),
+        shape: RoundedRectangleBorder(borderRadius: const BorderRadius.all(Radius.circular(20)), side: BorderSide(color: Color(themeSettings.cardBorderColorValue), width: 1)),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
