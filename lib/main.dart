@@ -190,40 +190,86 @@ class _AppDoPoliState extends State<AppDoPoli> {
                 const FinanceScreen(),
               ],
             ),
-            bottomNavigationBar: Builder(builder: (context) {
-              final navBase = themeSettings.navColorValue == 0 ? Theme.of(context).colorScheme.surface : Color(themeSettings.navColorValue);
-              final navContent = navBase.computeLuminance() > .48 ? Colors.black87 : Colors.white;
-              final accent = Color(themeSettings.accentColorValue == 0 ? (Theme.of(context).brightness == Brightness.dark ? 0xFF9B82DB : 0xFF6750A4) : themeSettings.accentColorValue);
-              return NavigationBarTheme(
-                data: NavigationBarThemeData(
-                  backgroundColor: navBase.withValues(alpha: themeSettings.navOpacity),
-                  indicatorColor: accent,
-                  iconTheme: WidgetStateProperty.resolveWith((states) {
-                    final selected = states.contains(WidgetState.selected);
-                    return IconThemeData(color: selected ? (accent.computeLuminance() > .48 ? Colors.black87 : Colors.white) : navContent);
-                  }),
-                  labelTextStyle: WidgetStateProperty.resolveWith((states) {
-                    final selected = states.contains(WidgetState.selected);
-                    return TextStyle(color: selected ? (accent.computeLuminance() > .48 ? Colors.black87 : Colors.white) : navContent);
-                  }),
-                  overlayColor: WidgetStatePropertyAll(navContent.withValues(alpha: .08)),
-                ),
-                child: NavigationBar(
-              selectedIndex: selectedIndex,
-              onDestinationSelected: (i) {
-                setState(() => selectedIndex = i);
-                if (i == 1) _gymKey.currentState?.refresh();
-                if (i == 2) _homeKey.currentState?.refresh();
+            bottomNavigationBar: Builder(
+              builder: (context) {
+                final navBase = themeSettings.navColorValue == 0
+                    ? Theme.of(context).colorScheme.surface
+                    : Color(themeSettings.navColorValue);
+                final navContent =
+                    navBase.computeLuminance() > .48 ? Colors.black87 : Colors.white;
+                final accent = Color(
+                  themeSettings.accentColorValue == 0
+                      ? (Theme.of(context).brightness == Brightness.dark
+                          ? 0xFF9B82DB
+                          : 0xFF6750A4)
+                      : themeSettings.accentColorValue,
+                );
+                return NavigationBarTheme(
+                  data: NavigationBarThemeData(
+                    backgroundColor:
+                        navBase.withValues(alpha: themeSettings.navOpacity),
+                    indicatorColor: accent,
+                    iconTheme: WidgetStateProperty.resolveWith((states) {
+                      final selected = states.contains(WidgetState.selected);
+                      return IconThemeData(
+                        color: selected
+                            ? (accent.computeLuminance() > .48
+                                ? Colors.black87
+                                : Colors.white)
+                            : navContent,
+                      );
+                    }),
+                    labelTextStyle: WidgetStateProperty.resolveWith((states) {
+                      final selected = states.contains(WidgetState.selected);
+                      return TextStyle(
+                        color: selected
+                            ? (accent.computeLuminance() > .48
+                                ? Colors.black87
+                                : Colors.white)
+                            : navContent,
+                      );
+                    }),
+                    overlayColor:
+                        WidgetStatePropertyAll(navContent.withValues(alpha: .08)),
+                  ),
+                  child: NavigationBar(
+                    selectedIndex: selectedIndex,
+                    onDestinationSelected: (i) {
+                      setState(() => selectedIndex = i);
+                      if (i == 1) _gymKey.currentState?.refresh();
+                      if (i == 2) _homeKey.currentState?.refresh();
+                    },
+                    destinations: const [
+                      NavigationDestination(
+                        icon: Icon(Icons.calendar_month_outlined),
+                        selectedIcon: Icon(Icons.calendar_month),
+                        label: 'Agenda',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.fitness_center_outlined),
+                        selectedIcon: Icon(Icons.fitness_center),
+                        label: 'Academia',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.home_outlined),
+                        selectedIcon: Icon(Icons.home),
+                        label: 'Início',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.restaurant_outlined),
+                        selectedIcon: Icon(Icons.restaurant),
+                        label: 'Alimentação',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.account_balance_wallet_outlined),
+                        selectedIcon: Icon(Icons.account_balance_wallet),
+                        label: 'Financeiro',
+                      ),
+                    ],
+                  ),
+                );
               },
-              destinations: [
-                NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month), label: 'Agenda'),
-                NavigationDestination(icon: Icon(Icons.fitness_center_outlined), selectedIcon: Icon(Icons.fitness_center), label: 'Academia'),
-                NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Início'),
-                NavigationDestination(icon: Icon(Icons.restaurant_outlined), selectedIcon: Icon(Icons.restaurant), label: 'Alimentação'),
-                NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Financeiro'),
-              ],
             ),
-          )
         : ActivationScreen(onActivated: _finishActivation),
   );
 }
