@@ -111,7 +111,7 @@ class _GymHistorySectionState extends State<GymHistorySection> {
             const Text('Histórico completo, sem limite de dias. O peso mostrado é a maior carga usada no exercício em cada treino.'),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
-              value: selectedPlan,
+              initialValue: selectedPlan,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Treino'),
               items: plans.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
@@ -123,7 +123,7 @@ class _GymHistorySectionState extends State<GymHistorySection> {
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<int>(
-              value: selectedDay,
+              initialValue: selectedDay,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Dia do treino'),
               items: days.map((d) => DropdownMenuItem(value: d, child: Text(_dayName(d)))).toList(),
@@ -135,7 +135,7 @@ class _GymHistorySectionState extends State<GymHistorySection> {
             if (exercises.isNotEmpty) ...[
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
-                value: selectedExercise,
+                initialValue: selectedExercise,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Exercício'),
                 items: exercises.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
