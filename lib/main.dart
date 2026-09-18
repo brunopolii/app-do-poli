@@ -27,6 +27,106 @@ Future<void> main() async {
   ));
 }
 
+class _AppBackground extends StatefulWidget {
+  final ThemeSettings settings;
+  final Widget child;
+
+  const _AppBackground({
+    required this.settings,
+    required this.child,
+  });
+
+  @override
+  State<_AppBackground> createState() => _AppBackgroundState();
+}
+
+class _AppBackgroundState extends State<_AppBackground> {
+  ImageProvider? _image;
+  String? _path;
+
+  @override
+  void initState() {
+    super.initState();
+    _setImage(widget.settings.imagePath);
+  }
+
+  @override
+  void didUpdateWidget(covariant _AppBackground oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.settings.imagePath != _path) {
+      _setImage(widget.settings.imagePath);
+    }
+  }
+
+  void _setImage(String? path) {
+    if (path == null || !File(path).existsSync()) {
+      if (mounted) {
+        setState(() {
+          _path = null;
+          _image = null;
+        });
+      }
+      return;
+    }
+
+    final provider = FileImage(File(path));
+    _path = path;
+    _precacheAndShow(provider);
+  }
+
+  Future<void> _precacheAndShow(ImageProvider provider) async {
+    try {
+      await precacheImage(provider, context);
+    } catch (_) {
+      // Keep the current background if the new image cannot be decoded.
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _image = provider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.settings;
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final configured = Color(s.backgroundColorValue);
+    final base = dark ? theme.colorScheme.surface : configured;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ColoredBox(color: base),
+        if (_image != null)
+          IgnorePointer(
+            child: ClipRect(
+              child: Opacity(
+                opacity: s.opacity,
+                child: Transform.translate(
+                  offset: Offset(s.x * 40, s.y * 40),
+                  child: Transform.scale(
+                    scale: s.scale,
+                    child: Image(
+                      image: _image!,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        s.imagePath != null && _image == null
+            ? const SizedBox.shrink()
+            : const SizedBox.shrink(),
+        widget.child,
+      ],
+    );
+  }
+}
+
+
 class AppDoPoli extends StatefulWidget {
   final bool initiallyActivated;
   final ThemeSettings initialTheme;
@@ -58,6 +158,26 @@ class _AppDoPoliState extends State<AppDoPoli> {
 
   void _finishActivation() => setState(() => activated = true);
 
+  Future<void> _showHelp() async {
+    await showDialog<void>(
+      context: _navigatorKey.currentContext ?? context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Ajuda'),
+        content: const Text(
+          'Precisa de ajuda ou encontrou algum problema no Poliroutines?\n\n'
+          'Entre em contato pelo e-mail:\n'
+          'brunopolineg@gmail.com',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _openTheme() async {
     final navigator = _navigatorKey.currentState;
     if (navigator == null) return;
@@ -84,39 +204,9 @@ class _AppDoPoliState extends State<AppDoPoli> {
   }
 
   Widget _background(BuildContext context, Widget child) {
-    final s = themeSettings;
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final configured = Color(s.backgroundColorValue);
-    final base = dark ? theme.colorScheme.surface : configured;
-    final path = s.imagePath;
-    if (path == null || !File(path).existsSync()) {
-      return ColoredBox(color: base, child: child);
-    }
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        ColoredBox(color: base),
-        IgnorePointer(
-          child: ClipRect(
-            child: Opacity(
-              opacity: s.opacity,
-              child: Transform.translate(
-                offset: Offset(s.x * 40, s.y * 40),
-                child: Transform.scale(
-                  scale: s.scale,
-                  child: Image.file(
-                    File(path),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        child,
-      ],
+    return _AppBackground(
+      settings: themeSettings,
+      child: child,
     );
   }
 
@@ -154,7 +244,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
-    title: 'Polirotinas',
+    title: 'Poliroutines',
     navigatorKey: _navigatorKey,
     theme: _theme(Brightness.light),
     darkTheme: _theme(Brightness.dark),
@@ -172,6 +262,11 @@ class _AppDoPoliState extends State<AppDoPoli> {
                   tooltip: 'Personalizar tema',
                   onPressed: _openTheme,
                   icon: const Icon(Icons.palette_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Ajuda',
+                  onPressed: _showHelp,
+                  icon: const Icon(Icons.help_outline),
                 ),
                 IconButton(
                   tooltip: 'Modo claro/escuro',
