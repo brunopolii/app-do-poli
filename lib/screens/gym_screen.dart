@@ -79,15 +79,15 @@ class _GymChartState extends State<_GymChart>{
   @override Widget build(BuildContext context)=>GestureDetector(
     onTapUp:(d){final w=MediaQuery.sizeOf(context).width;final chartW=(w-48).clamp(1.0,10000.0).toDouble();final x=(d.localPosition.dx-36).clamp(0.0,chartW);final i=widget.data.length==1?0:(x/chartW*(widget.data.length-1)).round().clamp(0,widget.data.length-1);setState(()=>selected=i);},
     child:SizedBox(height:235,child:Stack(children:[
-      Positioned.fill(child:CustomPaint(painter:GymChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,selected))),
+      Positioned.fill(child:CustomPaint(painter:GymChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,selected,Directionality.of(context)))),
       if(selected!=null&&selected!>=0&&selected!<widget.data.length)Align(alignment:Alignment.topCenter,child:Container(margin:const EdgeInsets.only(top:2),padding:const EdgeInsets.symmetric(horizontal:10,vertical:6),decoration:BoxDecoration(color:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(10)),child:Text(_label(widget.data[selected!]),style:Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight:FontWeight.bold)))),
     ])),
   );
   String _label(_Point p)=>'${DateFormat('dd/MM','pt_BR').format(p.date)} • ${p.value.toStringAsFixed(p.value.truncateToDouble()==p.value?0:1)} kg';
 }
 class GymChartPainter extends CustomPainter{
-  final List<_Point> data;final Color color;final Color labelColor;final int? selected;
-  GymChartPainter(this.data,this.color,this.labelColor,[this.selected]);
+  final List<_Point> data;final Color color;final Color labelColor;final int? selected;final TextDirection textDirection;
+  GymChartPainter(this.data,this.color,this.labelColor,[this.selected,this.textDirection=TextDirection.ltr]);
   @override void paint(Canvas c,Size s){
     if(data.isEmpty)return;
     const left=42.0,right=12.0,top=26.0,bottom=40.0;
@@ -110,6 +110,6 @@ class GymChartPainter extends CustomPainter{
     _drawLabel(c,'${max.toStringAsFixed(max.truncateToDouble()==max?0:1)} kg',Offset(2,top),TextAlign.left);
     if(rawRange.abs()>.01)_drawLabel(c,'${min.toStringAsFixed(min.truncateToDouble()==min?0:1)} kg',Offset(2,s.height-bottom),TextAlign.left);
   }
-  void _drawLabel(Canvas c,String text,Offset center,TextAlign align){final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(color:labelColor,fontSize:10,fontWeight:FontWeight.w500)),textDirection:TextDirection.ltr,textAlign:align)..layout(maxWidth:90);final dx=(align==TextAlign.center?center.dx-tp.width/2:center.dx).toDouble();final dy=(align==TextAlign.center?center.dy-tp.height/2:center.dy).toDouble();tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),dy.clamp(0.0,10000.0).toDouble()));}
+  void _drawLabel(Canvas c,String text,Offset center,TextAlign align){final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(color:labelColor,fontSize:10,fontWeight:FontWeight.w500)),textDirection:textDirection,textAlign:align)..layout(maxWidth:90);final dx=(align==TextAlign.center?center.dx-tp.width/2:center.dx).toDouble();final dy=(align==TextAlign.center?center.dy-tp.height/2:center.dy).toDouble();tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),dy.clamp(0.0,10000.0).toDouble()));}
   @override bool shouldRepaint(covariant GymChartPainter old)=>old.data!=data||old.color!=color||old.labelColor!=labelColor||old.selected!=selected;
 }
