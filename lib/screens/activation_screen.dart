@@ -35,7 +35,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
 
     if (result.ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Polirotinas ativado com sucesso!')),
+        const SnackBar(content: Text('Poliroutines ativado com sucesso!')),
       );
       widget.onActivated();
     } else {
@@ -64,7 +64,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
                   ),
                   const SizedBox(height: 20),
                   const Text(
-                    'Ative o Polirotinas',
+                    'Ative o Poliroutines',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                   ),
