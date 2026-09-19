@@ -53,11 +53,14 @@ jobs:
           products=$(curl -fsS --max-time 30 -G 'https://public-api.kiwify.com/v1/products' -H "Authorization: Bearer $token" -H "x-kiwify-account-id: $KIWIFY_ACCOUNT_ID" --data-urlencode 'page_size=100' --data-urlencode 'page_number=1')
           lifetime_id=$(echo "$products" | jq -r '.data[] | select(.name == "Poliroutines" or .name == "Polirotinas" or .name == "Poliroutines Vitalício" or .name == "Polirotinas Vitalício") | .id' | head -n1)
           monthly_id=$(echo "$products" | jq -r '.data[] | select(.name == "Poliroutines Mensal" or .name == "Polirotinas Mensal") | .id' | head -n1)
+          annual_id=$(echo "$products" | jq -r '.data[] | select(.name == "Poliroutines Anual" or .name == "Polirotinas Anual") | .id' | head -n1)
           test -n "$lifetime_id"
           echo "lifetime_id=$lifetime_id" >> "$GITHUB_OUTPUT"
           echo "monthly_id=$monthly_id" >> "$GITHUB_OUTPUT"
+          echo "annual_id=$annual_id" >> "$GITHUB_OUTPUT"
           echo "Lifetime product: $lifetime_id"
-          if [ -n "$monthly_id" ]; then echo "Monthly product: $monthly_id"; else echo 'Monthly Kiwify product not found yet; lifetime synchronization will continue.'; fi
+          if [ -n "$monthly_id" ]; then echo "Monthly product: $monthly_id"; else echo 'Monthly Kiwify product not found; continuing.'; fi
+          if [ -n "$annual_id" ]; then echo "Annual product: $annual_id"; else echo 'Annual Kiwify product not found; continuing.'; fi
 
       - name: Migrate D1 schema
         env:
@@ -88,6 +91,7 @@ jobs:
           KIWIFY_ACCOUNT_ID: ${{ secrets.KIWIFY_ACCOUNT_ID }}
           LIFETIME_PRODUCT_ID: ${{ steps.products.outputs.lifetime_id }}
           MONTHLY_PRODUCT_ID: ${{ steps.products.outputs.monthly_id }}
+          ANNUAL_PRODUCT_ID: ${{ steps.products.outputs.annual_id }}
         shell: bash
         run: |
           set -euo pipefail
@@ -107,6 +111,7 @@ jobs:
           }
           fetch_product "$LIFETIME_PRODUCT_ID" lifetime
           fetch_product "$MONTHLY_PRODUCT_ID" monthly
+          fetch_product "$ANNUAL_PRODUCT_ID" annual
           echo "Downloaded $(wc -l < /tmp/sales.jsonl) sale records."
 
       - name: Build D1 synchronization SQL
@@ -144,14 +149,15 @@ jobs:
               next_payment=dt(subscription.get('next_payment') or sale.get('next_payment'))
               sub_status=str(subscription.get('status') or '').strip().lower()
               status=str(sale.get('status') or sale.get('order_status') or '').strip().lower()
-              monthly=label == 'monthly' or bool(subscription_id)
+              subscription_product=label in {'monthly','annual'} or bool(subscription_id)
+              license_type='annual' if label == 'annual' else 'monthly'
               cancelled=sub_status in {'cancelled','canceled'}
               if status in {'paid','approved'}:
-                  if monthly:
+                  if subscription_product:
                       license_key=key()
                       cancel_sql = "datetime('now')" if cancelled else 'NULL'
-                      statements.append(f"UPDATE licenses SET buyer_email={q(email)}, buyer_name={q(name)}, product_name={q(product_name)}, license_type='monthly', status=CASE WHEN status='revoked' THEN status ELSE 'active' END, last_payment_id={q(tx)}, expires_at={q(next_payment)}, cancelled_at={cancel_sql}, revoked_at=NULL WHERE subscription_id={q(subscription_id)};")
-                      statements.append(f"INSERT INTO licenses (license_key,transaction_id,buyer_email,buyer_name,product_name,license_type,status,subscription_id,last_payment_id,expires_at,cancelled_at,created_at) SELECT {q(license_key)},{q(tx)},{q(email)},{q(name)},{q(product_name)},'monthly','active',{q(subscription_id)},{q(tx)},{q(next_payment)},{cancel_sql},datetime('now') WHERE NOT EXISTS (SELECT 1 FROM licenses WHERE subscription_id={q(subscription_id)}) AND NOT EXISTS (SELECT 1 FROM licenses WHERE transaction_id={q(tx)});")
+                      statements.append(f"UPDATE licenses SET buyer_email={q(email)}, buyer_name={q(name)}, product_name={q(product_name)}, license_type={q(license_type)}, status=CASE WHEN status='revoked' THEN status ELSE 'active' END, last_payment_id={q(tx)}, expires_at={q(next_payment)}, cancelled_at={cancel_sql}, revoked_at=NULL WHERE subscription_id={q(subscription_id)};")
+                      statements.append(f"INSERT INTO licenses (license_key,transaction_id,buyer_email,buyer_name,product_name,license_type,status,subscription_id,last_payment_id,expires_at,cancelled_at,created_at) SELECT {q(license_key)},{q(tx)},{q(email)},{q(name)},{q(product_name)},{q(license_type)},'active',{q(subscription_id)},{q(tx)},{q(next_payment)},{cancel_sql},datetime('now') WHERE NOT EXISTS (SELECT 1 FROM licenses WHERE subscription_id={q(subscription_id)}) AND NOT EXISTS (SELECT 1 FROM licenses WHERE transaction_id={q(tx)});")
                   else:
                       license_key=key()
                       statements.append(f"INSERT INTO licenses (license_key,transaction_id,buyer_email,buyer_name,product_name,license_type,status,last_payment_id,created_at) VALUES ({q(license_key)},{q(tx)},{q(email)},{q(name)},{q(product_name)},'lifetime','active',{q(tx)},datetime('now')) ON CONFLICT(transaction_id) DO UPDATE SET buyer_email=excluded.buyer_email,buyer_name=excluded.buyer_name,product_name=excluded.product_name,license_type='lifetime',status='active',last_payment_id=excluded.last_payment_id,revoked_at=NULL;")
