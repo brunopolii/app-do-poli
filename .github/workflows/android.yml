@@ -47,6 +47,6 @@ jobs:
           name: Poliroutines APK ${{ github.run_number }}
           body: |
             APK do Poliroutines pronto para instalar no Android.
-            Baixe o arquivo app-release.apk abaixo e instale no celular.
+            Baixe o arquivo Poliroutines.apk abaixo e instale no celular.
           files: Poliroutines.apk
           make_latest: true
