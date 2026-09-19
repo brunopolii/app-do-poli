@@ -112,7 +112,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    'A licença fica vinculada a esta instalação. O plano mensal permanece válido até a data paga; o plano vitalício não expira.',
+                    'A licença fica vinculada a esta instalação. Os planos por assinatura permanecem válidos até a data paga; o plano vitalício não expira.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
