@@ -48,7 +48,7 @@ class LicenseService {
     if (key == null || key.isEmpty) return false;
 
     final type = await storedLicenseType();
-    if (type != 'monthly') return true;
+    if (type == 'lifetime') return true;
 
     final expiresAt = await storedExpiresAt();
     if (expiresAt == null) return false;
@@ -182,7 +182,7 @@ class LicenseService {
           );
         case 'license_expired':
           return const LicenseActivationResult.failure(
-            'Esta licença mensal expirou. Renove sua assinatura para continuar.',
+            'Esta assinatura expirou. Renove seu plano para continuar.',
           );
         case 'license_already_activated':
           return const LicenseActivationResult.failure(
