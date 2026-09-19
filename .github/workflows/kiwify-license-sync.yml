@@ -51,9 +51,10 @@ jobs:
           set -euo pipefail
           token=$(cat /tmp/kiwify_token)
           products=$(curl -fsS --max-time 30 -G 'https://public-api.kiwify.com/v1/products' -H "Authorization: Bearer $token" -H "x-kiwify-account-id: $KIWIFY_ACCOUNT_ID" --data-urlencode 'page_size=100' --data-urlencode 'page_number=1')
-          lifetime_id=$(echo "$products" | jq -r '.data[] | select(.name == "Poliroutines" or .name == "Polirotinas" or .name == "Poliroutines Vitalício" or .name == "Polirotinas Vitalício") | .id' | head -n1)
-          monthly_id=$(echo "$products" | jq -r '.data[] | select(.name == "Poliroutines Mensal" or .name == "Polirotinas Mensal") | .id' | head -n1)
-          annual_id=$(echo "$products" | jq -r '.data[] | select(.name == "Poliroutines Anual" or .name == "Polirotinas Anual") | .id' | head -n1)
+          echo "$products" | jq -r '.data[]? | .name' | sed 's/^/Kiwify product: /'
+          lifetime_id=$(echo "$products" | jq -r '.data[]? | select((.name // "" | ascii_downcase | test("poliroutines|polirotinas")) and (.name // "" | ascii_downcase | test("mensal|monthly|anual|annual") | not)) | .id' | head -n1)
+          monthly_id=$(echo "$products" | jq -r '.data[]? | select((.name // "" | ascii_downcase | test("poliroutines|polirotinas")) and (.name // "" | ascii_downcase | test("mensal|monthly"))) | .id' | head -n1)
+          annual_id=$(echo "$products" | jq -r '.data[]? | select((.name // "" | ascii_downcase | test("poliroutines|polirotinas")) and (.name // "" | ascii_downcase | test("anual|annual"))) | .id' | head -n1)
           test -n "$lifetime_id"
           echo "lifetime_id=$lifetime_id" >> "$GITHUB_OUTPUT"
           echo "monthly_id=$monthly_id" >> "$GITHUB_OUTPUT"
