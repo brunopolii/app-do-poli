@@ -1,99 +1,72 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Polirotinas — várias rotinas em um só lugar. Agenda, academia, alimentação e finanças.">
-  <meta name="theme-color" content="#6750A4">
-  <title>Polirotinas — Várias rotinas. Um só lugar.</title>
-  <style>
-    :root { --primary:#6750A4; --primary-dark:#4F378B; --bg:#F7F5FA; --text:#201A24; --muted:#665F6D; --card:#FFFFFF; }
-    * { box-sizing:border-box; }
-    html { scroll-behavior:smooth; }
-    body { margin:0; font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
-    .wrap { width:min(1080px,92%); margin:auto; }
-    header { padding:22px 0; background:rgba(247,245,250,.92); position:sticky; top:0; z-index:10; backdrop-filter:blur(12px); border-bottom:1px solid #e7e1eb; }
-    nav { display:flex; align-items:center; justify-content:space-between; gap:20px; }
-    .brand { font-weight:900; font-size:1.35rem; letter-spacing:-.03em; color:var(--primary-dark); }
-    nav a { color:var(--text); text-decoration:none; font-weight:700; }
-    .hero { padding:82px 0 70px; text-align:center; background:radial-gradient(circle at top, #eee8fa 0, var(--bg) 58%); }
-    .badge { display:inline-block; padding:7px 13px; border-radius:999px; background:#ebe4f8; color:var(--primary-dark); font-weight:800; font-size:.9rem; }
-    h1 { font-size:clamp(2.5rem,7vw,5rem); line-height:1.02; letter-spacing:-.06em; margin:20px auto 18px; max-width:850px; }
-    .hero p { max-width:680px; margin:0 auto 30px; color:var(--muted); font-size:1.15rem; }
-    .cta { display:inline-flex; align-items:center; justify-content:center; padding:15px 26px; border-radius:16px; background:var(--primary); color:white; text-decoration:none; font-weight:900; box-shadow:0 10px 28px rgba(103,80,164,.24); }
-    .cta:hover { background:var(--primary-dark); }
-    .price { margin-top:16px; color:var(--muted); font-weight:700; }
-    section { padding:72px 0; }
-    .section-title { text-align:center; max-width:680px; margin:0 auto 34px; }
-    .section-title h2 { font-size:2rem; margin:0 0 8px; letter-spacing:-.03em; }
-    .section-title p { color:var(--muted); margin:0; }
-    .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:18px; }
-    .card { background:var(--card); border:1px solid #e7e1eb; border-radius:22px; padding:25px; box-shadow:0 8px 24px rgba(40,25,55,.05); }
-    .icon { font-size:2rem; margin-bottom:10px; }
-    .card h3 { margin:0 0 7px; }
-    .card p { margin:0; color:var(--muted); font-size:.95rem; }
-    .highlight { background:#201A24; color:white; border-radius:28px; padding:44px; display:grid; grid-template-columns:1.3fr .7fr; gap:30px; align-items:center; }
-    .highlight p { color:#d8d0df; }
-    .highlight .cta { background:white; color:var(--primary-dark); box-shadow:none; }
-    footer { padding:32px 0 45px; color:var(--muted); text-align:center; font-size:.9rem; }
-    @media(max-width:800px){ .grid{grid-template-columns:repeat(2,1fr)} .highlight{grid-template-columns:1fr} nav a{display:none} }
-    @media(max-width:520px){ .grid{grid-template-columns:1fr} .hero{padding:62px 0 55px} .highlight{padding:30px 24px} }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Poliroutines — agenda, academia, alimentação e finanças em um único aplicativo.">
+<meta name="theme-color" content="#6750A4">
+<title>Poliroutines — Várias rotinas. Um só lugar.</title>
+<style>
+:root{--p:#6750A4;--pd:#4F378B;--bg:#F7F5FA;--tx:#201A24;--mut:#665F6D;--card:#fff;--line:#E7E1EB;--dark:#201A24;--soft:#EEE8FA}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--tx);line-height:1.6}a{text-decoration:none}.wrap{width:min(1120px,92%);margin:auto}
+header{padding:16px 0;position:sticky;top:0;z-index:20;background:#f7f5fae8;backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+nav{display:flex;align-items:center;justify-content:space-between;gap:18px}.brand{font-weight:950;letter-spacing:.03em;color:var(--pd)}.links{display:flex;gap:18px;align-items:center}.links a{color:var(--mut);font-weight:800;font-size:.92rem}.links .buy{color:#fff;background:var(--p);padding:9px 14px;border-radius:12px}
+section{padding:80px 0}.hero{padding:85px 0 72px;background:radial-gradient(circle at top,#eee8fa 0,var(--bg) 58%)}.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:50px;align-items:center}
+.badge{display:inline-block;padding:7px 12px;border-radius:999px;background:#ebe4f8;color:var(--pd);font-weight:900;font-size:.84rem}h1{font-size:clamp(2.8rem,6vw,5.5rem);line-height:.98;letter-spacing:-.065em;margin:20px 0}.lead{font-size:1.15rem;color:var(--mut);max-width:650px}.actions{display:flex;gap:11px;flex-wrap:wrap;margin-top:25px}.btn{display:inline-flex;justify-content:center;align-items:center;padding:14px 21px;border-radius:15px;background:var(--p);color:#fff;font-weight:950;box-shadow:0 10px 28px #6750a43d}.btn.secondary{background:#fff;color:var(--pd);border:1px solid var(--line);box-shadow:none}.mini{margin-top:13px;color:var(--mut);font-weight:750;font-size:.93rem}
+.frame{background:var(--dark);padding:10px;border-radius:28px;box-shadow:0 25px 60px #201a2430;transform:rotate(1deg)}.frame img{display:block;width:100%;border-radius:19px}
+.head{text-align:center;max-width:740px;margin:0 auto 38px}.eyebrow{text-transform:uppercase;letter-spacing:.1em;color:var(--p);font-size:.75rem;font-weight:950}.head h2{font-size:clamp(2rem,4vw,3rem);letter-spacing:-.05em;line-height:1.05;margin:7px 0 10px}.head p{margin:0;color:var(--mut)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:0 8px 26px #2819370d}.icon{font-size:2rem}.card h3{margin:9px 0 6px}.card p{margin:0;color:var(--mut);font-size:.94rem}
+.show{display:grid;grid-template-columns:1.1fr .9fr;gap:30px;align-items:center}.copy h3{font-size:1.8rem;letter-spacing:-.04em;margin:0 0 10px}.copy p{color:var(--mut)}.checks{display:grid;gap:10px;margin-top:18px}.check{display:flex;gap:9px}.check b{color:var(--pd)}
+.theme{background:var(--soft)}.theme .frame{max-width:650px;margin:auto}
+.offline{background:#eee8fa}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.info{background:#fff;border:1px solid var(--line);border-radius:22px;padding:25px}.info h3{margin:0 0 6px}.info p{margin:0;color:var(--mut)}
+.plans{background:var(--dark);color:#fff}.plans .head p{color:#d8d0df}.plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.plan{background:#2a2530;border:1px solid #3b3444;border-radius:25px;padding:29px}.plan.featured{border-color:#ad9adf;box-shadow:0 20px 55px #0003}.tag{display:inline-block;padding:5px 9px;border-radius:999px;background:#e9e1ff;color:var(--pd);font-size:.7rem;font-weight:950}.plan h3{margin:10px 0 5px}.price{font-size:2.5rem;font-weight:950;letter-spacing:-.05em}.plan small,.plan p{color:#d8d0df}.plan ul{margin:18px 0 23px;padding-left:19px;color:#eee9f3}.plan li{margin:7px 0}.plan .btn{width:100%;background:#fff;color:var(--pd);box-shadow:none}.soon{display:block;text-align:center;padding:13px;border-radius:14px;background:#3a3441;color:#eee9f3;font-weight:900}.note{font-size:.8rem;color:#9d95a4;margin-top:9px}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}.step{background:#fff;border:1px solid var(--line);border-radius:20px;padding:21px}.n{width:32px;height:32px;border-radius:10px;background:var(--soft);color:var(--pd);display:grid;place-items:center;font-weight:950;margin-bottom:10px}.step h3{margin:0 0 5px}.step p{margin:0;color:var(--mut);font-size:.92rem}
+.download{background:linear-gradient(135deg,#6750a4,#4f378b);color:#fff}.download-box{background:#ffffff12;border:1px solid #ffffff28;border-radius:27px;padding:33px;display:flex;align-items:center;justify-content:space-between;gap:25px}.download p{color:#e9e2f0}.download .btn{background:#fff;color:var(--pd);box-shadow:none;white-space:nowrap}
+.faq{display:grid;gap:12px;max-width:900px;margin:auto}details{background:#fff;border:1px solid var(--line);border-radius:17px;padding:17px 18px}summary{cursor:pointer;font-weight:900}details p{color:var(--mut);margin:11px 0 2px}.support{margin-top:25px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;text-align:center}.support a{color:var(--pd);font-weight:950}
+footer{background:#17131a;color:#cfc7d6;padding:40px 0 28px}.foot{display:grid;grid-template-columns:1.4fr .8fr .8fr;gap:28px}.foot h3{color:#fff;margin:0 0 7px}.foot a{display:block;color:#bdb4c5;margin:6px 0;font-size:.91rem}.copyright{text-align:center;border-top:1px solid #332d37;margin-top:28px;padding-top:17px;color:#9d95a4;font-size:.82rem}
+@media(max-width:900px){.hero-grid,.show,.info-grid{grid-template-columns:1fr}.grid{grid-template-columns:repeat(2,1fr)}.steps{grid-template-columns:repeat(2,1fr)}.download-box{display:block}.download .btn{width:100%;margin-top:18px}.frame{transform:none}}
+@media(max-width:650px){.links a:not(.buy){display:none}.grid,.plan-grid,.steps{grid-template-columns:1fr}section{padding:62px 0}.hero{padding-top:60px}.foot{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
-  <header>
-    <div class="wrap">
-      <nav>
-        <div class="brand">POLIROTINAS</div>
-        <a href="#recursos">Recursos</a>
-      </nav>
-    </div>
-  </header>
+<header><div class="wrap"><nav><div class="brand">POLIROUTINES</div><div class="links"><a href="#recursos">Recursos</a><a href="#telas">Telas</a><a href="#planos">Planos</a><a href="#baixar">Baixar</a><a href="#ajuda">Ajuda</a><a class="buy" href="#planos">Comprar</a></div></nav></div></header>
 
-  <main>
-    <section class="hero">
-      <div class="wrap">
-        <span class="badge">📱 Organização pessoal</span>
-        <h1>Várias rotinas.<br>Um só lugar.</h1>
-        <p>Organize seus compromissos, treinos, alimentação e finanças em um único aplicativo, com uma interface simples e prática para o dia a dia.</p>
-        <a class="cta" href="#comprar">Quero o Polirotinas</a>
-        <div class="price">Licença vitalícia • Pagamento único</div>
-      </div>
-    </section>
+<main>
+<section class="hero"><div class="wrap hero-grid"><div><span class="badge">📱 Organização pessoal</span><h1>Várias rotinas.<br>Um só lugar.</h1><p class="lead">Organize compromissos, treinos, alimentação e finanças em um único aplicativo, com personalização e acompanhamento da sua evolução.</p><div class="actions"><a class="btn" href="#planos">Conhecer os planos</a><a class="btn secondary" href="#telas">Ver as telas</a></div><div class="mini">R$ 11,90/mês · ou R$ 69,90 vitalício</div></div><div class="frame"><img src="assets/poliroutines-showcase.jpg" alt="Telas do aplicativo Poliroutines"></div></div></section>
 
-    <section id="recursos">
-      <div class="wrap">
-        <div class="section-title">
-          <h2>Tudo o que você precisa para se organizar</h2>
-          <p>Quatro áreas essenciais reunidas em um aplicativo.</p>
-        </div>
-        <div class="grid">
-          <article class="card"><div class="icon">📅</div><h3>Agenda</h3><p>Organize compromissos, horários e lembretes para não perder o que importa.</p></article>
-          <article class="card"><div class="icon">🏋️</div><h3>Academia</h3><p>Monte seus treinos, registre séries, repetições e cargas e acompanhe sua evolução.</p></article>
-          <article class="card"><div class="icon">🍽️</div><h3>Alimentação</h3><p>Registre refeições e acompanhe calorias e macronutrientes ao longo dos dias.</p></article>
-          <article class="card"><div class="icon">💰</div><h3>Finanças</h3><p>Controle entradas, despesas, categorias, saldo e evolução dos seus gastos.</p></article>
-        </div>
-      </div>
-    </section>
+<section id="recursos"><div class="wrap"><div class="head"><div class="eyebrow">Recursos</div><h2>Quatro áreas para acompanhar sua rotina</h2><p>Um único aplicativo para reunir tarefas e informações que você consulta no dia a dia.</p></div><div class="grid">
+<article class="card"><div class="icon">📅</div><h3>Agenda</h3><p>Compromissos, horários e lembretes em um só lugar.</p></article>
+<article class="card"><div class="icon">🏋️</div><h3>Academia</h3><p>Treinos, séries, repetições, cargas e gráficos de evolução.</p></article>
+<article class="card"><div class="icon">🍽️</div><h3>Alimentação</h3><p>Refeições, calorias, macronutrientes, peso e histórico.</p></article>
+<article class="card"><div class="icon">💰</div><h3>Finanças</h3><p>Entradas, despesas, saldo, projeções e evolução mensal.</p></article>
+</div></div></section>
 
-    <section>
-      <div class="wrap">
-        <div class="highlight" id="comprar">
-          <div>
-            <h2>Comece a organizar sua vida hoje.</h2>
-            <p>Uma compra única para ter acesso ao Polirotinas. Depois da ativação, o aplicativo foi pensado para continuar útil mesmo sem internet.</p>
-          </div>
-          <div style="text-align:center">
-            <a class="cta" href="https://pay.kiwify.com.br/FX6n6gr" target="_blank" rel="noopener noreferrer">Comprar agora</a>
-            <div style="margin-top:12px;color:#d8d0df;font-weight:800">R$ 19,90 • pagamento único</div>
-          </div>
-        </div>
-      </div>
-    </section>
-  </main>
+<section id="telas"><div class="wrap"><div class="head"><div class="eyebrow">Veja por dentro</div><h2>Algumas telas do Poliroutines</h2><p>Uma visão geral das áreas e dos gráficos disponíveis no aplicativo.</p></div><div class="show"><div class="frame"><img src="assets/poliroutines-showcase.jpg" alt="Montagem com telas de Início, Academia, Alimentação e Finanças do Poliroutines"></div><div class="copy"><h3>Feito para acompanhar a rotina de verdade.</h3><p>As informações importantes ficam reunidas em telas simples, com históricos e visualizações para acompanhar seu progresso.</p><div class="checks"><div class="check">✓ <span><b>Academia:</b> acompanhe a evolução das cargas.</span></div><div class="check">✓ <span><b>Alimentação:</b> visualize metas e evolução de peso.</span></div><div class="check">✓ <span><b>Finanças:</b> acompanhe resultados e projeções.</span></div><div class="check">✓ <span><b>Início:</b> veja um resumo da rotina.</span></div></div></div></div></div></section>
 
-  <footer>
-    <div class="wrap">© 2026 Polirotinas. Todos os direitos reservados.</div>
-  </footer>
-</body>
-</html>
+<section class="theme"><div class="wrap"><div class="show"><div class="copy"><div class="eyebrow">Personalização</div><h2>Seu Poliroutines, do seu jeito.</h2><p>Escolha cores, transparência e aparência para deixar o aplicativo com a sua cara. Os exemplos nas telas mostram como a personalização pode mudar completamente o visual.</p><div class="actions"><a class="btn" href="#planos">Quero o Poliroutines</a></div></div><div class="frame"><img src="assets/poliroutines-showcase.jpg" alt="Exemplos de temas e telas personalizadas do Poliroutines"></div></div></div></section>
+
+<section class="offline"><div class="wrap"><div class="head"><div class="eyebrow">Offline</div><h2>Ative uma vez e continue sua rotina</h2><p>A primeira ativação precisa de internet. Depois, o Poliroutines pode ser usado offline enquanto a licença estiver válida.</p></div><div class="info-grid"><div class="info"><h3>📡 Primeira ativação</h3><p>Depois da compra e da instalação, informe a chave de ativação com internet. A licença fica vinculada à instalação.</p></div><div class="info"><h3>📴 Uso offline</h3><p>A autorização fica salva localmente. Licenças mensais recebem novas datas quando houver uma validação online; a vitalícia não expira.</p></div></div></div></section>
+
+<section id="planos" class="plans"><div class="wrap"><div class="head"><div class="eyebrow" style="color:#bca9f0">Planos</div><h2>Escolha como quer usar o Poliroutines</h2><p>Os dois planos utilizam o mesmo APK.</p></div><div class="plan-grid">
+<article class="plan"><h3>Mensal</h3><div class="price">R$ 11,90</div><small>por mês</small><p>Para quem prefere pagar conforme utiliza.</p><ul><li>Mesmo APK do Poliroutines</li><li>Uso offline enquanto a licença estiver válida</li><li>Cancelamento mantém o acesso até o fim do período pago</li><li>Renovações estendem a validade</li></ul><span class="soon">Checkout mensal será conectado</span><div class="note">O produto de assinatura recorrente precisa ser criado na Kiwify para este botão receber o link definitivo.</div></article>
+<article class="plan featured"><span class="tag">PAGAMENTO ÚNICO</span><h3>Vitalício</h3><div class="price">R$ 69,90</div><small>uma vez</small><p>Para ter uma licença sem renovação.</p><ul><li>Mesmo APK do Poliroutines</li><li>Licença sem data de expiração</li><li>Uso offline</li><li>Futuras atualizações incluídas</li></ul><a class="btn" href="https://pay.kiwify.com.br/FX6n6gr" target="_blank" rel="noopener noreferrer">Comprar vitalício</a></article>
+</div></div></section>
+
+<section><div class="wrap"><div class="head"><div class="eyebrow">Como funciona</div><h2>Do pagamento ao primeiro uso</h2></div><div class="steps">
+<div class="step"><div class="n">1</div><h3>Escolha um plano</h3><p>Faça a compra pela Kiwify.</p></div><div class="step"><div class="n">2</div><h3>Receba sua licença</h3><p>A compra aprovada gera ou atualiza sua licença.</p></div><div class="step"><div class="n">3</div><h3>Baixe o APK</h3><p>Use o botão de download deste site.</p></div><div class="step"><div class="n">4</div><h3>Ative e use</h3><p>Informe a chave na primeira abertura e comece.</p></div>
+</div></div></section>
+
+<section id="baixar" class="download"><div class="wrap"><div class="download-box"><div><div class="eyebrow" style="color:#dccfff">Aplicativo</div><h2>Baixe o Poliroutines</h2><p>O mesmo APK serve para os dois planos. Você não precisa navegar pelo GitHub para encontrar o arquivo.</p></div><a class="btn" href="download.html">Baixar APK</a></div></div></section>
+
+<section id="ajuda"><div class="wrap"><div class="head"><div class="eyebrow">Ajuda</div><h2>Dúvidas frequentes</h2><p>Respostas rápidas sobre compra, instalação e licença.</p></div><div class="faq">
+<details><summary>Posso usar o Poliroutines sem internet?</summary><p>Sim. A primeira ativação precisa de internet, mas depois o aplicativo pode funcionar offline enquanto a licença estiver válida.</p></details>
+<details><summary>Cancelei o mensal. Perco o acesso na hora?</summary><p>Não. O acesso continua até o fim do período que já foi pago. Uma nova renovação mantém a licença ativa.</p></details>
+<details><summary>O vitalício precisa ser renovado?</summary><p>Não. A licença vitalícia é de pagamento único e não tem data de expiração.</p></details>
+<details><summary>As atualizações futuras estão incluídas?</summary><p>Sim. O plano vitalício inclui as futuras atualizações do Poliroutines.</p></details>
+<details><summary>Existe um APK diferente para cada plano?</summary><p>Não. Os dois planos utilizam o mesmo APK; o tipo e a validade da licença são tratados pelo sistema de ativação.</p></details>
+<details><summary>Preciso de ajuda?</summary><p>Entre em contato pelo e-mail <a href="mailto:brunopolineg@gmail.com">brunopolineg@gmail.com</a>.</p></details>
+</div><div class="support"><strong>Suporte:</strong> <a href="mailto:brunopolineg@gmail.com">brunopolineg@gmail.com</a></div></div></section>
+</main>
+
+<footer><div class="wrap"><div class="foot"><div><h3>POLIROUTINES</h3><p>Agenda, academia, alimentação e finanças em um só aplicativo.</p></div><div><h3>Navegação</h3><a href="#recursos">Recursos</a><a href="#telas">Telas</a><a href="#planos">Planos</a><a href="#baixar">Baixar</a></div><div><h3>Ajuda</h3><a href="#ajuda">Perguntas frequentes</a><a href="mailto:brunopolineg@gmail.com">brunopolineg@gmail.com</a></div></div><div class="copyright">© 2026 Poliroutines. Todos os direitos reservados.</div></div></footer>
+</body></html>
