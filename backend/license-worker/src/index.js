@@ -61,9 +61,18 @@ function getProductName(body) {
   ).trim();
 }
 
-function isMonthlyProduct(body) {
+function isAnnualProduct(body) {
   const name = getProductName(body).toLowerCase();
-  return Boolean(getSubscriptionId(body)) || /mensal|monthly|assinatura/.test(name);
+  return /anual|annual/.test(name);
+}
+
+function isSubscriptionProduct(body) {
+  const name = getProductName(body).toLowerCase();
+  return Boolean(getSubscriptionId(body)) || /mensal|monthly|anual|annual|assinatura/.test(name);
+}
+
+function getSubscriptionLicenseType(body) {
+  return isAnnualProduct(body) ? "annual" : "monthly";
 }
 
 function parseDateToSql(value) {
@@ -179,9 +188,9 @@ async function upsertApproved(body, env) {
   if (!transactionId) return json({ error: "transaction_id_required" }, 400);
 
   const subscriptionId = getSubscriptionId(body);
-  const monthly = isMonthlyProduct(body);
+  const subscriptionProduct = isSubscriptionProduct(body);
   const subscription = getSubscription(body);
-  const expiresAt = monthly
+  const expiresAt = subscriptionProduct
     ? parseDateToSql(
         subscription?.next_payment ||
           subscription?.nextPayment ||
@@ -190,10 +199,10 @@ async function upsertApproved(body, env) {
       )
     : null;
 
-  if (monthly && !subscriptionId) {
+  if (subscriptionProduct && !subscriptionId) {
     return json({ error: "subscription_id_required" }, 400);
   }
-  if (monthly && !expiresAt) {
+  if (subscriptionProduct && !expiresAt) {
     return json({ error: "subscription_expiration_required" }, 400);
   }
 
@@ -219,10 +228,10 @@ async function upsertApproved(body, env) {
       customer.email || null,
       customer.name || null,
       productName || null,
-      monthly ? "monthly" : "lifetime",
+      subscriptionProduct ? getSubscriptionLicenseType(body) : "lifetime",
       subscriptionId || null,
       transactionId,
-      monthly ? expiresAt : null,
+      subscriptionProduct ? expiresAt : null,
       existing.id
     ).run();
 
@@ -230,8 +239,8 @@ async function upsertApproved(body, env) {
       ok: true,
       license_key: existing.license_key,
       existing: true,
-      license_type: monthly ? "monthly" : "lifetime",
-      expires_at: monthly ? expiresAt : null,
+      license_type: subscriptionProduct ? getSubscriptionLicenseType(body) : "lifetime",
+      expires_at: subscriptionProduct ? expiresAt : null,
     });
   }
 
@@ -247,18 +256,18 @@ async function upsertApproved(body, env) {
     customer.email || null,
     customer.name || null,
     productName || null,
-    monthly ? "monthly" : "lifetime",
+    subscriptionProduct ? getSubscriptionLicenseType(body) : "lifetime",
     subscriptionId || null,
     transactionId,
-    monthly ? expiresAt : null
+    subscriptionProduct ? expiresAt : null
   ).run();
 
   return json({
     ok: true,
     license_key: licenseKey,
     created: true,
-    license_type: monthly ? "monthly" : "lifetime",
-    expires_at: monthly ? expiresAt : null,
+    license_type: subscriptionProduct ? getSubscriptionLicenseType(body) : "lifetime",
+    expires_at: subscriptionProduct ? expiresAt : null,
   });
 }
 
@@ -289,7 +298,7 @@ async function cancelSubscription(body, env) {
     `UPDATE licenses
      SET cancelled_at = datetime('now'),
          status = CASE
-           WHEN license_type='monthly' AND expires_at IS NOT NULL AND expires_at <= datetime('now')
+           WHEN license_type IN ('monthly','annual') AND expires_at IS NOT NULL AND expires_at <= datetime('now')
              THEN 'expired'
            ELSE status
          END
@@ -349,7 +358,7 @@ async function licenseForRequest(body, env) {
   if (license.status === "revoked") return { error: "license_revoked", status: 403 };
 
   if (
-    license.license_type === "monthly" &&
+    ["monthly", "annual"].includes(license.license_type) &&
     (!license.expires_at || license.expires_at <= new Date().toISOString().slice(0, 19).replace("T", " "))
   ) {
     await env.DB.prepare(
@@ -451,7 +460,7 @@ async function claim(request, env) {
 
   if (!license) return json({ error: "purchase_not_found" }, 404);
   if (license.status === "revoked") return json({ error: "license_revoked" }, 403);
-  if (license.license_type === "monthly" && (!license.expires_at || license.expires_at <= new Date().toISOString().slice(0, 19).replace("T", " "))) {
+  if (["monthly", "annual"].includes(license.license_type) && (!license.expires_at || license.expires_at <= new Date().toISOString().slice(0, 19).replace("T", " "))) {
     return json({ error: "license_expired" }, 403);
   }
 
@@ -488,7 +497,7 @@ const btn=document.getElementById('btn'),result=document.getElementById('result'
 try{
 const r=await fetch('/claim',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:document.getElementById('email').value,order_id:document.getElementById('order').value})});
 const d=await r.json();
-if(!r.ok)throw new Error(d.error==='purchase_not_found'?'Compra não encontrada. Confira o e-mail e o ID do pedido.':d.error==='license_expired'?'Esta licença mensal expirou. Faça uma nova renovação.':d.error||'Não foi possível consultar a licença.');
+if(!r.ok)throw new Error(d.error==='purchase_not_found'?'Compra não encontrada. Confira o e-mail e o ID do pedido.':d.error==='license_expired'?'Esta assinatura expirou. Faça uma nova renovação.':d.error||'Não foi possível consultar a licença.');
 result.innerHTML='<div class="key">'+d.license_key+'</div>';
 }catch(e){result.innerHTML='<div class="error">'+e.message+'</div>';}
 finally{btn.disabled=false;}
