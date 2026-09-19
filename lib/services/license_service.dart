@@ -111,7 +111,7 @@ class LicenseService {
           data['valid'] == true) {
         await _saveLicense(
           key: key,
-          type: String(data['license_type'] ?? 'lifetime'),
+          type: (data['license_type'] ?? 'lifetime').toString(),
           expiresAt: data['expires_at'] as String?,
         );
         return true;
@@ -161,12 +161,12 @@ class LicenseService {
           data['activated'] == true) {
         await _saveLicense(
           key: key,
-          type: String(data['license_type'] ?? 'lifetime'),
+          type: (data['license_type'] ?? 'lifetime').toString(),
           expiresAt: data['expires_at'] as String?,
         );
         return LicenseActivationResult.success(
           key,
-          String(data['license_type'] ?? 'lifetime'),
+          (data['license_type'] ?? 'lifetime').toString(),
           data['expires_at'] as String?,
         );
       }
@@ -190,9 +190,7 @@ class LicenseService {
           );
         default:
           return LicenseActivationResult.failure(
-            'Não foi possível ativar a licença (HTTP ' +
-                response.statusCode.toString() +
-                ').',
+            'Não foi possível ativar a licença (HTTP ${response.statusCode}).',
           );
       }
     } catch (_) {
