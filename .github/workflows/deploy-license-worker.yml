@@ -3,47 +3,72 @@ name: Deploy license worker
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - 'backend/license-worker/**'
       - '.github/workflows/deploy-license-worker.yml'
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Apply D1 schema
-        uses: cloudflare/wrangler-action@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: backend/license-worker
-          command: d1 execute polirotinas-licenses --remote --file=./schema.sql
+          node-version: 22
 
-      - name: Deploy Worker
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: backend/license-worker
-          command: deploy
+      - name: Install Wrangler
+        run: npm install --global wrangler@latest
 
-      - name: Smoke test Worker
+      - name: Migrate D1 schema
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: backend/license-worker
         shell: bash
         run: |
-          for attempt in 1 2 3 4 5; do
-            body=$(curl -fsS --max-time 15 https://polirotinas-license.brunopoli95.workers.dev/health || true)
-            echo "$body"
-            if echo "$body" | grep -q '"service":"polirotinas-license"'; then
-              exit 0
-            fi
-            sleep 10
-          done
-          echo 'Worker did not expose the expected health response.'
-          exit 1
+          set -euo pipefail
+          info=$(wrangler d1 execute polirotinas-licenses --remote --command "PRAGMA table_info(licenses)" --json || true)
+          if echo "$info" | jq -e '.[0].results' >/dev/null 2>&1; then
+            add_column() {
+              local name="$1" definition="$2"
+              if ! echo "$info" | jq -e --arg n "$name" '.[0].results[] | select(.name == $n)' >/dev/null; then
+                wrangler d1 execute polirotinas-licenses --remote --command "ALTER TABLE licenses ADD COLUMN $name $definition"
+              fi
+            }
+            add_column product_name 'TEXT'
+            add_column license_type "TEXT NOT NULL DEFAULT 'lifetime'"
+            add_column subscription_id 'TEXT'
+            add_column last_payment_id 'TEXT'
+            add_column expires_at 'TEXT'
+            add_column cancelled_at 'TEXT'
+          fi
+          wrangler d1 execute polirotinas-licenses --remote --command "CREATE INDEX IF NOT EXISTS idx_licenses_transaction_id ON licenses(transaction_id); CREATE INDEX IF NOT EXISTS idx_licenses_status ON licenses(status); CREATE INDEX IF NOT EXISTS idx_licenses_subscription_id ON licenses(subscription_id); CREATE INDEX IF NOT EXISTS idx_licenses_expires_at ON licenses(expires_at); CREATE INDEX IF NOT EXISTS idx_license_deliveries_license_key ON license_deliveries(license_key);" || true
+
+      - name: Ensure D1 schema
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: backend/license-worker
+        run: wrangler d1 execute polirotinas-licenses --remote --file=schema.sql
+
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: backend/license-worker
+        run: wrangler deploy
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          response=$(curl -fsS --max-time 20 'https://polirotinas-license.brunopoli95.workers.dev/health')
+          echo "$response"
+          echo "$response" | jq -e '.ok == true and .service == "poliroutines-license" and .version == "5"' >/dev/null
