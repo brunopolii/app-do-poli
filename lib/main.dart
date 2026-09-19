@@ -17,7 +17,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('pt_BR');
   await NotificationService.initialize();
-  final activated = await LicenseService().isActivated();
+  final activated = await LicenseService().initialize();
   final settings = await ThemeService.load();
   final prefs = await SharedPreferences.getInstance();
   runApp(AppDoPoli(
