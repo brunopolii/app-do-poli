@@ -70,7 +70,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Digite a chave de ativação recebida após a compra. A primeira ativação precisa de internet.',
+                    'Digite a chave de ativação recebida após a compra. A primeira ativação precisa de internet. Depois, o Poliroutines pode ser usado offline enquanto sua licença estiver válida.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
@@ -112,7 +112,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    'A licença fica vinculada a esta instalação. Depois da ativação, o aplicativo pode ser usado offline.',
+                    'A licença fica vinculada a esta instalação. O plano mensal permanece válido até a data paga; o plano vitalício não expira.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
