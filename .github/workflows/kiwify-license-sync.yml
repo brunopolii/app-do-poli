@@ -13,8 +13,7 @@ permissions:
   contents: read
 
 env:
-  FORCE_SYNC_TEST: "1"
-  APK_DOWNLOAD_URL: "https://github.com/brunopolii/app-do-poli/releases/latest/download/app-release.apk"
+  APK_DOWNLOAD_URL: 'https://github.com/brunopolii/app-do-poli/releases/latest/download/Poliroutines.apk'
 
 jobs:
   sync:
@@ -38,37 +37,57 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          token_json=$(curl -fsS --max-time 30 \
-            -X POST 'https://public-api.kiwify.com/v1/oauth/token' \
-            -H 'Content-Type: application/x-www-form-urlencoded' \
-            --data-urlencode "client_id=$KIWIFY_CLIENT_ID" \
-            --data-urlencode "client_secret=$KIWIFY_CLIENT_SECRET")
+          token_json=$(curl -fsS --max-time 30 -X POST 'https://public-api.kiwify.com/v1/oauth/token' -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode "client_id=$KIWIFY_CLIENT_ID" --data-urlencode "client_secret=$KIWIFY_CLIENT_SECRET")
           token=$(echo "$token_json" | jq -r '.access_token // empty')
           test -n "$token"
           printf '%s' "$token" > /tmp/kiwify_token
-          echo 'Kiwify OAuth authentication succeeded.'
 
-      - name: Find Polirotinas product
-        id: product
+      - name: Find Poliroutines products
+        id: products
         env:
           KIWIFY_ACCOUNT_ID: ${{ secrets.KIWIFY_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
           token=$(cat /tmp/kiwify_token)
-          products=$(curl -fsS --max-time 30 \
-            -H "Authorization: Bearer $token" \
-            -H "x-kiwify-account-id: $KIWIFY_ACCOUNT_ID" \
-            'https://public-api.kiwify.com/v1/products?page_size=100&page_number=1')
-          product_id=$(echo "$products" | jq -r '.data[] | select(.name == "Polirotinas") | .id' | head -n1)
-          test -n "$product_id"
-          echo "product_id=$product_id" >> "$GITHUB_OUTPUT"
-          echo 'Polirotinas product found.'
+          products=$(curl -fsS --max-time 30 -G 'https://public-api.kiwify.com/v1/products' -H "Authorization: Bearer $token" -H "x-kiwify-account-id: $KIWIFY_ACCOUNT_ID" --data-urlencode 'page_size=100' --data-urlencode 'page_number=1')
+          lifetime_id=$(echo "$products" | jq -r '.data[] | select(.name == "Poliroutines" or .name == "Polirotinas" or .name == "Poliroutines Vitalício" or .name == "Polirotinas Vitalício") | .id' | head -n1)
+          monthly_id=$(echo "$products" | jq -r '.data[] | select(.name == "Poliroutines Mensal" or .name == "Polirotinas Mensal") | .id' | head -n1)
+          test -n "$lifetime_id"
+          echo "lifetime_id=$lifetime_id" >> "$GITHUB_OUTPUT"
+          echo "monthly_id=$monthly_id" >> "$GITHUB_OUTPUT"
+          echo "Lifetime product: $lifetime_id"
+          if [ -n "$monthly_id" ]; then echo "Monthly product: $monthly_id"; else echo 'Monthly Kiwify product not found yet; lifetime synchronization will continue.'; fi
+
+      - name: Migrate D1 schema
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: backend/license-worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          info=$(wrangler d1 execute polirotinas-licenses --remote --command "PRAGMA table_info(licenses)" --json)
+          add_column() {
+            local name="$1" definition="$2"
+            if ! echo "$info" | jq -e --arg n "$name" '.[0].results[] | select(.name == $n)' >/dev/null; then
+              echo "Adding column $name"
+              wrangler d1 execute polirotinas-licenses --remote --command "ALTER TABLE licenses ADD COLUMN $name $definition"
+            fi
+          }
+          add_column product_name 'TEXT'
+          add_column license_type "TEXT NOT NULL DEFAULT 'lifetime'"
+          add_column subscription_id 'TEXT'
+          add_column last_payment_id 'TEXT'
+          add_column expires_at 'TEXT'
+          add_column cancelled_at 'TEXT'
+          wrangler d1 execute polirotinas-licenses --remote --command "CREATE INDEX IF NOT EXISTS idx_licenses_subscription_id ON licenses(subscription_id); CREATE INDEX IF NOT EXISTS idx_licenses_expires_at ON licenses(expires_at); CREATE INDEX IF NOT EXISTS idx_license_deliveries_license_key ON license_deliveries(license_key);"
 
       - name: Download recent sales
         env:
           KIWIFY_ACCOUNT_ID: ${{ secrets.KIWIFY_ACCOUNT_ID }}
-          PRODUCT_ID: ${{ steps.product.outputs.product_id }}
+          LIFETIME_PRODUCT_ID: ${{ steps.products.outputs.lifetime_id }}
+          MONTHLY_PRODUCT_ID: ${{ steps.products.outputs.monthly_id }}
         shell: bash
         run: |
           set -euo pipefail
@@ -76,22 +95,19 @@ jobs:
           start_date=$(date -u -d '89 days ago' +%Y-%m-%d)
           end_date=$(date -u +%Y-%m-%d)
           : > /tmp/sales.jsonl
-          for page in $(seq 1 10); do
-            response=$(curl -fsS --max-time 30 \
-              -G 'https://public-api.kiwify.com/v1/sales' \
-              -H "Authorization: Bearer $token" \
-              -H "x-kiwify-account-id: $KIWIFY_ACCOUNT_ID" \
-              --data-urlencode "start_date=$start_date" \
-              --data-urlencode "end_date=$end_date" \
-              --data-urlencode "product_id=$PRODUCT_ID" \
-              --data-urlencode 'page_size=100' \
-              --data-urlencode "page_number=$page" \
-              --data-urlencode 'view_full_sale_details=true')
-            count=$(echo "$response" | jq '.data | length')
-            echo "$response" | jq -c '.data[]' >> /tmp/sales.jsonl
-            if [ "$count" -lt 100 ]; then break; fi
-          done
-          echo "Downloaded $(wc -l < /tmp/sales.jsonl) Polirotinas sales records."
+          fetch_product() {
+            local product_id="$1" label="$2"
+            [ -n "$product_id" ] || return 0
+            for page in $(seq 1 10); do
+              response=$(curl -fsS --max-time 30 -G 'https://public-api.kiwify.com/v1/sales' -H "Authorization: Bearer $token" -H "x-kiwify-account-id: $KIWIFY_ACCOUNT_ID" --data-urlencode "start_date=$start_date" --data-urlencode "end_date=$end_date" --data-urlencode "product_id=$product_id" --data-urlencode 'page_size=100' --data-urlencode "page_number=$page" --data-urlencode 'view_full_sale_details=true')
+              count=$(echo "$response" | jq '.data | length')
+              echo "$response" | jq -c --arg label "$label" '.data[] | . + {__sync_product_label:$label}' >> /tmp/sales.jsonl
+              if [ "$count" -lt 100 ]; then break; fi
+            done
+          }
+          fetch_product "$LIFETIME_PRODUCT_ID" lifetime
+          fetch_product "$MONTHLY_PRODUCT_ID" monthly
+          echo "Downloaded $(wc -l < /tmp/sales.jsonl) sale records."
 
       - name: Build D1 synchronization SQL
         shell: bash
@@ -100,29 +116,50 @@ jobs:
           python3 - <<'PY'
           import json, secrets
           from pathlib import Path
-          alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+          alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
           def key():
               raw = ''.join(secrets.choice(alphabet) for _ in range(12))
-              return f"POLI-{raw[:4]}-{raw[4:8]}-{raw[8:12]}"
+              return f'POLI-{raw[:4]}-{raw[4:8]}-{raw[8:12]}'
           def q(value):
-              if value is None: return "NULL"
+              if value is None: return 'NULL'
               return "'" + str(value).replace("'", "''") + "'"
-          statements=[]; seen=set()
+          def dt(value):
+              if not value: return None
+              text = str(value).strip().replace('T', ' ').replace('Z', '')
+              return text[:19]
+          statements=[]
           for line in Path('/tmp/sales.jsonl').read_text().splitlines():
               if not line.strip(): continue
               sale=json.loads(line)
-              transaction_id=str(sale.get('id') or '').strip()
-              if not transaction_id or transaction_id in seen: continue
-              seen.add(transaction_id)
-              customer=sale.get('customer') or {}
+              tx=str(sale.get('id') or sale.get('order_id') or '').strip()
+              if not tx: continue
+              customer=sale.get('customer') or sale.get('Customer') or {}
+              product=sale.get('Product') or sale.get('product') or {}
               email=str(customer.get('email') or '').strip().lower()
-              name=str(customer.get('name') or '').strip()
-              status=str(sale.get('status') or '').lower()
+              name=str(customer.get('full_name') or customer.get('name') or '').strip()
+              product_name=str(product.get('product_name') or product.get('name') or sale.get('product_name') or '').strip()
+              label=str(sale.get('__sync_product_label') or '').strip().lower()
+              subscription=sale.get('Subscription') or sale.get('subscription') or {}
+              subscription_id=str(subscription.get('id') or subscription.get('subscription_id') or sale.get('subscription_id') or '').strip()
+              next_payment=dt(subscription.get('next_payment') or sale.get('next_payment'))
+              sub_status=str(subscription.get('status') or '').strip().lower()
+              status=str(sale.get('status') or sale.get('order_status') or '').strip().lower()
+              monthly=label == 'monthly' or bool(subscription_id)
+              cancelled=sub_status in {'cancelled','canceled'}
               if status in {'paid','approved'}:
-                  statements.append("INSERT INTO licenses (license_key, transaction_id, buyer_email, buyer_name, status, created_at) VALUES (%s, %s, %s, %s, 'active', datetime('now')) ON CONFLICT(transaction_id) DO UPDATE SET buyer_email=excluded.buyer_email, buyer_name=excluded.buyer_name, status='active', revoked_at=NULL;" % (q(key()),q(transaction_id),q(email),q(name)))
-              elif status in {'refunded','chargedback','pending_refund','refund_requested'}:
-                  statements.append(f"UPDATE licenses SET status='revoked', revoked_at=datetime('now') WHERE transaction_id={q(transaction_id)};")
-          Path('/tmp/sync.sql').write_text('\n'.join(statements)+('\n' if statements else ''))
+                  if monthly:
+                      license_key=key()
+                      cancel_sql = "datetime('now')" if cancelled else 'NULL'
+                      statements.append(f"UPDATE licenses SET buyer_email={q(email)}, buyer_name={q(name)}, product_name={q(product_name)}, license_type='monthly', status=CASE WHEN status='revoked' THEN status ELSE 'active' END, last_payment_id={q(tx)}, expires_at={q(next_payment)}, cancelled_at={cancel_sql}, revoked_at=NULL WHERE subscription_id={q(subscription_id)};")
+                      statements.append(f"INSERT INTO licenses (license_key,transaction_id,buyer_email,buyer_name,product_name,license_type,status,subscription_id,last_payment_id,expires_at,cancelled_at,created_at) SELECT {q(license_key)},{q(tx)},{q(email)},{q(name)},{q(product_name)},'monthly','active',{q(subscription_id)},{q(tx)},{q(next_payment)},{cancel_sql},datetime('now') WHERE NOT EXISTS (SELECT 1 FROM licenses WHERE subscription_id={q(subscription_id)}) AND NOT EXISTS (SELECT 1 FROM licenses WHERE transaction_id={q(tx)});")
+                  else:
+                      license_key=key()
+                      statements.append(f"INSERT INTO licenses (license_key,transaction_id,buyer_email,buyer_name,product_name,license_type,status,last_payment_id,created_at) VALUES ({q(license_key)},{q(tx)},{q(email)},{q(name)},{q(product_name)},'lifetime','active',{q(tx)},datetime('now')) ON CONFLICT(transaction_id) DO UPDATE SET buyer_email=excluded.buyer_email,buyer_name=excluded.buyer_name,product_name=excluded.product_name,license_type='lifetime',status='active',last_payment_id=excluded.last_payment_id,revoked_at=NULL;")
+              elif status in {'refunded','chargedback','chargeback','charged_back','pending_refund','refund_requested'}:
+                  if subscription_id:
+                      statements.append(f"UPDATE licenses SET status='revoked', revoked_at=datetime('now') WHERE subscription_id={q(subscription_id)};")
+                  statements.append(f"UPDATE licenses SET status='revoked', revoked_at=datetime('now') WHERE transaction_id={q(tx)};")
+          Path('/tmp/sync.sql').write_text('\n'.join(statements) + ('\n' if statements else ''))
           print(f'Generated {len(statements)} D1 statements.')
           PY
 
@@ -135,22 +172,6 @@ jobs:
         run: |
           set -euo pipefail
           wrangler d1 execute polirotinas-licenses --remote --file=schema.sql
-          echo 'D1 schema is ready.'
-
-      - name: Generate test license
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        working-directory: backend/license-worker
-        shell: bash
-        run: |
-          set -euo pipefail
-          TEST_TRANSACTION_ID='POLIROTINAS-INTERNAL-TEST'
-          TEST_LICENSE_KEY='POLI-TEST-APK133-2026'
-          wrangler d1 execute polirotinas-licenses --remote --command "INSERT INTO licenses (license_key, transaction_id, buyer_email, buyer_name, status, created_at) VALUES ('$TEST_LICENSE_KEY','$TEST_TRANSACTION_ID','teste@polirotinas.local','Teste Polirotinas','active',datetime('now')) ON CONFLICT(transaction_id) DO UPDATE SET license_key=excluded.license_key, status='active', revoked_at=NULL;"
-          echo "TEST_LICENSE_KEY=$TEST_LICENSE_KEY"
-          echo "TEST_LICENSE_KEY=$TEST_LICENSE_KEY" >> "$GITHUB_ENV"
-          echo 'Internal test license is active.'
 
       - name: Apply licenses to D1
         env:
@@ -159,11 +180,18 @@ jobs:
         working-directory: backend/license-worker
         run: |
           set -euo pipefail
-          if [ -s /tmp/sync.sql ]; then
-            wrangler d1 execute polirotinas-licenses --remote --file=/tmp/sync.sql
-          else
-            echo 'No license changes to apply.'
-          fi
+          if [ -s /tmp/sync.sql ]; then wrangler d1 execute polirotinas-licenses --remote --file=/tmp/sync.sql; else echo 'No license changes to apply.'; fi
+
+      - name: Generate test license
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: backend/license-worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          wrangler d1 execute polirotinas-licenses --remote --command "INSERT INTO licenses (license_key, transaction_id, buyer_email, buyer_name, product_name, license_type, status, created_at) VALUES ('POLI-TEST-APK133-2026','POLIROUTINES-INTERNAL-TEST','teste@poliroutines.local','Teste Poliroutines','Poliroutines Test','lifetime','active',datetime('now')) ON CONFLICT(transaction_id) DO UPDATE SET status='active', revoked_at=NULL;"
 
       - name: Verify D1 population
         env:
@@ -177,7 +205,6 @@ jobs:
           echo "$result" | jq -r '.[0].results[0] | "D1 licenses total=\(.total) active=\(.active // 0)"'
           total=$(echo "$result" | jq -r '.[0].results[0].total // 0')
           test "$total" -gt 0
-          echo 'D1 verification passed.'
 
       - name: Deliver new licenses by email
         env:
@@ -189,44 +216,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          if [ -z "${RESEND_API_KEY:-}" ] || [ -z "${RESEND_FROM_EMAIL:-}" ]; then
-            echo 'Email delivery is not configured yet. Add RESEND_API_KEY and RESEND_FROM_EMAIL to GitHub Secrets.'
-            exit 0
-          fi
-
-          licenses=$(wrangler d1 execute polirotinas-licenses --remote --command "SELECT l.transaction_id, l.license_key, l.buyer_email, COALESCE(l.buyer_name,'Cliente') AS buyer_name FROM licenses l LEFT JOIN license_deliveries d ON d.transaction_id=l.transaction_id WHERE l.status='active' AND l.buyer_email IS NOT NULL AND l.buyer_email != '' AND l.buyer_email NOT LIKE '%@polirotinas.local' AND d.transaction_id IS NULL" --json)
-
+          if [ -z "${RESEND_API_KEY:-}" ] || [ -z "${RESEND_FROM_EMAIL:-}" ]; then echo 'Email delivery is not configured; skipping.'; exit 0; fi
+          licenses=$(wrangler d1 execute polirotinas-licenses --remote --command "SELECT l.transaction_id, l.license_key, l.buyer_email, COALESCE(l.buyer_name,'Cliente') AS buyer_name, l.license_type FROM licenses l WHERE l.status='active' AND l.buyer_email IS NOT NULL AND l.buyer_email != '' AND l.buyer_email NOT LIKE '%@poliroutines.local' AND NOT EXISTS (SELECT 1 FROM license_deliveries d WHERE d.license_key=l.license_key)" --json)
           echo "$licenses" | jq -c '.[0].results[]?' | while IFS= read -r row; do
-            email=$(echo "$row" | jq -r '.buyer_email')
-            name=$(echo "$row" | jq -r '.buyer_name')
-            transaction_id=$(echo "$row" | jq -r '.transaction_id')
-            license_key=$(echo "$row" | jq -r '.license_key')
-
-            payload=$(jq -n \
-              --arg from "$RESEND_FROM_EMAIL" \
-              --arg to "$email" \
-              --arg name "$name" \
-              --arg license "$license_key" \
-              --arg apk "$APK_DOWNLOAD_URL" \
-              '{from:$from,to:[$to],subject:"Seu acesso ao Polirotinas",html:("<h2>Compra aprovada! 🎉</h2><p>Olá, " + $name + "!</p><p>Obrigado por adquirir o <strong>Polirotinas</strong>.</p><p><strong>Seu código de ativação:</strong></p><p style=\"font-size:22px;font-weight:bold;letter-spacing:1px\">" + $license + "</p><p><a href=\"" + $apk + "\">Baixar o aplicativo Polirotinas para Android</a></p><p>Instale o aplicativo, abra a tela de ativação e informe o código acima.</p><p>Guarde este e-mail para futuras reinstalações.</p>") }')
-
-            response=$(curl -fsS --max-time 30 \
-              -X POST 'https://api.resend.com/emails' \
-              -H "Authorization: Bearer $RESEND_API_KEY" \
-              -H 'Content-Type: application/json' \
-              --data "$payload")
-
+            email=$(echo "$row" | jq -r '.buyer_email'); name=$(echo "$row" | jq -r '.buyer_name'); transaction_id=$(echo "$row" | jq -r '.transaction_id'); license_key=$(echo "$row" | jq -r '.license_key'); license_type=$(echo "$row" | jq -r '.license_type')
+            payload=$(jq -n --arg from "$RESEND_FROM_EMAIL" --arg to "$email" --arg name "$name" --arg license "$license_key" --arg apk "$APK_DOWNLOAD_URL" --arg type "$license_type" '{from:$from,to:[$to],subject:"Seu acesso ao Poliroutines",html:("<h2>Compra aprovada! 🎉</h2><p>Olá, " + $name + "!</p><p>Obrigado por adquirir o <strong>Poliroutines</strong>.</p><p><strong>Seu código de ativação:</strong></p><p style=\"font-size:22px;font-weight:bold;letter-spacing:1px\">" + $license + "</p><p>Plano: " + $type + "</p><p><a href=\"" + $apk + "\">Baixar o aplicativo Poliroutines</a></p><p>Instale o aplicativo, abra a tela de ativação e informe o código acima.</p><p>Guarde este e-mail para futuras reinstalações.</p>") }')
+            response=$(curl -fsS --max-time 30 -X POST 'https://api.resend.com/emails' -H "Authorization: Bearer $RESEND_API_KEY" -H 'Content-Type: application/json' --data "$payload")
             email_id=$(echo "$response" | jq -r '.id // empty')
             test -n "$email_id"
-
-            wrangler d1 execute polirotinas-licenses --remote --command "INSERT INTO license_deliveries (transaction_id,email,license_key,sent_at) VALUES ('$transaction_id','$email','$license_key',datetime('now'));"
-            echo "License delivered to $email. Resend ID: $email_id"
+            wrangler d1 execute polirotinas-licenses --remote --command "INSERT INTO license_deliveries (transaction_id,email,license_key,sent_at) VALUES ('$transaction_id','$email','$license_key',datetime('now')) ON CONFLICT(transaction_id) DO NOTHING;"
           done
-
-      - name: Show test license for manual activation
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        run: |
-          echo "=========================================="
-          echo "POLIROTINAS TEST LICENSE: $TEST_LICENSE_KEY"
-          echo "=========================================="
