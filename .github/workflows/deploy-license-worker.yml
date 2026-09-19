@@ -76,6 +76,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          response=$(curl -fsS --max-time 20 'https://polirotinas-license.brunopoli95.workers.dev/health')
-          echo "$response"
-          echo "$response" | jq -e '.ok == true and .service == "poliroutines-license" and .version == "5"' >/dev/null
+          ok=0
+          for attempt in $(seq 1 12); do
+            response=$(curl -fsS --max-time 20 'https://polirotinas-license.brunopoli95.workers.dev/health' || true)
+            echo "Attempt $attempt: $response"
+            if echo "$response" | jq -e '.ok == true and .service == "poliroutines-license" and .version == "5"' >/dev/null 2>&1; then
+              ok=1
+              break
+            fi
+            sleep 5
+          done
+          test "$ok" -eq 1
