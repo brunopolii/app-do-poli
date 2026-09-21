@@ -1,0 +1,43 @@
+name: Import original site screenshots
+
+on:
+  push:
+    paths:
+      - ".github/workflows/import-original-screens.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download original screenshots
+        run: |
+          set -e
+          mkdir -p docs/assets/screens-web
+          curl -L --fail --retry 3 "https://github.com/user-attachments/assets/e9dcc259-c0ab-4604-9eb0-72ef0a1f67e9" -o docs/assets/screens-web/01-inicio.jpg
+          curl -L --fail --retry 3 "https://github.com/user-attachments/assets/b81a26f8-f68b-4282-bf11-47e5d590d9cd" -o docs/assets/screens-web/02-personalizacao-a.jpg
+          curl -L --fail --retry 3 "https://github.com/user-attachments/assets/fc718934-3505-446d-af5f-7859fcedcf9d" -o docs/assets/screens-web/03-alimentacao.jpg
+          curl -L --fail --retry 3 "https://github.com/user-attachments/assets/dfd7e4df-e2e8-4b8e-9d6a-fff5e27da452" -o docs/assets/screens-web/04-financeiro.jpg
+          curl -L --fail --retry 3 "https://github.com/user-attachments/assets/924be9d4-447f-423f-9afd-4ed4b19704f9" -o docs/assets/screens-web/05-academia.jpg
+          curl -L --fail --retry 3 "https://github.com/user-attachments/assets/bd5cdd3f-bcec-4bbc-b557-8623779570cc" -o docs/assets/screens-web/06-inicio-dark.jpg
+
+      - name: Verify downloaded files
+        run: |
+          set -e
+          for f in docs/assets/screens-web/01-inicio.jpg docs/assets/screens-web/02-personalizacao-a.jpg docs/assets/screens-web/03-alimentacao.jpg docs/assets/screens-web/04-financeiro.jpg docs/assets/screens-web/05-academia.jpg docs/assets/screens-web/06-inicio-dark.jpg; do
+            test -s "$f"
+            file "$f"
+          done
+
+      - name: Commit original screenshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/assets/screens-web/*.jpg
+          git commit -m "Adiciona screenshots originais do Poliroutines" || exit 0
+          git push
