@@ -354,7 +354,10 @@ async function handleWebhook(request, env) {
 
   if (!configuredSecrets.length) return json({ error: "Webhook secret not configured" }, 500);
 
-  const suppliedSecret = getWebhookToken(request);
+  const url = new URL(request.url);
+  const suppliedSecret =
+    getWebhookToken(request) ||
+    String(url.searchParams.get("signature") || "").trim();
   if (!suppliedSecret || !configuredSecrets.includes(suppliedSecret)) {
     return json({ error: "Unauthorized" }, 401);
   }
