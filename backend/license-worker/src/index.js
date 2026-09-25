@@ -71,7 +71,7 @@ function normalizePlanFrequency(value) {
     .trim()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "");
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 function getSubscriptionLicenseType(body) {
@@ -227,7 +227,7 @@ async function upsertApproved(body, env) {
     return json({ error: "subscription_expiration_required" }, 400);
   }
 
-  const licenseType = licenseType;
+  const licenseType = subscriptionProduct ? getSubscriptionLicenseType(body) : "lifetime";
   if (subscriptionProduct && !licenseType) {
     return json({
       error: "subscription_plan_type_required",
