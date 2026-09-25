@@ -81,8 +81,8 @@ function getSubscriptionLicenseType(body) {
 
   if (/annual|anual|yearly|year/.test(frequency)) return "annual";
   if (/monthly|mensal|month/.test(frequency)) return "monthly";
-  if (/annual|anual|yearly/.test(planName)) return "annual";
-  if (/monthly|mensal/.test(planName)) return "monthly";
+  if (/annual|anual|yearly|year/.test(planName)) return "annual";
+  if (/monthly|mensal|month/.test(planName)) return "monthly";
 
   return null;
 }
@@ -271,10 +271,14 @@ async function upsertApproved(body, env) {
 
   const licenseType = subscriptionProduct ? getSubscriptionLicenseType(body) : "lifetime";
   if (subscriptionProduct && !licenseType) {
+    const plan = getSubscriptionPlan(body);
     return json({
-      error: "subscription_plan_type_required",
-      message: "Could not determine whether the subscription plan is monthly or annual.",
-    }, 400);
+      ok: true,
+      ignored: true,
+      reason: "unsupported_subscription_plan_frequency",
+      frequency: normalizePlanFrequency(plan?.frequency),
+      plan_name: normalizePlanFrequency(plan?.name),
+    });
   }
 
   const customer = customerData(body);
