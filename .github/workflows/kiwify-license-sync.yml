@@ -53,15 +53,13 @@ jobs:
           products=$(curl -fsS --max-time 30 -G 'https://public-api.kiwify.com/v1/products' -H "Authorization: Bearer $token" -H "x-kiwify-account-id: $KIWIFY_ACCOUNT_ID" --data-urlencode 'page_size=100' --data-urlencode 'page_number=1')
           echo "$products" | jq -r '.data[]? | .name' | sed 's/^/Kiwify product: /'
           lifetime_id=$(echo "$products" | jq -r '.data[]? | select((.name // "" | ascii_downcase | test("poliroutines|polirotinas")) and (.name // "" | ascii_downcase | test("mensal|monthly|anual|annual") | not)) | .id' | head -n1)
-          monthly_id=$(echo "$products" | jq -r '.data[]? | select((.name // "" | ascii_downcase | test("poliroutines|polirotinas")) and (.name // "" | ascii_downcase | test("mensal|monthly"))) | .id' | head -n1)
-          annual_id=$(echo "$products" | jq -r '.data[]? | select((.name // "" | ascii_downcase | test("poliroutines|polirotinas")) and (.name // "" | ascii_downcase | test("anual|annual"))) | .id' | head -n1)
+          subscription_id=$(echo "$products" | jq -r '.data[]? | select((.name // "" | ascii_downcase | test("poliroutines|polirotinas")) and (.name // "" | ascii_downcase | test("mensal|monthly|anual|annual"))) | .id' | head -n1)
           test -n "$lifetime_id"
+          test -n "$subscription_id"
           echo "lifetime_id=$lifetime_id" >> "$GITHUB_OUTPUT"
-          echo "monthly_id=$monthly_id" >> "$GITHUB_OUTPUT"
-          echo "annual_id=$annual_id" >> "$GITHUB_OUTPUT"
+          echo "subscription_id=$subscription_id" >> "$GITHUB_OUTPUT"
           echo "Lifetime product: $lifetime_id"
-          if [ -n "$monthly_id" ]; then echo "Monthly product: $monthly_id"; else echo 'Monthly Kiwify product not found; continuing.'; fi
-          if [ -n "$annual_id" ]; then echo "Annual product: $annual_id"; else echo 'Annual Kiwify product not found; continuing.'; fi
+          echo "Subscription product: $subscription_id"
 
       - name: Migrate D1 schema
         env:
@@ -91,8 +89,7 @@ jobs:
         env:
           KIWIFY_ACCOUNT_ID: ${{ secrets.KIWIFY_ACCOUNT_ID }}
           LIFETIME_PRODUCT_ID: ${{ steps.products.outputs.lifetime_id }}
-          MONTHLY_PRODUCT_ID: ${{ steps.products.outputs.monthly_id }}
-          ANNUAL_PRODUCT_ID: ${{ steps.products.outputs.annual_id }}
+          SUBSCRIPTION_PRODUCT_ID: ${{ steps.products.outputs.subscription_id }}
         shell: bash
         run: |
           set -euo pipefail
@@ -111,8 +108,7 @@ jobs:
             done
           }
           fetch_product "$LIFETIME_PRODUCT_ID" lifetime
-          fetch_product "$MONTHLY_PRODUCT_ID" monthly
-          fetch_product "$ANNUAL_PRODUCT_ID" annual
+          fetch_product "$SUBSCRIPTION_PRODUCT_ID" subscription
           echo "Downloaded $(wc -l < /tmp/sales.jsonl) sale records."
 
       - name: Build D1 synchronization SQL
@@ -144,16 +140,29 @@ jobs:
               email=str(customer.get('email') or '').strip().lower()
               name=str(customer.get('full_name') or customer.get('name') or '').strip()
               product_name=str(product.get('product_name') or product.get('name') or sale.get('product_name') or '').strip()
-              label=str(sale.get('__sync_product_label') or '').strip().lower()
               subscription=sale.get('Subscription') or sale.get('subscription') or {}
+              plan=subscription.get('plan') or sale.get('plan') or {}
+              frequency=str(plan.get('frequency') or '').strip().lower()
+              plan_name=str(plan.get('name') or '').strip().lower()
               subscription_id=str(subscription.get('id') or subscription.get('subscription_id') or sale.get('subscription_id') or '').strip()
               next_payment=dt(subscription.get('next_payment') or sale.get('next_payment'))
               sub_status=str(subscription.get('status') or '').strip().lower()
               status=str(sale.get('status') or sale.get('order_status') or '').strip().lower()
-              subscription_product=label in {'monthly','annual'} or bool(subscription_id)
-              license_type='annual' if label == 'annual' else 'monthly'
+              subscription_product=bool(subscription_id)
+              if any(x in frequency for x in ('annual','anual','year')):
+                  license_type='annual'
+              elif any(x in frequency for x in ('monthly','mensal','month')):
+                  license_type='monthly'
+              elif any(x in plan_name for x in ('annual','anual','yearly')):
+                  license_type='annual'
+              elif any(x in plan_name for x in ('monthly','mensal')):
+                  license_type='monthly'
+              else:
+                  license_type=None
               cancelled=sub_status in {'cancelled','canceled'}
               if status in {'paid','approved'}:
+                  if subscription_product and not license_type:
+                      raise RuntimeError(f"Unknown subscription plan frequency for transaction {tx}: {frequency!r} / {plan_name!r}")
                   if subscription_product:
                       license_key=key()
                       cancel_sql = "datetime('now')" if cancelled else 'NULL'
