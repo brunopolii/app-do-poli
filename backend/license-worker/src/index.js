@@ -154,6 +154,48 @@ function getWebhookToken(request) {
   ).trim();
 }
 
+function bytesToHex(bytes) {
+  return Array.from(new Uint8Array(bytes))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function bytesToBase64(bytes) {
+  let binary = "";
+  for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+async function signWebhookBody(secret, bodyText) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-1" },
+    false,
+    ["sign"]
+  );
+  return crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(bodyText)
+  );
+}
+
+async function verifyKiwifySignature(signature, bodyText, secrets) {
+  if (!signature || !bodyText || !secrets.length) return false;
+  const normalized = signature.trim();
+  for (const secret of secrets) {
+    const digest = await signWebhookBody(secret, bodyText);
+    if (
+      normalized === bytesToHex(digest) ||
+      normalized === bytesToBase64(digest)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function customerData(body) {
   const customer = body?.Customer || body?.customer || {};
   return {
@@ -355,16 +397,31 @@ async function handleWebhook(request, env) {
   if (!configuredSecrets.length) return json({ error: "Webhook secret not configured" }, 500);
 
   const url = new URL(request.url);
-  const suppliedSecret =
-    getWebhookToken(request) ||
-    String(url.searchParams.get("signature") || "").trim();
-  if (!suppliedSecret || !configuredSecrets.includes(suppliedSecret)) {
+  const signature = String(url.searchParams.get("signature") || "").trim();
+  const headerToken = getWebhookToken(request);
+
+  let bodyText;
+  try {
+    bodyText = await request.text();
+  } catch {
+    return json({ error: "Invalid body" }, 400);
+  }
+
+  const signatureValid = await verifyKiwifySignature(
+    signature,
+    bodyText,
+    configuredSecrets
+  );
+  const legacyTokenValid =
+    Boolean(headerToken) && configuredSecrets.includes(headerToken);
+
+  if (!signatureValid && !legacyTokenValid) {
     return json({ error: "Unauthorized" }, 401);
   }
 
   let body;
   try {
-    body = await request.json();
+    body = JSON.parse(bodyText);
   } catch {
     return json({ error: "Invalid JSON" }, 400);
   }
