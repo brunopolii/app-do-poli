@@ -61,18 +61,39 @@ function getProductName(body) {
   ).trim();
 }
 
-function isAnnualProduct(body) {
-  const name = getProductName(body).toLowerCase();
-  return /anual|annual/.test(name);
+function getSubscriptionPlan(body) {
+  const subscription = getSubscription(body);
+  return subscription?.plan || body?.plan || null;
+}
+
+function normalizePlanFrequency(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "");
+}
+
+function getSubscriptionLicenseType(body) {
+  const plan = getSubscriptionPlan(body);
+  const frequency = normalizePlanFrequency(plan?.frequency);
+  const planName = normalizePlanFrequency(plan?.name);
+
+  if (/annual|anual|yearly|year/.test(frequency)) return "annual";
+  if (/monthly|mensal|month/.test(frequency)) return "monthly";
+  if (/annual|anual|yearly/.test(planName)) return "annual";
+  if (/monthly|mensal/.test(planName)) return "monthly";
+
+  return null;
 }
 
 function isSubscriptionProduct(body) {
   const name = getProductName(body).toLowerCase();
-  return Boolean(getSubscriptionId(body)) || /mensal|monthly|anual|annual|assinatura/.test(name);
-}
-
-function getSubscriptionLicenseType(body) {
-  return isAnnualProduct(body) ? "annual" : "monthly";
+  return (
+    Boolean(getSubscription(body)) ||
+    Boolean(getSubscriptionId(body)) ||
+    /mensal|monthly|anual|annual|assinatura/.test(name)
+  );
 }
 
 function parseDateToSql(value) {
@@ -206,6 +227,14 @@ async function upsertApproved(body, env) {
     return json({ error: "subscription_expiration_required" }, 400);
   }
 
+  const licenseType = licenseType;
+  if (subscriptionProduct && !licenseType) {
+    return json({
+      error: "subscription_plan_type_required",
+      message: "Could not determine whether the subscription plan is monthly or annual.",
+    }, 400);
+  }
+
   const customer = customerData(body);
   const productName = getProductName(body);
   const existing = await findLicense(env, { transactionId, subscriptionId });
@@ -228,7 +257,7 @@ async function upsertApproved(body, env) {
       customer.email || null,
       customer.name || null,
       productName || null,
-      subscriptionProduct ? getSubscriptionLicenseType(body) : "lifetime",
+      licenseType,
       subscriptionId || null,
       transactionId,
       subscriptionProduct ? expiresAt : null,
@@ -239,7 +268,7 @@ async function upsertApproved(body, env) {
       ok: true,
       license_key: existing.license_key,
       existing: true,
-      license_type: subscriptionProduct ? getSubscriptionLicenseType(body) : "lifetime",
+      license_type: licenseType,
       expires_at: subscriptionProduct ? expiresAt : null,
     });
   }
@@ -256,7 +285,7 @@ async function upsertApproved(body, env) {
     customer.email || null,
     customer.name || null,
     productName || null,
-    subscriptionProduct ? getSubscriptionLicenseType(body) : "lifetime",
+    licenseType,
     subscriptionId || null,
     transactionId,
     subscriptionProduct ? expiresAt : null
@@ -266,7 +295,7 @@ async function upsertApproved(body, env) {
     ok: true,
     license_key: licenseKey,
     created: true,
-    license_type: subscriptionProduct ? getSubscriptionLicenseType(body) : "lifetime",
+    license_type: licenseType,
     expires_at: subscriptionProduct ? expiresAt : null,
   });
 }
@@ -313,11 +342,20 @@ async function cancelSubscription(body, env) {
 }
 
 async function handleWebhook(request, env) {
-  const configuredSecret = String(env.KIWIFY_WEBHOOK_SECRET || "").trim();
-  if (!configuredSecret) return json({ error: "Webhook secret not configured" }, 500);
+  const configuredSecrets = [
+    env.KIWIFY_WEBHOOK_SECRET,
+    env.KIWIFY_WEBHOOK_SECRET_2,
+    env.KIWIFY_WEBHOOK_SECRET_3,
+    ...(String(env.KIWIFY_WEBHOOK_SECRETS || "")
+      .split(/[,\\n]/)
+      .map((value) => value.trim())
+      .filter(Boolean)),
+  ].filter(Boolean);
+
+  if (!configuredSecrets.length) return json({ error: "Webhook secret not configured" }, 500);
 
   const suppliedSecret = getWebhookToken(request);
-  if (!suppliedSecret || suppliedSecret !== configuredSecret) {
+  if (!suppliedSecret || !configuredSecrets.includes(suppliedSecret)) {
     return json({ error: "Unauthorized" }, 401);
   }
 
@@ -511,7 +549,7 @@ export default {
     let response;
 
     if (url.pathname === "/health") {
-      response = json({ ok: true, service: "poliroutines-license", version: "5" });
+      response = json({ ok: true, service: "poliroutines-license", version: "6" });
     } else if (url.pathname === "/webhook" && request.method === "POST") {
       response = await handleWebhook(request, env);
     } else if (url.pathname === "/activate" && request.method === "POST") {
