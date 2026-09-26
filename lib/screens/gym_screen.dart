@@ -66,7 +66,7 @@ class _HistorySectionState extends State<HistorySection>{
   String get periodLabel{
     if(mode==_GymPeriodMode.week){
       final end=periodStart.add(const Duration(days:6));
-      return '\${DateFormat('dd/MM').format(periodStart)} – \${DateFormat('dd/MM/yyyy').format(end)}';
+      return '${DateFormat('dd/MM').format(periodStart)} – ${DateFormat('dd/MM/yyyy').format(end)}';
     }
     return DateFormat('MMMM yyyy','pt_BR').format(periodStart);
   }
@@ -119,7 +119,7 @@ class _HistorySectionState extends State<HistorySection>{
     final target=workout.exercises[exerciseIndex];
     final controllers=List.generate(target.weights.length,(i)=>TextEditingController(text:target.weights[i]>0?target.weights[i].toString():''));
     final ok=await showDialog<bool>(context:context,builder:(d)=>AlertDialog(
-      title:Text('Editar registro • \${target.name}'),
+      title:Text('Editar registro • ${target.name}'),
       content:SizedBox(width:420,child:SingleChildScrollView(child:Column(
         mainAxisSize:MainAxisSize.min,
         children:[
@@ -130,7 +130,7 @@ class _HistorySectionState extends State<HistorySection>{
             child:TextField(
               controller:controllers[i],
               keyboardType:const TextInputType.numberWithOptions(decimal:true),
-              decoration:InputDecoration(labelText:'Série \${i+1} (kg)'),
+              decoration:InputDecoration(labelText:'Série ${i+1} (kg)'),
             ),
           ),
         ],
@@ -160,7 +160,7 @@ class _HistorySectionState extends State<HistorySection>{
     if(workout==null)return;
     final ok=await showDialog<bool>(context:context,builder:(d)=>AlertDialog(
       title:const Text('Excluir registro?'),
-      content:Text('Excluir o registro de \${exercise??'este exercício'} em \${DateFormat('dd/MM/yyyy').format(point.date)}?'),
+      content:Text('Excluir o registro de ${exercise??'este exercício'} em ${DateFormat('dd/MM/yyyy').format(point.date)}?'),
       actions:[
         TextButton(onPressed:()=>Navigator.pop(d,false),child:const Text('Cancelar')),
         FilledButton(onPressed:()=>Navigator.pop(d,true),child:const Text('Excluir')),
@@ -213,14 +213,14 @@ class _HistorySectionState extends State<HistorySection>{
       const SizedBox(height:6),
       if(pts.isNotEmpty)_GymChart(data:pts,color:Theme.of(context).colorScheme.primary)
       else const Padding(padding:EdgeInsets.symmetric(vertical:24),child:Text('Nenhum registro de carga neste período.')),
-      if(pts.isNotEmpty)Text('\${pts.length} dia(s) com registro • maior carga do treino selecionado'),
+      if(pts.isNotEmpty)Text('${pts.length} dia(s) com registro • maior carga do treino selecionado'),
       if(selected!=null&&pts.isNotEmpty)Row(children:[
         Expanded(child:OutlinedButton.icon(onPressed:()=>_editPoint(pts[selected!]),icon:const Icon(Icons.edit_outlined),label:const Text('Editar registro'))),
         const SizedBox(width:8),
         Expanded(child:OutlinedButton.icon(onPressed:()=>_deletePoint(pts[selected!]),icon:const Icon(Icons.delete_outline),label:const Text('Excluir registro'))),
       ]),
       if(pts.isNotEmpty)const Padding(padding:EdgeInsets.only(top:6),child:Text('Toque em um ponto para editar ou excluir o registro daquele dia.')),
-      Text('\${history.length} treino(s) concluído(s).'),
+      Text('${history.length} treino(s) concluído(s).'),
     ]));
   }
 }
@@ -258,7 +258,7 @@ class _GymChartState extends State<_GymChart>{
       ),
     ])),
   );
-  String _label(_Point p)=>'\${DateFormat('dd/MM','pt_BR').format(p.date)} • \${p.value.toStringAsFixed(p.value.truncateToDouble()==p.value?0:1)} kg';
+  String _label(_Point p)=>'${DateFormat('dd/MM','pt_BR').format(p.date)} • ${p.value.toStringAsFixed(p.value.truncateToDouble()==p.value?0:1)} kg';
 }
 class _GymChartPainter extends CustomPainter{
   final List<_Point> data;final Color color;final Color labelColor;final int? selected;final ui.TextDirection textDirection;
@@ -277,7 +277,7 @@ class _GymChartPainter extends CustomPainter{
       final y=top+chartH*i/4;
       c.drawLine(Offset(left,y),Offset(s.width-right,y),grid);
       final value=max-(max-min)*i/4;
-      _drawLabel(c,'\${value.toStringAsFixed(value.truncateToDouble()==value?0:1)} kg',Offset(2,y),TextAlign.left);
+      _drawLabel(c,'${value.toStringAsFixed(value.truncateToDouble()==value?0:1)} kg',Offset(2,y),TextAlign.left);
     }
     for(var i=0;i<data.length;i++){
       final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);
@@ -285,7 +285,7 @@ class _GymChartPainter extends CustomPainter{
       final y=top+chartH-normalized*chartH;
       if(i==0)path.moveTo(x,y);else path.lineTo(x,y);
       c.drawCircle(Offset(x,y),i==selected?7:4,Paint()..color=color);
-      _drawLabel(c,'\${data[i].value.toStringAsFixed(data[i].value.truncateToDouble()==data[i].value?0:1)} kg',Offset(x,y-12),TextAlign.center);
+      _drawLabel(c,'${data[i].value.toStringAsFixed(data[i].value.truncateToDouble()==data[i].value?0:1)} kg',Offset(x,y-12),TextAlign.center);
       if(data.length<=6||i==0||i==data.length-1)_drawLabel(c,DateFormat('dd/MM').format(data[i].date),Offset(x,s.height-bottom+8),TextAlign.center);
     }
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
