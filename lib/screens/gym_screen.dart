@@ -30,46 +30,206 @@ class HistorySection extends StatefulWidget{
   const HistorySection({super.key});
   @override State<HistorySection> createState()=>_HistorySectionState();
 }
+enum _GymPeriodMode{week,month}
 class _HistorySectionState extends State<HistorySection>{
-  List<Workout> history=[];String? exercise;bool showAll=false;
-  @override void initState(){super.initState();load();}
-  Future<void> load()async{history=(await StorageService.read('workout_history')).map(Workout.fromJson).toList();history.sort((a,b)=>a.date.compareTo(b.date));if(mounted)setState((){});}
+  List<Workout> history=[];
+  String? exercise;
+  _GymPeriodMode mode=_GymPeriodMode.week;
+  late DateTime period;
+  int? selected;
+
+  @override
+  void initState(){
+    super.initState();
+    final now=DateTime.now();
+    period=_weekStart(now);
+    load();
+  }
+
+  static DateTime _day(DateTime d)=>DateTime(d.year,d.month,d.day);
+  static DateTime _weekStart(DateTime d)=>_day(d).subtract(Duration(days:d.weekday-1));
+  static DateTime _monthStart(DateTime d)=>DateTime(d.year,d.month,1);
+
+  Future<void> load()async{
+    history=(await StorageService.read('workout_history')).map(Workout.fromJson).toList();
+    history.sort((a,b)=>a.date.compareTo(b.date));
+    if(mounted)setState((){});
+  }
+
+  DateTime get periodStart=>mode==_GymPeriodMode.week?_weekStart(period):_monthStart(period);
+  DateTime get periodEnd=>mode==_GymPeriodMode.week?periodStart.add(const Duration(days:7)):DateTime(periodStart.year,periodStart.month+1,1);
+  DateTime get currentStart{
+    final now=DateTime.now();
+    return mode==_GymPeriodMode.week?_weekStart(now):_monthStart(now);
+  }
+  bool get canGoNext=>periodStart.isBefore(currentStart);
+  String get periodLabel{
+    if(mode==_GymPeriodMode.week){
+      final end=periodStart.add(const Duration(days:6));
+      return '\${DateFormat('dd/MM').format(periodStart)} – \${DateFormat('dd/MM/yyyy').format(end)}';
+    }
+    return DateFormat('MMMM yyyy','pt_BR').format(periodStart);
+  }
+
+  void _setMode(_GymPeriodMode next){
+    setState((){
+      mode=next;
+      period=next==_GymPeriodMode.week?_weekStart(DateTime.now()):_monthStart(DateTime.now());
+      selected=null;
+    });
+  }
+
+  void _move(int delta){
+    setState((){
+      period=mode==_GymPeriodMode.week
+          ?periodStart.add(Duration(days:7*delta))
+          :DateTime(periodStart.year,periodStart.month+delta,1);
+      selected=null;
+    });
+  }
+
   List<_Point> points(){
     if(exercise==null)return[];
-    final now=DateTime.now(),today=DateTime(now.year,now.month,now.day),start=today.subtract(const Duration(days:6));
-    final bySession=<String,_Point>{};
+    final byDay=<String,_Point>{};
     for(final w in history){
-      final d=DateTime.tryParse(w.date);if(d==null)continue;
-      if(!showAll&&(d.isBefore(start)||!d.isBefore(today.add(const Duration(days:1)))))continue;
+      final d=DateTime.tryParse(w.date);
+      if(d==null||d.isBefore(periodStart)||!d.isBefore(periodEnd))continue;
       double? best;
       for(final e in w.exercises.where((e)=>e.name==exercise)){
-        for(final v in e.weights){if(v.isFinite&&v>0&&(best==null||v>best))best=v;}
+        for(final v in e.weights){
+          if(v.isFinite&&v>0&&(best==null||v>best))best=v;
+        }
       }
-      if(best!=null){final key=w.id.isNotEmpty?w.id:'${w.date}|${w.name}|${d.microsecondsSinceEpoch}';bySession[key]=_Point(d,best);}
+      if(best==null)continue;
+      final dayKey=DateFormat('yyyy-MM-dd').format(d);
+      final previous=byDay[dayKey];
+      if(previous==null||d.isAfter(previous.date)){
+        byDay[dayKey]=_Point(d,best,w.id);
+      }
     }
-    final out=bySession.values.toList()..sort((a,b)=>a.date.compareTo(b.date));
+    final out=byDay.values.toList()..sort((a,b)=>a.date.compareTo(b.date));
     return out;
   }
-  @override Widget build(BuildContext context){
-    if(history.isEmpty)return AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Evolução de carga',style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:8),const Text('Conclua um treino com cargas registradas para começar a acompanhar sua evolução.')]));
+
+  Future<void> _editPoint(_Point point)async{
+    final workout=history.cast<Workout?>().firstWhere((w)=>w?.id==point.workoutId,orElse:()=>null);
+    if(workout==null)return;
+    final exerciseIndex=workout.exercises.indexWhere((e)=>e.name==exercise);
+    if(exerciseIndex<0)return;
+    final target=workout.exercises[exerciseIndex];
+    final controllers=List.generate(target.weights.length,(i)=>TextEditingController(text:target.weights[i]>0?target.weights[i].toString():''));
+    final ok=await showDialog<bool>(context:context,builder:(d)=>AlertDialog(
+      title:Text('Editar registro • \${target.name}'),
+      content:SizedBox(width:420,child:SingleChildScrollView(child:Column(
+        mainAxisSize:MainAxisSize.min,
+        children:[
+          Text(DateFormat('dd/MM/yyyy HH:mm','pt_BR').format(DateTime.tryParse(workout.date)??point.date)),
+          const SizedBox(height:12),
+          for(var i=0;i<controllers.length;i++)Padding(
+            padding:const EdgeInsets.only(bottom:8),
+            child:TextField(
+              controller:controllers[i],
+              keyboardType:const TextInputType.numberWithOptions(decimal:true),
+              decoration:InputDecoration(labelText:'Série \${i+1} (kg)'),
+            ),
+          ),
+        ],
+      ))),
+      actions:[
+        TextButton(onPressed:()=>Navigator.pop(d,false),child:const Text('Cancelar')),
+        FilledButton(onPressed:()=>Navigator.pop(d,true),child:const Text('Salvar')),
+      ],
+    ));
+    if(ok==true){
+      final values=controllers.map((c)=>double.tryParse(c.text.replaceAll(',','.').trim())??0).toList();
+      if(values.any((v)=>v<0||!v.isFinite)){
+        for(final c in controllers)c.dispose();
+        return;
+      }
+      target.weights=values;
+      await StorageService.write('workout_history',history.map((e)=>e.toJson()).toList());
+      for(final c in controllers)c.dispose();
+      if(mounted)setState(()=>selected=null);
+    }else{
+      for(final c in controllers)c.dispose();
+    }
+  }
+
+  Future<void> _deletePoint(_Point point)async{
+    final workout=history.cast<Workout?>().firstWhere((w)=>w?.id==point.workoutId,orElse:()=>null);
+    if(workout==null)return;
+    final ok=await showDialog<bool>(context:context,builder:(d)=>AlertDialog(
+      title:const Text('Excluir registro?'),
+      content:Text('Excluir o registro de \${exercise??'este exercício'} em \${DateFormat('dd/MM/yyyy').format(point.date)}?'),
+      actions:[
+        TextButton(onPressed:()=>Navigator.pop(d,false),child:const Text('Cancelar')),
+        FilledButton(onPressed:()=>Navigator.pop(d,true),child:const Text('Excluir')),
+      ],
+    ));
+    if(ok!=true)return;
+    workout.exercises.removeWhere((e)=>e.name==exercise);
+    if(workout.exercises.isEmpty)history.removeWhere((w)=>w.id==workout.id);
+    await StorageService.write('workout_history',history.map((e)=>e.toJson()).toList());
+    if(mounted)setState(()=>selected=null);
+  }
+
+  @override
+  Widget build(BuildContext context){
+    if(history.isEmpty)return AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Text('Evolução de carga',style:Theme.of(context).textTheme.titleLarge),
+      const SizedBox(height:8),
+      const Text('Conclua um treino com cargas registradas para começar a acompanhar sua evolução.')
+    ]));
     final names=history.expand((w)=>w.exercises.map((e)=>e.name)).where((n)=>n.trim().isNotEmpty).toSet().toList()..sort();
     exercise=names.contains(exercise)?exercise:(names.isEmpty?null:names.first);
     final pts=points();
+    if(selected!=null&&(selected!<0||selected!>=pts.length))selected=null;
     return AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       Text('Evolução de carga',style:Theme.of(context).textTheme.titleLarge),
-      DropdownButtonFormField<String>(initialValue:exercise,items:names.map((n)=>DropdownMenuItem(value:n,child:Text(n))).toList(),onChanged:(v)=>setState(()=>exercise=v)),
-      const SizedBox(height:4),
-      Text(showAll?'Histórico completo':'Últimos 7 dias',style:Theme.of(context).textTheme.bodySmall),
+      const SizedBox(height:8),
+      SegmentedButton<_GymPeriodMode>(
+        segments:const[
+          ButtonSegment(value:_GymPeriodMode.week,label:Text('Semanal')),
+          ButtonSegment(value:_GymPeriodMode.month,label:Text('Mensal')),
+        ],
+        selected:{mode},
+        onSelectionChanged:(v){if(v.isNotEmpty)_setMode(v.first);},
+      ),
+      const SizedBox(height:8),
+      Row(children:[
+        IconButton(onPressed:()=>_move(-1),icon:const Icon(Icons.chevron_left)),
+        Expanded(child:Text(periodLabel,textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.w600))),
+        if(canGoNext)IconButton(onPressed:()=>_move(1),icon:const Icon(Icons.chevron_right))
+        else const SizedBox(width:48),
+      ]),
+      DropdownButtonFormField<String>(
+        initialValue:exercise,
+        items:names.map((n)=>DropdownMenuItem(value:n,child:Text(n))).toList(),
+        onChanged:(v)=>setState((){exercise=v;selected=null;}),
+        decoration:const InputDecoration(labelText:'Exercício'),
+      ),
+      const SizedBox(height:6),
+      const Text('Uma carga por dia • treino mais recente do dia'),
       const SizedBox(height:6),
       if(pts.isNotEmpty)_GymChart(data:pts,color:Theme.of(context).colorScheme.primary)
-      else Padding(padding:const EdgeInsets.symmetric(vertical:24),child:Text(showAll?'Nenhum registro de carga para este exercício.':'Nenhum registro de carga nos últimos 7 dias.')),
-      if(pts.isNotEmpty)Text('${pts.length} sessão(ões) • maior carga real por sessão'),
-      TextButton.icon(onPressed:()=>setState(()=>showAll=!showAll),icon:Icon(showAll?Icons.history_toggle_off:Icons.history),label:Text(showAll?'Mostrar últimos 7 dias':'Ver histórico completo')),
-      Text('${history.length} treino(s) concluído(s).'),
+      else const Padding(padding:EdgeInsets.symmetric(vertical:24),child:Text('Nenhum registro de carga neste período.')),
+      if(pts.isNotEmpty)Text('\${pts.length} dia(s) com registro • maior carga do treino selecionado'),
+      if(selected!=null&&pts.isNotEmpty)Row(children:[
+        Expanded(child:OutlinedButton.icon(onPressed:()=>_editPoint(pts[selected!]),icon:const Icon(Icons.edit_outlined),label:const Text('Editar registro'))),
+        const SizedBox(width:8),
+        Expanded(child:OutlinedButton.icon(onPressed:()=>_deletePoint(pts[selected!]),icon:const Icon(Icons.delete_outline),label:const Text('Excluir registro'))),
+      ]),
+      if(pts.isNotEmpty)const Padding(padding:EdgeInsets.only(top:6),child:Text('Toque em um ponto para editar ou excluir o registro daquele dia.')),
+      Text('\${history.length} treino(s) concluído(s).'),
     ]));
   }
 }
-class _Point{final DateTime date;final double value;_Point(this.date,this.value);}
+class _Point{
+  final DateTime date;
+  final double value;
+  final String workoutId;
+  _Point(this.date,this.value,this.workoutId);
+}
 class _GymChart extends StatefulWidget{
   final List<_Point> data;final Color color;
   const _GymChart({required this.data,required this.color});
@@ -78,13 +238,27 @@ class _GymChart extends StatefulWidget{
 class _GymChartState extends State<_GymChart>{
   int? selected;
   @override Widget build(BuildContext context)=>GestureDetector(
-    onTapUp:(d){final w=MediaQuery.sizeOf(context).width;final chartW=(w-48).clamp(1.0,10000.0).toDouble();final x=(d.localPosition.dx-36).clamp(0.0,chartW);final i=widget.data.length==1?0:(x/chartW*(widget.data.length-1)).round().clamp(0,widget.data.length-1);setState(()=>selected=i);},
+    onTapUp:(d){
+      final w=MediaQuery.sizeOf(context).width;
+      final chartW=(w-48).clamp(1.0,10000.0).toDouble();
+      final x=(d.localPosition.dx-36).clamp(0.0,chartW);
+      final i=widget.data.length==1?0:(x/chartW*(widget.data.length-1)).round().clamp(0,widget.data.length-1);
+      setState(()=>selected=i);
+    },
     child:SizedBox(height:235,child:Stack(children:[
       Positioned.fill(child:CustomPaint(painter:_GymChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,selected,Directionality.of(context)))),
-      if(selected!=null&&selected!>=0&&selected!<widget.data.length)Align(alignment:Alignment.topCenter,child:Container(margin:const EdgeInsets.only(top:2),padding:const EdgeInsets.symmetric(horizontal:10,vertical:6),decoration:BoxDecoration(color:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(10)),child:Text(_label(widget.data[selected!]),style:Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight:FontWeight.bold)))),
+      if(selected!=null&&selected!>=0&&selected!<widget.data.length)Align(
+        alignment:Alignment.topCenter,
+        child:Container(
+          margin:const EdgeInsets.only(top:2),
+          padding:const EdgeInsets.symmetric(horizontal:10,vertical:6),
+          decoration:BoxDecoration(color:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(10)),
+          child:Text(_label(widget.data[selected!]),style:Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight:FontWeight.bold)),
+        ),
+      ),
     ])),
   );
-  String _label(_Point p)=>'${DateFormat('dd/MM','pt_BR').format(p.date)} • ${p.value.toStringAsFixed(p.value.truncateToDouble()==p.value?0:1)} kg';
+  String _label(_Point p)=>'\${DateFormat('dd/MM','pt_BR').format(p.date)} • \${p.value.toStringAsFixed(p.value.truncateToDouble()==p.value?0:1)} kg';
 }
 class _GymChartPainter extends CustomPainter{
   final List<_Point> data;final Color color;final Color labelColor;final int? selected;final ui.TextDirection textDirection;
@@ -96,21 +270,33 @@ class _GymChartPainter extends CustomPainter{
     final min=data.map((p)=>p.value).reduce((a,b)=>a<b?a:b),max=data.map((p)=>p.value).reduce((a,b)=>a>b?a:b),rawRange=max-min;
     final range=rawRange.abs()<.01?1.0:rawRange;
     final axis=Paint()..color=labelColor.withValues(alpha:.35)..strokeWidth=1;
+    final grid=Paint()..color=labelColor.withValues(alpha:.16)..strokeWidth=1;
     final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke;
     final path=Path();
+    for(var i=0;i<=4;i++){
+      final y=top+chartH*i/4;
+      c.drawLine(Offset(left,y),Offset(s.width-right,y),grid);
+      final value=max-(max-min)*i/4;
+      _drawLabel(c,'\${value.toStringAsFixed(value.truncateToDouble()==value?0:1)} kg',Offset(2,y),TextAlign.left);
+    }
     for(var i=0;i<data.length;i++){
       final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);
-      final normalized=(rawRange.abs()<.01) ? .5 : (data[i].value-min)/range;
+      final normalized=rawRange.abs()<.01?.5:(data[i].value-min)/range;
       final y=top+chartH-normalized*chartH;
       if(i==0)path.moveTo(x,y);else path.lineTo(x,y);
       c.drawCircle(Offset(x,y),i==selected?7:4,Paint()..color=color);
-      _drawLabel(c,'${data[i].value.toStringAsFixed(data[i].value.truncateToDouble()==data[i].value?0:1)} kg',Offset(x,y-12),TextAlign.center);
+      _drawLabel(c,'\${data[i].value.toStringAsFixed(data[i].value.truncateToDouble()==data[i].value?0:1)} kg',Offset(x,y-12),TextAlign.center);
       if(data.length<=6||i==0||i==data.length-1)_drawLabel(c,DateFormat('dd/MM').format(data[i].date),Offset(x,s.height-bottom+8),TextAlign.center);
     }
-    c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);c.drawPath(path,line);
-    _drawLabel(c,'${max.toStringAsFixed(max.truncateToDouble()==max?0:1)} kg',Offset(2,top),TextAlign.left);
-    if(rawRange.abs()>.01)_drawLabel(c,'${min.toStringAsFixed(min.truncateToDouble()==min?0:1)} kg',Offset(2,s.height-bottom),TextAlign.left);
+    c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
+    c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
+    c.drawPath(path,line);
   }
-  void _drawLabel(Canvas c,String text,Offset center,TextAlign align){final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(color:labelColor,fontSize:10,fontWeight:FontWeight.w500)),textDirection:textDirection,textAlign:align)..layout(maxWidth:90);final dx=(align==TextAlign.center?center.dx-tp.width/2:center.dx).toDouble();final dy=(align==TextAlign.center?center.dy-tp.height/2:center.dy).toDouble();tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),dy.clamp(0.0,10000.0).toDouble()));}
+  void _drawLabel(Canvas c,String text,Offset center,TextAlign align){
+    final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(color:labelColor,fontSize:10,fontWeight:FontWeight.w500)),textDirection:textDirection,textAlign:align)..layout(maxWidth:90);
+    final dx=(align==TextAlign.center?center.dx-tp.width/2:center.dx).toDouble();
+    final dy=(align==TextAlign.center?center.dy-tp.height/2:center.dy).toDouble();
+    tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),dy.clamp(0.0,10000.0).toDouble()));
+  }
   @override bool shouldRepaint(covariant _GymChartPainter old)=>old.data!=data||old.color!=color||old.labelColor!=labelColor||old.selected!=selected;
 }
