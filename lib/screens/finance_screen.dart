@@ -248,7 +248,7 @@ class _FinanceScreenState extends State<FinanceScreen>{
       AppCard(child:Row(children:[IconButton(onPressed:()=>setState(()=>month=DateTime(month.year,month.month-1)),icon:const Icon(Icons.chevron_left)),Expanded(child:Text(DateFormat('MMMM yyyy','pt_BR').format(month),textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.bold))),IconButton(onPressed:()=>setState(()=>month=DateTime(month.year,month.month+1)),icon:const Icon(Icons.chevron_right))])),
       Row(children:[Expanded(child:_metric('Entradas pagas',incPaid)),Expanded(child:_metric('Despesas pagas',outPaid))]),
       Row(children:[Expanded(child:_metric('Saldo atual',_balance())),Expanded(child:_metric('Próximo/previsto',projectedOut))]),
-      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Previsão do mês',style:Theme.of(context).textTheme.titleLarge),Text('Despesas previstas: ${money(projectedOut)}'),Text('Saldo projetado: ${money(projectedBalance)}'),Text('Pendentes: ${{money(cur.where((x)=>!x.income&&!x.isPaid).fold(0.0,(a,x)=>a+x.amount))}')])) ,
+      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Previsão do mês',style:Theme.of(context).textTheme.titleLarge),Text('Despesas previstas: ${money(projectedOut)}'),Text('Saldo projetado: ${money(projectedBalance)}'),Text('Pendentes: ${money(cur.where((x)=>!x.income&&!x.isPaid).fold(0.0,(a,x)=>a+x.amount))}')])) ,
       AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text('Entradas x despesas',style:Theme.of(context).textTheme.titleLarge),
         const SizedBox(height:8),
