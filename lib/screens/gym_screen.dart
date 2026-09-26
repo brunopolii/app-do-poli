@@ -36,16 +36,9 @@ class _HistorySectionState extends State<HistorySection>{
   String? exercise;
   _GymPeriodMode mode=_GymPeriodMode.week;
   late DateTime period;
-  int? selected;
 
   @override
-  void initState(){
-    super.initState();
-    final now=DateTime.now();
-    period=_weekStart(now);
-    load();
-  }
-
+  void initState(){super.initState();period=_weekStart(DateTime.now());load();}
   static DateTime _day(DateTime d)=>DateTime(d.year,d.month,d.day);
   static DateTime _weekStart(DateTime d)=>_day(d).subtract(Duration(days:d.weekday-1));
   static DateTime _monthStart(DateTime d)=>DateTime(d.year,d.month,1);
@@ -70,27 +63,21 @@ class _HistorySectionState extends State<HistorySection>{
     }
     return DateFormat('MMMM yyyy','pt_BR').format(periodStart);
   }
-
   void _setMode(_GymPeriodMode next){
     setState((){
       mode=next;
       period=next==_GymPeriodMode.week?_weekStart(DateTime.now()):_monthStart(DateTime.now());
-      selected=null;
     });
   }
-
   void _move(int delta){
     setState((){
-      period=mode==_GymPeriodMode.week
-          ?periodStart.add(Duration(days:7*delta))
-          :DateTime(periodStart.year,periodStart.month+delta,1);
-      selected=null;
+      period=mode==_GymPeriodMode.week?periodStart.add(Duration(days:7*delta)):DateTime(periodStart.year,periodStart.month+delta,1);
     });
   }
 
-  List<_Point> points(){
+  List<_GymDayPoint?> points(){
     if(exercise==null)return[];
-    final byDay=<String,_Point>{};
+    final byDay=<String,_GymDayPoint>{};
     for(final w in history){
       final d=DateTime.tryParse(w.date);
       if(d==null||d.isBefore(periodStart)||!d.isBefore(periodEnd))continue;
@@ -101,40 +88,51 @@ class _HistorySectionState extends State<HistorySection>{
         }
       }
       if(best==null)continue;
-      final dayKey=DateFormat('yyyy-MM-dd').format(d);
-      final previous=byDay[dayKey];
-      if(previous==null||d.isAfter(previous.date)){
-        byDay[dayKey]=_Point(d,best,w.id);
+      final key=DateFormat('yyyy-MM-dd').format(d);
+      final previous=byDay[key];
+      if(previous==null||d.isAfter(previous.date))byDay[key]=_GymDayPoint(d,best,w.id);
+    }
+    final result=< _GymDayPoint?>[];
+    final days=mode==_GymPeriodMode.week?7:periodEnd.difference(periodStart).inDays;
+    for(var i=0;i<days;i++){
+      final d=periodStart.add(Duration(days:i));
+      result.add(byDay[DateFormat('yyyy-MM-dd').format(d)]);
+    }
+    return result;
+  }
+
+  List<_GymRecord> records(){
+    if(exercise==null)return[];
+    final out=< _GymRecord>[];
+    for(final w in history){
+      final d=DateTime.tryParse(w.date);
+      if(d==null||d.isBefore(periodStart)||!d.isBefore(periodEnd))continue;
+      for(final e in w.exercises.where((e)=>e.name==exercise)){
+        final values=e.weights.where((v)=>v.isFinite&&v>=0).toList();
+        if(values.isEmpty)continue;
+        out.add(_GymRecord(w.id,d,values.reduce((a,b)=>a>b?a:b)));
       }
     }
-    final out=byDay.values.toList()..sort((a,b)=>a.date.compareTo(b.date));
+    out.sort((a,b)=>b.date.compareTo(a.date));
     return out;
   }
 
-  Future<void> _editPoint(_Point point)async{
-    final workout=history.cast<Workout?>().firstWhere((w)=>w?.id==point.workoutId,orElse:()=>null);
-    if(workout==null)return;
-    final exerciseIndex=workout.exercises.indexWhere((e)=>e.name==exercise);
-    if(exerciseIndex<0)return;
-    final target=workout.exercises[exerciseIndex];
-    final controllers=List.generate(target.weights.length,(i)=>TextEditingController(text:target.weights[i]>0?target.weights[i].toString():''));
+  Workout? _workout(String id)=>history.cast<Workout?>().firstWhere((w)=>w?.id==id,orElse:()=>null);
+
+  Future<void> _editRecord(_GymRecord record)async{
+    final workout=_workout(record.workoutId);
+    if(workout==null||exercise==null)return;
+    final target=workout.exercises.cast<Exercise?>().firstWhere((e)=>e?.name==exercise,orElse:()=>null);
+    if(target==null)return;
+    final controllers=List.generate(target.weights.length,(i)=>TextEditingController(text:target.weights[i].toString()));
     final ok=await showDialog<bool>(context:context,builder:(d)=>AlertDialog(
       title:Text('Editar registro • ${target.name}'),
-      content:SizedBox(width:420,child:SingleChildScrollView(child:Column(
-        mainAxisSize:MainAxisSize.min,
-        children:[
-          Text(DateFormat('dd/MM/yyyy HH:mm','pt_BR').format(DateTime.tryParse(workout.date)??point.date)),
-          const SizedBox(height:12),
-          for(var i=0;i<controllers.length;i++)Padding(
-            padding:const EdgeInsets.only(bottom:8),
-            child:TextField(
-              controller:controllers[i],
-              keyboardType:const TextInputType.numberWithOptions(decimal:true),
-              decoration:InputDecoration(labelText:'Série ${i+1} (kg)'),
-            ),
-          ),
-        ],
-      ))),
+      content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+        for(var i=0;i<controllers.length;i++)Padding(
+          padding:const EdgeInsets.only(bottom:8),
+          child:TextField(controller:controllers[i],keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:InputDecoration(labelText:'Série ${i+1} (kg)')),
+        ),
+      ])),
       actions:[
         TextButton(onPressed:()=>Navigator.pop(d,false),child:const Text('Cancelar')),
         FilledButton(onPressed:()=>Navigator.pop(d,true),child:const Text('Salvar')),
@@ -142,25 +140,22 @@ class _HistorySectionState extends State<HistorySection>{
     ));
     if(ok==true){
       final values=controllers.map((c)=>double.tryParse(c.text.replaceAll(',','.').trim())??0).toList();
-      if(values.any((v)=>v<0||!v.isFinite)){
-        for(final c in controllers)c.dispose();
-        return;
-      }
+      for(final c in controllers)c.dispose();
+      if(values.any((v)=>v<0||!v.isFinite))return;
       target.weights=values;
       await StorageService.write('workout_history',history.map((e)=>e.toJson()).toList());
-      for(final c in controllers)c.dispose();
-      if(mounted)setState(()=>selected=null);
+      if(mounted)setState((){});
     }else{
       for(final c in controllers)c.dispose();
     }
   }
 
-  Future<void> _deletePoint(_Point point)async{
-    final workout=history.cast<Workout?>().firstWhere((w)=>w?.id==point.workoutId,orElse:()=>null);
-    if(workout==null)return;
+  Future<void> _deleteRecord(_GymRecord record)async{
+    final workout=_workout(record.workoutId);
+    if(workout==null||exercise==null)return;
     final ok=await showDialog<bool>(context:context,builder:(d)=>AlertDialog(
       title:const Text('Excluir registro?'),
-      content:Text('Excluir o registro de ${exercise??'este exercício'} em ${DateFormat('dd/MM/yyyy').format(point.date)}?'),
+      content:Text('Excluir o registro de ${exercise} em ${DateFormat('dd/MM/yyyy').format(record.date)}?'),
       actions:[
         TextButton(onPressed:()=>Navigator.pop(d,false),child:const Text('Cancelar')),
         FilledButton(onPressed:()=>Navigator.pop(d,true),child:const Text('Excluir')),
@@ -170,7 +165,7 @@ class _HistorySectionState extends State<HistorySection>{
     workout.exercises.removeWhere((e)=>e.name==exercise);
     if(workout.exercises.isEmpty)history.removeWhere((w)=>w.id==workout.id);
     await StorageService.write('workout_history',history.map((e)=>e.toJson()).toList());
-    if(mounted)setState(()=>selected=null);
+    if(mounted)setState((){});
   }
 
   @override
@@ -182,8 +177,9 @@ class _HistorySectionState extends State<HistorySection>{
     ]));
     final names=history.expand((w)=>w.exercises.map((e)=>e.name)).where((n)=>n.trim().isNotEmpty).toSet().toList()..sort();
     exercise=names.contains(exercise)?exercise:(names.isEmpty?null:names.first);
-    final pts=points();
-    if(selected!=null&&(selected!<0||selected!>=pts.length))selected=null;
+    final chartData=points();
+    final recordList=records();
+    final registered=chartData.whereType<_GymDayPoint>().length;
     return AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       Text('Evolução de carga',style:Theme.of(context).textTheme.titleLarge),
       const SizedBox(height:8),
@@ -199,98 +195,109 @@ class _HistorySectionState extends State<HistorySection>{
       Row(children:[
         IconButton(onPressed:()=>_move(-1),icon:const Icon(Icons.chevron_left)),
         Expanded(child:Text(periodLabel,textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.w600))),
-        if(canGoNext)IconButton(onPressed:()=>_move(1),icon:const Icon(Icons.chevron_right))
-        else const SizedBox(width:48),
+        if(canGoNext)IconButton(onPressed:()=>_move(1),icon:const Icon(Icons.chevron_right))else const SizedBox(width:48),
       ]),
       DropdownButtonFormField<String>(
         initialValue:exercise,
         items:names.map((n)=>DropdownMenuItem(value:n,child:Text(n))).toList(),
-        onChanged:(v)=>setState((){exercise=v;selected=null;}),
+        onChanged:(v)=>setState(()=>exercise=v),
         decoration:const InputDecoration(labelText:'Exercício'),
       ),
       const SizedBox(height:6),
       const Text('Uma carga por dia • treino mais recente do dia'),
       const SizedBox(height:6),
-      if(pts.isNotEmpty)_GymChart(data:pts,color:Theme.of(context).colorScheme.primary)
+      if(chartData.isNotEmpty)_GymChart(data:chartData,color:Theme.of(context).colorScheme.primary,startDate:periodStart)
       else const Padding(padding:EdgeInsets.symmetric(vertical:24),child:Text('Nenhum registro de carga neste período.')),
-      if(pts.isNotEmpty)Text('${pts.length} dia(s) com registro • maior carga do treino selecionado'),
-      if(selected!=null&&pts.isNotEmpty)Row(children:[
-        Expanded(child:OutlinedButton.icon(onPressed:()=>_editPoint(pts[selected!]),icon:const Icon(Icons.edit_outlined),label:const Text('Editar registro'))),
-        const SizedBox(width:8),
-        Expanded(child:OutlinedButton.icon(onPressed:()=>_deletePoint(pts[selected!]),icon:const Icon(Icons.delete_outline),label:const Text('Excluir registro'))),
-      ]),
-      if(pts.isNotEmpty)const Padding(padding:EdgeInsets.only(top:6),child:Text('Toque em um ponto para editar ou excluir o registro daquele dia.')),
+      if(registered>0)Text('${registered} dia(s) com registro • maior carga do treino selecionado'),
+      const SizedBox(height:8),
+      Text('Registros do período',style:Theme.of(context).textTheme.titleMedium),
+      if(recordList.isEmpty)const Padding(padding:EdgeInsets.symmetric(vertical:8),child:Text('Nenhum registro neste período.')),
+      for(final r in recordList)ListTile(
+        contentPadding:EdgeInsets.zero,
+        title:Text('${DateFormat('dd/MM/yyyy HH:mm').format(r.date)} • ${r.value.toStringAsFixed(r.value.truncateToDouble()==r.value?0:1)} kg'),
+        subtitle:Text(exercise!),
+        trailing:PopupMenuButton<String>(
+          onSelected:(v){if(v=='edit')_editRecord(r);if(v=='delete')_deleteRecord(r);},
+          itemBuilder:(_)=>const[
+            PopupMenuItem(value:'edit',child:Text('Editar')),
+            PopupMenuItem(value:'delete',child:Text('Excluir')),
+          ],
+        ),
+      ),
       Text('${history.length} treino(s) concluído(s).'),
     ]));
   }
 }
-class _Point{
-  final DateTime date;
-  final double value;
-  final String workoutId;
-  _Point(this.date,this.value,this.workoutId);
+class _GymDayPoint{
+  final DateTime date;final double value;final String workoutId;
+  _GymDayPoint(this.date,this.value,this.workoutId);
 }
-class _GymChart extends StatefulWidget{
-  final List<_Point> data;final Color color;
-  const _GymChart({required this.data,required this.color});
-  @override State<_GymChart> createState()=>_GymChartState();
+class _GymRecord{
+  final String workoutId;final DateTime date;final double value;
+  _GymRecord(this.workoutId,this.date,this.value);
 }
-class _GymChartState extends State<_GymChart>{
-  int? selected;
-  @override Widget build(BuildContext context)=>GestureDetector(
-    onTapUp:(d){
-      final w=MediaQuery.sizeOf(context).width;
-      final chartW=(w-48).clamp(1.0,10000.0).toDouble();
-      final x=(d.localPosition.dx-36).clamp(0.0,chartW);
-      final i=widget.data.length==1?0:(x/chartW*(widget.data.length-1)).round().clamp(0,widget.data.length-1);
-      setState(()=>selected=i);
-    },
-    child:SizedBox(height:235,child:Stack(children:[
-      Positioned.fill(child:CustomPaint(painter:_GymChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,selected,Directionality.of(context)))),
-      if(selected!=null&&selected!>=0&&selected!<widget.data.length)Align(
-        alignment:Alignment.topCenter,
-        child:Container(
-          margin:const EdgeInsets.only(top:2),
-          padding:const EdgeInsets.symmetric(horizontal:10,vertical:6),
-          decoration:BoxDecoration(color:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(10)),
-          child:Text(_label(widget.data[selected!]),style:Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight:FontWeight.bold)),
-        ),
-      ),
-    ])),
+class _GymChart extends StatelessWidget{
+  final List<_GymDayPoint?> data;final Color color;final DateTime startDate;
+  const _GymChart({required this.data,required this.color,required this.startDate});
+  @override Widget build(BuildContext context)=>SizedBox(
+    height:235,
+    child:CustomPaint(
+      painter:_GymChartPainter(data,color,Theme.of(context).colorScheme.onSurfaceVariant,Directionality.of(context),startDate),
+    ),
   );
-  String _label(_Point p)=>'${DateFormat('dd/MM','pt_BR').format(p.date)} • ${p.value.toStringAsFixed(p.value.truncateToDouble()==p.value?0:1)} kg';
 }
 class _GymChartPainter extends CustomPainter{
-  final List<_Point> data;final Color color;final Color labelColor;final int? selected;final ui.TextDirection textDirection;
-  _GymChartPainter(this.data,this.color,this.labelColor,[this.selected,this.textDirection=ui.TextDirection.ltr]);
+  final List<_GymDayPoint?> data;final Color color;final Color labelColor;final ui.TextDirection textDirection;final DateTime startDate;
+  _GymChartPainter(this.data,this.color,this.labelColor,this.textDirection,this.startDate);
   @override void paint(Canvas c,Size s){
     if(data.isEmpty)return;
     const left=42.0,right=12.0,top=26.0,bottom=40.0;
-    final chartW=(s.width-left-right).clamp(1.0,10000.0).toDouble(),chartH=(s.height-top-bottom).clamp(1.0,10000.0).toDouble();
-    final min=data.map((p)=>p.value).reduce((a,b)=>a<b?a:b),max=data.map((p)=>p.value).reduce((a,b)=>a>b?a:b),rawRange=max-min;
-    final range=rawRange.abs()<.01?1.0:rawRange;
-    final axis=Paint()..color=labelColor.withValues(alpha:.35)..strokeWidth=1;
+    final chartW=(s.width-left-right).clamp(1.0,10000.0).toDouble();
+    final chartH=(s.height-top-bottom).clamp(1.0,10000.0).toDouble();
+    final values=data.whereType<_GymDayPoint>().map((p)=>p.value).toList();
     final grid=Paint()..color=labelColor.withValues(alpha:.16)..strokeWidth=1;
-    final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke;
-    final path=Path();
+    final axis=Paint()..color=labelColor.withValues(alpha:.35)..strokeWidth=1;
     for(var i=0;i<=4;i++){
       final y=top+chartH*i/4;
       c.drawLine(Offset(left,y),Offset(s.width-right,y),grid);
-      final value=max-(max-min)*i/4;
-      _drawLabel(c,'${value.toStringAsFixed(value.truncateToDouble()==value?0:1)} kg',Offset(2,y),TextAlign.left);
     }
-    for(var i=0;i<data.length;i++){
-      final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);
-      final normalized=rawRange.abs()<.01 ? .5 : (data[i].value-min)/range;
-      final y=top+chartH-normalized*chartH;
-      if(i==0)path.moveTo(x,y);else path.lineTo(x,y);
-      c.drawCircle(Offset(x,y),i==selected?7:4,Paint()..color=color);
-      _drawLabel(c,'${data[i].value.toStringAsFixed(data[i].value.truncateToDouble()==data[i].value?0:1)} kg',Offset(x,y-12),TextAlign.center);
-      if(data.length<=6||i==0||i==data.length-1)_drawLabel(c,DateFormat('dd/MM').format(data[i].date),Offset(x,s.height-bottom+8),TextAlign.center);
+    if(values.isNotEmpty){
+      final min=values.reduce((a,b)=>a<b?a:b),max=values.reduce((a,b)=>a>b?a:b),rawRange=max-min;
+      final range=rawRange.abs()<.01?1.0:rawRange;
+      final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
+      final path=Path();
+      int? previousIndex;
+      for(var i=0;i<data.length;i++){
+        final p=data[i];
+        final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);
+        if(p!=null){
+          final normalized=(p.value-min)/range;
+          final y=top+chartH-normalized*chartH;
+          if(previousIndex==null)path.moveTo(x,y);else path.lineTo(x,y);
+          previousIndex=i;
+          c.drawCircle(Offset(x,y),4,Paint()..color=color);
+          _drawLabel(c,'${p.value.toStringAsFixed(p.value.truncateToDouble()==p.value?0:1)} kg',Offset(x,y-12),TextAlign.center);
+        }else{
+          previousIndex=null;
+        }
+        final showLabel=data.length<=7||i==0||i==data.length-1||(data.length>7&&i%5==0);
+        if(showLabel)_drawLabel(c,DateFormat('dd/MM').format(startDate.add(Duration(days:i))),Offset(x,s.height-bottom+8),TextAlign.center);
+      }
+      for(var i=0;i<=4;i++){
+        final y=top+chartH*i/4;
+        final value=max-rawRange*i/4;
+        _drawLabel(c,'${value.toStringAsFixed(value.truncateToDouble()==value?0:1)} kg',Offset(2,y),TextAlign.left);
+      }
+      c.drawPath(path,line);
+    }else{
+      for(var i=0;i<data.length;i++){
+        final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);
+        final showLabel=data.length<=7||i==0||i==data.length-1||(data.length>7&&i%5==0);
+        if(showLabel)_drawLabel(c,DateFormat('dd/MM').format(startDate.add(Duration(days:i))),Offset(x,s.height-bottom+8),TextAlign.center);
+      }
     }
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
     c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
-    c.drawPath(path,line);
   }
   void _drawLabel(Canvas c,String text,Offset center,TextAlign align){
     final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(color:labelColor,fontSize:10,fontWeight:FontWeight.w500)),textDirection:textDirection,textAlign:align)..layout(maxWidth:90);
@@ -298,5 +305,5 @@ class _GymChartPainter extends CustomPainter{
     final dy=(align==TextAlign.center?center.dy-tp.height/2:center.dy).toDouble();
     tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),dy.clamp(0.0,10000.0).toDouble()));
   }
-  @override bool shouldRepaint(covariant _GymChartPainter old)=>old.data!=data||old.color!=color||old.labelColor!=labelColor||old.selected!=selected;
+  @override bool shouldRepaint(covariant _GymChartPainter old)=>old.data!=data||old.color!=color||old.labelColor!=labelColor||old.startDate!=startDate;
 }
