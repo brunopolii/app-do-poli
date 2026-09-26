@@ -256,10 +256,15 @@ class _GymChartPainter extends CustomPainter{
     final chartH=(s.height-top-bottom).clamp(1.0,10000.0).toDouble();
     final values=data.whereType<_GymDayPoint>().map((p)=>p.value).toList();
     final grid=Paint()..color=labelColor.withValues(alpha:.16)..strokeWidth=1;
+    final vertical=Paint()..color=labelColor.withValues(alpha:.08)..strokeWidth=1;
     final axis=Paint()..color=labelColor.withValues(alpha:.35)..strokeWidth=1;
     for(var i=0;i<=4;i++){
       final y=top+chartH*i/4;
       c.drawLine(Offset(left,y),Offset(s.width-right,y),grid);
+    }
+    for(var i=0;i<data.length;i++){
+      final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);
+      c.drawLine(Offset(x,top),Offset(x,s.height-bottom),vertical);
     }
     if(values.isNotEmpty){
       final min=values.reduce((a,b)=>a<b?a:b),max=values.reduce((a,b)=>a>b?a:b),rawRange=max-min;
