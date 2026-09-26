@@ -50,7 +50,13 @@ class _HistorySectionState extends State<HistorySection>{
   }
 
   DateTime get periodStart=>mode==_GymPeriodMode.week?_weekStart(period):_monthStart(period);
-  DateTime get periodEnd=>mode==_GymPeriodMode.week?periodStart.add(const Duration(days:7)):DateTime(periodStart.year,periodStart.month+1,1);
+  DateTime get periodEnd{
+    final fullEnd=mode==_GymPeriodMode.week?periodStart.add(const Duration(days:7)):DateTime(periodStart.year,periodStart.month+1,1);
+    final now=DateTime.now();
+    final current=mode==_GymPeriodMode.week?_weekStart(now):_monthStart(now);
+    if(periodStart==current)return DateTime(now.year,now.month,now.day+1);
+    return fullEnd;
+  }
   DateTime get currentStart{
     final now=DateTime.now();
     return mode==_GymPeriodMode.week?_weekStart(now):_monthStart(now);
@@ -58,7 +64,7 @@ class _HistorySectionState extends State<HistorySection>{
   bool get canGoNext=>periodStart.isBefore(currentStart);
   String get periodLabel{
     if(mode==_GymPeriodMode.week){
-      final end=periodStart.add(const Duration(days:6));
+      final end=periodEnd.subtract(const Duration(days:1));
       return '${DateFormat('dd/MM').format(periodStart)} – ${DateFormat('dd/MM/yyyy').format(end)}';
     }
     return DateFormat('MMMM yyyy','pt_BR').format(periodStart);
