@@ -9,6 +9,7 @@ import '../widgets/app_card.dart';
 
 const expenseCategories=['Alimentação','Transporte','Moradia','Lazer','Educação','Saúde','Compras','Outros'];
 const incomeCategories=['Salário','Freelance','Investimentos','Outros'];
+enum _FinancePeriodMode{month,semester}
 
 class FinanceScreen extends StatefulWidget{const FinanceScreen({super.key});@override State<FinanceScreen> createState()=>_FinanceScreenState();}
 
@@ -16,6 +17,8 @@ class _FinanceScreenState extends State<FinanceScreen>{
   List<MoneyTransaction> items=[];
   DateTime month=DateTime(DateTime.now().year,DateTime.now().month);
   bool loading=true;
+  _FinancePeriodMode chartMode=_FinancePeriodMode.month;
+  DateTime chartAnchor=DateTime(DateTime.now().year,DateTime.now().month);
 
   @override void initState(){super.initState();_load();}
 
@@ -215,20 +218,57 @@ class _FinanceScreenState extends State<FinanceScreen>{
     if(choice=='in')await _single(true);else if(choice=='out')await _single(false);else if(choice=='inst')await _installment();else if(choice=='rec')await _recurring();
   }
 
+  DateTime get _chartCurrentMonth=>DateTime(DateTime.now().year,DateTime.now().month);
+  DateTime get _chartStart=>chartMode==_FinancePeriodMode.month?DateTime(chartAnchor.year,chartAnchor.month,1):DateTime(chartAnchor.year,chartAnchor.month-5,1);
+  DateTime get _chartFullEnd=>DateTime(chartAnchor.year,chartAnchor.month+1,1);
+  DateTime get _chartEnd{
+    final fullEnd=_chartFullEnd;
+    final now=DateTime.now();
+    if(chartMode==_FinancePeriodMode.month&&chartAnchor.year==now.year&&chartAnchor.month==now.month)return DateTime(now.year,now.month,now.day+1);
+    if(chartMode==_FinancePeriodMode.semester&&chartAnchor.year==now.year&&chartAnchor.month==now.month)return DateTime(now.year,now.month,now.day+1);
+    return fullEnd;
+  }
+  bool get _chartCanNext=>chartAnchor.isBefore(_chartCurrentMonth);
+  String get _chartLabel{
+    if(chartMode==_FinancePeriodMode.month)return DateFormat('MMMM yyyy','pt_BR').format(chartAnchor);
+    final start=_chartStart;
+    return '${{DateFormat('MMM','pt_BR').format(start)} – ${{DateFormat('MMM yyyy','pt_BR').format(chartAnchor)}';
+  }
+  void _setChartMode(_FinancePeriodMode next){setState((){chartMode=next;chartAnchor=_chartCurrentMonth;});}
+  void _moveChart(int delta){setState((){final step=chartMode==_FinancePeriodMode.month?delta:delta*6;chartAnchor=DateTime(chartAnchor.year,chartAnchor.month+step,1);});}
+
   @override Widget build(BuildContext context){
     if(loading)return const Center(child:CircularProgressIndicator());
     final cur=_month(month);
     final incPaid=_sum(cur,income:true,paidOnly:true),outPaid=_sum(cur,paidOnly:true);
     final projectedOut=_sum(cur,paidOnly:false),projectedBalance=_sum(cur,income:true)-projectedOut;
     final cats=<String,double>{};for(final x in cur.where((x)=>!x.income)){cats[x.category]=(cats[x.category]??0)+x.amount;}
-    final months=List.generate(6,(i)=>DateTime(month.year,month.month-5+i));
     return SafeArea(child:ListView(padding:const EdgeInsets.all(16),children:[
       Row(children:[Expanded(child:Text('Financeiro',style:Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.bold))),FilledButton.icon(onPressed:_menu,icon:const Icon(Icons.add),label:const Text('Adicionar'))]),
       AppCard(child:Row(children:[IconButton(onPressed:()=>setState(()=>month=DateTime(month.year,month.month-1)),icon:const Icon(Icons.chevron_left)),Expanded(child:Text(DateFormat('MMMM yyyy','pt_BR').format(month),textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.bold))),IconButton(onPressed:()=>setState(()=>month=DateTime(month.year,month.month+1)),icon:const Icon(Icons.chevron_right))])),
       Row(children:[Expanded(child:_metric('Entradas pagas',incPaid)),Expanded(child:_metric('Despesas pagas',outPaid))]),
       Row(children:[Expanded(child:_metric('Saldo atual',_balance())),Expanded(child:_metric('Próximo/previsto',projectedOut))]),
-      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Previsão do mês',style:Theme.of(context).textTheme.titleLarge),Text('Despesas previstas: ${money(projectedOut)}'),Text('Saldo projetado: ${money(projectedBalance)}'),Text('Pendentes: ${money(cur.where((x)=>!x.income&&!x.isPaid).fold(0.0,(a,x)=>a+x.amount))}')])) ,
-      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Entradas x despesas — 6 meses',style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:8),SizedBox(height:200,child:CustomPaint(painter:_FinanceChart(months,items,Theme.of(context).colorScheme.primary),child:const SizedBox.expand()))])),
+      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Previsão do mês',style:Theme.of(context).textTheme.titleLarge),Text('Despesas previstas: ${{money(projectedOut)}'),Text('Saldo projetado: ${{money(projectedBalance)}'),Text('Pendentes: ${{money(cur.where((x)=>!x.income&&!x.isPaid).fold(0.0,(a,x)=>a+x.amount))}')])) ,
+      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text('Entradas x despesas',style:Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height:8),
+        SegmentedButton<_FinancePeriodMode>(
+          segments:const[
+            ButtonSegment(value:_FinancePeriodMode.month,label:Text('Mensal')),
+            ButtonSegment(value:_FinancePeriodMode.semester,label:Text('Semestral')),
+          ],
+          selected:{chartMode},
+          onSelectionChanged:(v){if(v.isNotEmpty)_setChartMode(v.first);},
+        ),
+        const SizedBox(height:8),
+        Row(children:[
+          IconButton(onPressed:()=>_moveChart(-1),icon:const Icon(Icons.chevron_left)),
+          Expanded(child:Text(_chartLabel,textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.bold))),
+          if(_chartCanNext)IconButton(onPressed:()=>_moveChart(1),icon:const Icon(Icons.chevron_right))else const SizedBox(width:48),
+        ]),
+        const SizedBox(height:4),
+        SizedBox(height:230,child:CustomPaint(painter:_FinanceChart(start:_chartStart,end:_chartEnd,mode:chartMode,items:items,color:Theme.of(context).colorScheme.primary),child:const SizedBox.expand())),
+      ])),
       if(cats.isNotEmpty)AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Despesas por categoria',style:Theme.of(context).textTheme.titleLarge),for(final e in cats.entries)_category(e.key,e.value,cats.values.fold(0.0,(a,b)=>a+b))])),
       const SizedBox(height:8),Text('Movimentações',style:Theme.of(context).textTheme.titleLarge),
       if(cur.isEmpty)const AppCard(child:Text('Nenhuma movimentação neste mês.')),
@@ -249,45 +289,53 @@ class _FinancePoint{
   _FinancePoint(this.date,this.balance,this.delta);
 }
 class _FinanceChart extends CustomPainter{
-  final List<DateTime> months;final List<MoneyTransaction> items;final Color color;
-  _FinanceChart(this.months,this.items,this.color);
+  final DateTime start;
+  final DateTime end;
+  final _FinancePeriodMode mode;
+  final List<MoneyTransaction> items;
+  final Color color;
+  _FinanceChart({required this.start,required this.end,required this.mode,required this.items,required this.color});
+  DateTime _movementDate(MoneyTransaction x)=>DateTime.tryParse(x.income?x.date:(x.paidDate??x.date))??DateTime(1900);
+  double _delta(MoneyTransaction x)=>x.income?x.amount:-x.amount;
 
   @override void paint(Canvas c,Size s){
-    if(months.isEmpty)return;
-    final startDate=DateTime(months.first.year,months.first.month,1);
-    final endDate=DateTime(months.last.year,months.last.month+1,1).subtract(const Duration(days:1));
-    final events=<MoneyTransaction>[];
-    for(final x in items){
-      if(x.isCancelled||!x.isPaid)continue;
-      final rawDate=x.income?x.date:(x.paidDate??x.date);
-      final d=DateTime.tryParse(rawDate);
-      if(d==null||d.isBefore(startDate)||d.isAfter(endDate))continue;
-      events.add(x);
-    }
-    events.sort((a,b){
-      final da=DateTime.tryParse(a.income?a.date:(a.paidDate??a.date))??DateTime.now();
-      final db=DateTime.tryParse(b.income?b.date:(b.paidDate??b.date))??DateTime.now();
-      return da.compareTo(db);
-    });
-
+    if(!start.isBefore(end))return;
+    final now=DateTime.now();
+    final visibleEnd=end.isAfter(DateTime(now.year,now.month,now.day+1))?DateTime(now.year,now.month,now.day+1):end;
     double opening=0;
     for(final x in items){
       if(x.isCancelled||!x.isPaid)continue;
-      final rawDate=x.income?x.date:(x.paidDate??x.date);
-      final d=DateTime.tryParse(rawDate);
-      if(d!=null&&d.isBefore(startDate))opening+=x.income?x.amount:-x.amount;
+      final d=_movementDate(x);
+      if(d.isBefore(start))opening+=_delta(x);
     }
-
-    final points=< _FinancePoint>[_FinancePoint(startDate,opening,0)];
+    final events=<DateTime,double>{};
+    for(final x in items){
+      if(x.isCancelled||!x.isPaid)continue;
+      final d=_movementDate(x);
+      if(d.isBefore(start)||!d.isBefore(visibleEnd))continue;
+      final bucket=mode==_FinancePeriodMode.month?DateTime(d.year,d.month,d.day):DateTime(d.year,d.month,1);
+      events[bucket]=(events[bucket]??0)+_delta(x);
+    }
+    final points=< _FinancePoint>[];
     var balance=opening;
-    for(final x in events){
-      final d=DateTime.tryParse(x.income?x.date:(x.paidDate??x.date))!;
-      final delta=x.income?x.amount:-x.amount;
-      balance+=delta;
-      points.add(_FinancePoint(d,balance,delta));
+    if(mode==_FinancePeriodMode.month){
+      for(var d=start;d.isBefore(visibleEnd);d=d.add(const Duration(days:1))){
+        final delta=events[d]??0;
+        balance+=delta;
+        points.add(_FinancePoint(d,balance,delta));
+      }
+    }else{
+      for(var d=DateTime(start.year,start.month,1);d.isBefore(visibleEnd);d=DateTime(d.year,d.month+1,1)){
+        final monthEnd=DateTime(d.year,d.month+1,1);
+        final bucketEnd=monthEnd.isAfter(visibleEnd)?visibleEnd:monthEnd;
+        final delta=events[d]??0;
+        balance+=delta;
+        points.add(_FinancePoint(bucketEnd.subtract(const Duration(days:1)),balance,delta));
+      }
     }
+    if(points.isEmpty)return;
 
-    const left=52.0,right=16.0,top=24.0,bottom=38.0;
+    const left=52.0,right=16.0,top=26.0,bottom=40.0;
     final w=math.max(1.0,s.width-left-right).toDouble();
     final h=math.max(1.0,s.height-top-bottom).toDouble();
     final values=points.map((p)=>p.balance).toList();
@@ -299,6 +347,13 @@ class _FinanceChart extends CustomPainter{
     final vertical=Paint()..color=color.withValues(alpha:.08)..strokeWidth=1;
     final axis=Paint()..color=color.withValues(alpha:.35)..strokeWidth=1;
     final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
+    final totalDays=visibleEnd.difference(start).inDays.toDouble();
+    double xFor(DateTime d){
+      if(totalDays<=1)return left+w/2;
+      final days=d.difference(start).inDays.toDouble();
+      return left+w*(days/(totalDays-1));
+    }
+    double yFor(double value)=>top+h-(value-minV)/range*h;
 
     for(var row=0;row<=4;row++){
       final y=top+h*row/4;
@@ -307,19 +362,20 @@ class _FinanceChart extends CustomPainter{
       _text(c,moneyLabel(value),Offset(2,y-7),9,color.withValues(alpha:.75));
     }
 
-    final totalDays=endDate.difference(startDate).inDays.toDouble();
-    for(var i=0;i<months.length;i++){
-      final md=DateTime(months[i].year,months[i].month,1);
-      final x=left+w*(md.difference(startDate).inDays/totalDays);
-      c.drawLine(Offset(x,top),Offset(x,s.height-bottom),vertical);
-      _text(c,DateFormat('MMM','pt_BR').format(md),Offset(x-16,s.height-bottom+8),9,color.withValues(alpha:.75));
+    if(mode==_FinancePeriodMode.month){
+      for(var i=0;i<points.length;i++){
+        final x=xFor(points[i].date);
+        c.drawLine(Offset(x,top),Offset(x,s.height-bottom),vertical);
+        final showLabel=points.length<=10||i==0||i==points.length-1||(i%5==0);
+        if(showLabel)_text(c,DateFormat('dd/MM').format(points[i].date),Offset(x-14,s.height-bottom+8),9,color.withValues(alpha:.75));
+      }
+    }else{
+      for(var i=0;i<points.length;i++){
+        final x=xFor(points[i].date);
+        c.drawLine(Offset(x,top),Offset(x,s.height-bottom),vertical);
+        _text(c,DateFormat('MMM','pt_BR').format(DateTime(points[i].date.year,points[i].date.month,1)),Offset(x-16,s.height-bottom+8),9,color.withValues(alpha:.75));
+      }
     }
-
-    double xFor(DateTime d){
-      final days=d.difference(startDate).inDays.toDouble();
-      return left+w*(days/totalDays);
-    }
-    double yFor(double v)=>top+h-(v-minV)/range*h;
 
     final path=Path();
     for(var i=0;i<points.length;i++){
@@ -333,36 +389,33 @@ class _FinanceChart extends CustomPainter{
       final p=points[i];
       final x=xFor(p.date),y=yFor(p.balance);
       c.drawCircle(Offset(x,y),4,Paint()..color=color);
-      if(i>0){
+      _text(c,moneyPoint(p.balance),Offset(x-30,y-23),9,color);
+      if(i>0&&p.delta.abs()>.0001){
         final prev=points[i-1];
         final px=xFor(prev.date),py=yFor(prev.balance);
-        final labelX=(px+x)/2;
-        final labelY=((py+y)/2)-13-(i.isEven?0:12);
-        _text(c,deltaLabel(p.delta),Offset(labelX-26,labelY),9,color);
+        final labelX=(px+x)/2-28;
+        final labelY=((py+y)/2)-11-(i.isEven?0:12);
+        _text(c,deltaLabel(p.delta),Offset(labelX,labelY),9,color);
       }
     }
-
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
     c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
 
   String deltaLabel(double value){
     final sign=value>=0?'+':'-';
-    final abs=value.abs();
-    return 'R\$'+sign+abs.toStringAsFixed(2).replaceAll('.',',');
+    return 'R\$'+sign+value.abs().toStringAsFixed(2).replaceAll('.',',');
   }
+  String moneyPoint(double value)=>'R\$'+value.toStringAsFixed(value.truncateToDouble()==value?0:2).replaceAll('.',',');
   String moneyLabel(double value){
     final sign=value<0?'-':'';
     final abs=value.abs();
     if(abs>=1000)return 'R\$'+sign+(abs/1000).toStringAsFixed(abs%1000==0?0:1)+'k';
-    return 'R\$'+sign+abs.toStringAsFixed(abs.truncateToDouble()==abs?0:2);
+    return 'R\$'+sign+abs.toStringAsFixed(abs.truncateToDouble()==abs?0:2).replaceAll('.',',');
   }
   void _text(Canvas c,String text,Offset position,double size,Color textColor){
-    final tp=TextPainter(
-      text:TextSpan(text:text,style:TextStyle(fontSize:size,color:textColor,fontWeight:FontWeight.w500)),
-      textDirection:ui.TextDirection.ltr,
-    )..layout(maxWidth:78);
+    final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(fontSize:size,color:textColor,fontWeight:FontWeight.w500)),textDirection:ui.TextDirection.ltr)..layout(maxWidth:88);
     tp.paint(c,position);
   }
-  @override bool shouldRepaint(covariant _FinanceChart old)=>old.months!=months||old.items!=items||old.color!=color;
+  @override bool shouldRepaint(covariant _FinanceChart old)=>old.start!=start||old.end!=end||old.mode!=mode||old.items!=items||old.color!=color;
 }
