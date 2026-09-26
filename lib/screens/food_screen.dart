@@ -8,10 +8,22 @@ import '../services/ai_food_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/app_card.dart';
 
+enum _FoodPeriodMode{week,month}
+
 class FoodScreen extends StatefulWidget { const FoodScreen({super.key}); @override State<FoodScreen> createState()=>_FoodScreenState(); }
 class _FoodScreenState extends State<FoodScreen> {
-  final ai=AiFoodService(); final picker=ImagePicker(); List<Meal> meals=[]; List<WeightEntry> weights=[]; Map<String,double>? goals; bool loading=true; bool _showAllWeights=false; String get today=>DateFormat('yyyy-MM-dd').format(DateTime.now());
-  @override void initState(){super.initState();_load();}
+  final ai=AiFoodService(); final picker=ImagePicker(); List<Meal> meals=[]; List<WeightEntry> weights=[]; Map<String,double>? goals; bool loading=true; _FoodPeriodMode mode=_FoodPeriodMode.week; late DateTime period; String get today=>DateFormat('yyyy-MM-dd').format(DateTime.now());
+  @override void initState(){super.initState();period=_weekStart(DateTime.now());_load();}
+  static DateTime _day(DateTime d)=>DateTime(d.year,d.month,d.day);
+  static DateTime _weekStart(DateTime d)=>_day(d).subtract(Duration(days:d.weekday-1));
+  static DateTime _monthStart(DateTime d)=>DateTime(d.year,d.month,1);
+  DateTime get periodStart=>mode==_FoodPeriodMode.week?_weekStart(period):_monthStart(period);
+  DateTime get periodEnd=>mode==_FoodPeriodMode.week?periodStart.add(const Duration(days:7)):DateTime(periodStart.year,periodStart.month+1,1);
+  DateTime get currentStart{final now=DateTime.now();return mode==_FoodPeriodMode.week?_weekStart(now):_monthStart(now);}
+  bool get canGoNext=>periodStart.isBefore(currentStart);
+  String get periodLabel{if(mode==_FoodPeriodMode.week){final end=periodStart.add(const Duration(days:6));return '${DateFormat('dd/MM').format(periodStart)} – ${DateFormat('dd/MM/yyyy').format(end)}';}return DateFormat('MMMM yyyy','pt_BR').format(periodStart);}
+  void _setMode(_FoodPeriodMode next){setState((){mode=next;period=next==_FoodPeriodMode.week?_weekStart(DateTime.now()):_monthStart(DateTime.now());});}
+  void _move(int delta){setState((){period=mode==_FoodPeriodMode.week?periodStart.add(Duration(days:7*delta)):DateTime(periodStart.year,periodStart.month+delta,1);});}
   Future<void> _load()async{meals=(await StorageService.read('meals')).map(Meal.fromJson).toList();weights=(await StorageService.read('body_weights')).map(WeightEntry.fromJson).toList()..sort((a,b)=>a.date.compareTo(b.date));final p=await SharedPreferences.getInstance();final r=p.getString('nutrition_goals');if(r!=null){final a=r.split('|');if(a.length==4){goals={'calories':double.tryParse(a[0])??0,'protein':double.tryParse(a[1])??0,'carbs':double.tryParse(a[2])??0,'fat':double.tryParse(a[3])??0};}}if(mounted)setState(()=>loading=false);}
   Future<void> _saveMeals()=>StorageService.write('meals',meals.map((e)=>e.toJson()).toList());Future<void> _saveWeights()=>StorageService.write('body_weights',weights.map((e)=>e.toJson()).toList());
   Future<void> _saveWeight(double value)async{weights.add(WeightEntry(date:DateTime.now().toIso8601String(),weight:value));weights.sort((a,b)=>a.date.compareTo(b.date));await _saveWeights();}
@@ -25,69 +37,135 @@ class _FoodScreenState extends State<FoodScreen> {
   Future<void> _photo()async{final x=await picker.pickImage(source:ImageSource.camera,imageQuality:80);if(x==null)return;try{await _result(await ai.estimateImage(x.path));}catch(e){_message(e.toString());}}
   Future<void> _result(FoodResult r)async{final ok=await showDialog<bool>(context:context,builder:(d)=>AlertDialog(title:const Text('Estimativa nutricional'),content:SingleChildScrollView(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[for(final i in r.items)ListTile(contentPadding:EdgeInsets.zero,title:Text(i.name),subtitle:Text('${i.grams.toStringAsFixed(0)}g • ${i.calories.toStringAsFixed(0)} kcal • P ${i.protein.toStringAsFixed(1)}g • C ${i.carbs.toStringAsFixed(1)}g • G ${i.fat.toStringAsFixed(1)}g')),const Divider(),Text('${r.calories.toStringAsFixed(0)} kcal • P ${r.protein.toStringAsFixed(1)}g • C ${r.carbs.toStringAsFixed(1)}g • G ${r.fat.toStringAsFixed(1)}g')])),actions:[TextButton(onPressed:()=>Navigator.pop(d,false),child:const Text('NÃO CONTAR')),FilledButton(onPressed:()=>Navigator.pop(d,true),child:const Text('CONTAR'))]));if(ok==true){meals.add(Meal(id:DateTime.now().microsecondsSinceEpoch.toString(),date:today,type:'Refeição',food:r.items.map((e)=>e.name).join(', '),calories:r.calories,protein:r.protein,carbs:r.carbs,fat:r.fat,source:'ai'));await _saveMeals();if(mounted)setState((){});}}
   void _message(String s)=>ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s)));
-  List<WeightEntry> _chartWeights(DateTime dayStart,DateTime weekStart){
-    final source=_showAllWeights
-        ? [...weights]
-        : weights.where((e){
-            final d=DateTime.tryParse(e.date);
-            return d!=null&&!d.isBefore(weekStart)&&d.isBefore(dayStart.add(const Duration(days:1)));
-          }).toList();
+  List<WeightEntry?> _chartWeights(){
     final latestByDay=<String,WeightEntry>{};
-    for(final e in source){
+    for(final e in weights){
       final d=DateTime.tryParse(e.date);
-      if(d==null)continue;
+      if(d==null||d.isBefore(periodStart)||!d.isBefore(periodEnd))continue;
       final key=DateFormat('yyyy-MM-dd').format(d);
       final previous=latestByDay[key];
-      if(previous==null){
-        latestByDay[key]=e;
-      }else{
+      if(previous==null)latestByDay[key]=e;
+      else{
         final previousDate=DateTime.tryParse(previous.date);
         if(previousDate==null||d.isAfter(previousDate))latestByDay[key]=e;
       }
     }
-    final out=latestByDay.values.toList()..sort((a,b)=>a.date.compareTo(b.date));
+    final out=<WeightEntry?>[];
+    final days=mode==_FoodPeriodMode.week?7:periodEnd.difference(periodStart).inDays;
+    for(var i=0;i<days;i++){
+      final d=periodStart.add(Duration(days:i));
+      out.add(latestByDay[DateFormat('yyyy-MM-dd').format(d)]);
+    }
     return out;
   }
 
-  @override Widget build(BuildContext context){if(loading)return const Center(child:CircularProgressIndicator());final tm=meals.where((m)=>m.date==today);final kcal=tm.fold<double>(0,(s,m)=>s+m.calories),pro=tm.fold<double>(0,(s,m)=>s+m.protein),carb=tm.fold<double>(0,(s,m)=>s+m.carbs),fat=tm.fold<double>(0,(s,m)=>s+m.fat);final current=weights.isEmpty?null:weights.last;final now=DateTime.now();final dayStart=DateTime(now.year,now.month,now.day);final weekStart=dayStart.subtract(const Duration(days:6));final chart=_chartWeights(dayStart,weekStart);return SafeArea(child:ListView(padding:const EdgeInsets.all(16),children:[Row(children:[Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Alimentação',style:Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.bold)),Text('${tm.length} refeição(ões) hoje')])),IconButton(onPressed:_setupGoals,icon:const Icon(Icons.settings_outlined))]),if(goals!=null)AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Metas diárias',style:Theme.of(context).textTheme.titleLarge),_bar('Calorias',kcal,goals!['calories']!,'kcal'),_bar('Proteína',pro,goals!['protein']!,'g'),_bar('Carboidratos',carb,goals!['carbs']!,'g'),_bar('Gorduras',fat,goals!['fat']!,'g')])),AppCard(child:Row(children:[const Icon(Icons.monitor_weight_outlined,size:32),const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('Peso corporal'),Text(current==null?'—':'${current.weight.toStringAsFixed(1)} kg',style:Theme.of(context).textTheme.titleLarge)])),OutlinedButton(onPressed:_weight,child:const Text('Registrar'))])),if(chart.isNotEmpty)AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Evolução do peso',style:Theme.of(context).textTheme.titleLarge),Text(_showAllWeights?'Histórico completo':'Últimos 7 dias',style:Theme.of(context).textTheme.bodySmall),const SizedBox(height:6),_WeightChart(data:chart,color:Theme.of(context).colorScheme.primary),Row(children:[Expanded(child:Text('${weights.length} registro(s) total')),TextButton(onPressed:()=>setState(()=>_showAllWeights=!_showAllWeights),child:Text(_showAllWeights?'Mostrar últimos 7 dias':'Ver histórico completo'))])])),if(chart.isEmpty)AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('Evolução do peso'),const SizedBox(height:6),const Text('Nenhum registro de peso nos últimos 7 dias.'),TextButton(onPressed:_history,child:const Text('Ver histórico completo'))])),Row(children:[Expanded(child:OutlinedButton.icon(onPressed:_manual,icon:const Icon(Icons.add),label:const Text('Manual'))),const SizedBox(width:8),Expanded(child:OutlinedButton.icon(onPressed:_textAI,icon:const Icon(Icons.auto_awesome),label:const Text('IA texto'))),const SizedBox(width:8),Expanded(child:OutlinedButton.icon(onPressed:_photo,icon:const Icon(Icons.camera_alt),label:const Text('Foto')))]),AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Hoje',style:Theme.of(context).textTheme.titleLarge),if(tm.isEmpty)const Text('Nenhuma refeição registrada.'),for(final m in tm)ListTile(contentPadding:EdgeInsets.zero,title:Text(m.food),subtitle:Text('${m.calories.toStringAsFixed(0)} kcal • P ${m.protein.toStringAsFixed(1)}g • C ${m.carbs.toStringAsFixed(1)}g • G ${m.fat.toStringAsFixed(1)}g'))]))]));}
+  List<WeightEntry> _periodRecords(){
+    final out=weights.where((e){
+      final d=DateTime.tryParse(e.date);
+      return d!=null&&!d.isBefore(periodStart)&&d.isBefore(periodEnd);
+    }).toList();
+    out.sort((a,b)=>b.date.compareTo(a.date));
+    return out;
+  }
+
+  @override Widget build(BuildContext context){
+    if(loading)return const Center(child:CircularProgressIndicator());
+    final tm=meals.where((m)=>m.date==today);
+    final kcal=tm.fold<double>(0,(s,m)=>s+m.calories),pro=tm.fold<double>(0,(s,m)=>s+m.protein),carb=tm.fold<double>(0,(s,m)=>s+m.carbs),fat=tm.fold<double>(0,(s,m)=>s+m.fat);
+    final current=weights.isEmpty?null:weights.last;
+    final chart=_chartWeights();
+    final records=_periodRecords();
+    return SafeArea(child:ListView(padding:const EdgeInsets.all(16),children:[
+      Row(children:[Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Alimentação',style:Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.bold)),Text('${tm.length} refeição(ões) hoje')])),IconButton(onPressed:_setupGoals,icon:const Icon(Icons.settings_outlined))]),
+      if(goals!=null)AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Metas diárias',style:Theme.of(context).textTheme.titleLarge),_bar('Calorias',kcal,goals!['calories']!,'kcal'),_bar('Proteína',pro,goals!['protein']!,'g'),_bar('Carboidratos',carb,goals!['carbs']!,'g'),_bar('Gorduras',fat,goals!['fat']!,'g')])),
+      AppCard(child:Row(children:[const Icon(Icons.monitor_weight_outlined,size:32),const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('Peso corporal'),Text(current==null?'—':'${current.weight.toStringAsFixed(1)} kg',style:Theme.of(context).textTheme.titleLarge)])),OutlinedButton(onPressed:_weight,child:const Text('Registrar'))])),
+      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text('Evolução do peso',style:Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height:8),
+        SegmentedButton<_FoodPeriodMode>(
+          segments:const[
+            ButtonSegment(value:_FoodPeriodMode.week,label:Text('Semanal')),
+            ButtonSegment(value:_FoodPeriodMode.month,label:Text('Mensal')),
+          ],
+          selected:{mode},
+          onSelectionChanged:(v){if(v.isNotEmpty)_setMode(v.first);},
+        ),
+        const SizedBox(height:8),
+        Row(children:[
+          IconButton(onPressed:()=>_move(-1),icon:const Icon(Icons.chevron_left)),
+          Expanded(child:Text(periodLabel,textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.w600))),
+          if(canGoNext)IconButton(onPressed:()=>_move(1),icon:const Icon(Icons.chevron_right))else const SizedBox(width:48),
+        ]),
+        Text(mode==_FoodPeriodMode.week?'Uma pesagem por dia • última pesagem do dia':'Uma pesagem por dia • última pesagem de cada dia',style:Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height:4),
+        _WeightChart(data:chart,color:Theme.of(context).colorScheme.primary,startDate:periodStart),
+        Text('${chart.whereType<WeightEntry>().length} dia(s) com registro • ${weights.length} registro(s) total'),
+      ])),
+      const SizedBox(height:8),
+      Text('Registros do período',style:Theme.of(context).textTheme.titleLarge),
+      if(records.isEmpty)const AppCard(child:Text('Nenhum registro de peso neste período.')),
+      for(final e in records)ListTile(
+        contentPadding:const EdgeInsets.symmetric(horizontal:8),
+        title:Text('${e.weight.toStringAsFixed(1)} kg'),
+        subtitle:Text(DateTime.tryParse(e.date)==null?e.date:DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(e.date))),
+        trailing:PopupMenuButton<String>(
+          onSelected:(v)async{if(v=='edit')await _editWeight(e);if(v=='delete')await _deleteWeight(e);},
+          itemBuilder:(_)=>const[PopupMenuItem(value:'edit',child:Text('Editar')),PopupMenuItem(value:'delete',child:Text('Excluir'))],
+        ),
+      ),
+      Row(children:[Expanded(child:OutlinedButton.icon(onPressed:_manual,icon:const Icon(Icons.add),label:const Text('Manual'))),const SizedBox(width:8),Expanded(child:OutlinedButton.icon(onPressed:_textAI,icon:const Icon(Icons.auto_awesome),label:const Text('IA texto'))),const SizedBox(width:8),Expanded(child:OutlinedButton.icon(onPressed:_photo,icon:const Icon(Icons.camera_alt),label:const Text('Foto')))]),
+      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Hoje',style:Theme.of(context).textTheme.titleLarge),if(tm.isEmpty)const Text('Nenhuma refeição registrada.'),for(final m in tm)ListTile(contentPadding:EdgeInsets.zero,title:Text(m.food),subtitle:Text('${m.calories.toStringAsFixed(0)} kcal • P ${m.protein.toStringAsFixed(1)}g • C ${m.carbs.toStringAsFixed(1)}g • G ${m.fat.toStringAsFixed(1)}g'))])),
+    ]));
+  }
   Widget _bar(String n,double v,double goal,String unit){final ratio=goal<=0?0.0:(v/goal).clamp(0.0,1.0).toDouble();return Padding(padding:const EdgeInsets.only(top:8),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[Text(n),Text('${v.toStringAsFixed(0)} / ${goal.toStringAsFixed(0)} $unit')]),LinearProgressIndicator(value:ratio)]));}
 }
-class _WeightChart extends StatefulWidget {
-  final List<WeightEntry> data; final Color color;
-  const _WeightChart({required this.data,required this.color});
-  @override State<_WeightChart> createState()=>_WeightChartState();
-}
-class _WeightChartState extends State<_WeightChart>{
-  int? selected;
-  @override Widget build(BuildContext context){
-    return GestureDetector(
-      onTapUp:(d){if(widget.data.isEmpty)return;final width=MediaQuery.sizeOf(context).width;final chartW=(width-48).clamp(1.0,10000.0).toDouble();final x=(d.localPosition.dx-36).clamp(0.0,chartW);final i=widget.data.length==1?0:(x/chartW*(widget.data.length-1)).round().clamp(0,widget.data.length-1);setState(()=>selected=i);},
-      child:SizedBox(height:210,child:Stack(children:[
-        Positioned.fill(child:CustomPaint(painter:_WeightPainter(widget.data,widget.color,selected,Directionality.of(context)))),
-        if(selected!=null&&selected!>=0&&selected!<widget.data.length)Align(alignment:Alignment.topCenter,child:Container(margin:const EdgeInsets.only(top:2),padding:const EdgeInsets.symmetric(horizontal:10,vertical:6),decoration:BoxDecoration(color:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(10)),child:Text(_label(widget.data[selected!]),style:Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight:FontWeight.bold)))),
-      ])),
-    );
-  }
-  String _label(WeightEntry e){final d=DateTime.tryParse(e.date);return d==null?'${e.weight.toStringAsFixed(1)} kg':'${DateFormat('dd/MM','pt_BR').format(d)} • ${e.weight.toStringAsFixed(1)} kg';}
+class _WeightChart extends StatelessWidget {
+  final List<WeightEntry?> data; final Color color; final DateTime startDate;
+  const _WeightChart({required this.data,required this.color,required this.startDate});
+  @override Widget build(BuildContext context)=>SizedBox(
+    height:210,
+    child:CustomPaint(painter:_WeightPainter(data,color,Directionality.of(context),startDate)),
+  );
 }
 class _WeightPainter extends CustomPainter{
-  final List<WeightEntry> data; final Color color; final int? selected; final ui.TextDirection textDirection;
-  _WeightPainter(this.data,this.color,this.selected,this.textDirection);
+  final List<WeightEntry?> data; final Color color; final ui.TextDirection textDirection; final DateTime startDate;
+  _WeightPainter(this.data,this.color,this.textDirection,this.startDate);
   @override void paint(Canvas c,Size s){
     if(data.isEmpty)return;
     const left=36.0,right=10.0,top=26.0,bottom=38.0;
     final w=(s.width-left-right).clamp(1.0,10000.0).toDouble(),h=(s.height-top-bottom).clamp(1.0,10000.0).toDouble();
-    final min=data.map((e)=>e.weight).reduce((a,b)=>a<b?a:b),max=data.map((e)=>e.weight).reduce((a,b)=>a>b?a:b),range=(max-min).abs()<.01?1.0:max-min;
-    final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke;
-    final grid=Paint()..color=color.withValues(alpha:.16)..strokeWidth=1;
-    final path=Path();
-    for(var i=0;i<=4;i++){
-      final y=top+h*i/4;
-      c.drawLine(Offset(left,y),Offset(s.width-right,y),grid);
+    final values=data.whereType<WeightEntry>().map((e)=>e.weight).toList();
+    final grid=Paint()..color=color.withValues(alpha:.14)..strokeWidth=1;
+    final vertical=Paint()..color=color.withValues(alpha:.08)..strokeWidth=1;
+    final axis=Paint()..color=color.withValues(alpha:.35)..strokeWidth=1;
+    for(var i=0;i<=4;i++){final y=top+h*i/4;c.drawLine(Offset(left,y),Offset(s.width-right,y),grid);}
+    for(var i=0;i<data.length;i++){final x=data.length==1?left+w/2:left+i*w/(data.length-1);c.drawLine(Offset(x,top),Offset(x,s.height-bottom),vertical);}
+    if(values.isNotEmpty){
+      final min=values.reduce((a,b)=>a<b?a:b),max=values.reduce((a,b)=>a>b?a:b),rawRange=max-min,range=rawRange.abs()<.01?1.0:rawRange;
+      final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
+      final path=Path();bool hasPrevious=false;
+      for(var i=0;i<data.length;i++){
+        final e=data[i];final x=data.length==1?left+w/2:left+i*w/(data.length-1);
+        if(e!=null){
+          final y=top+h-((e.weight-min)/range)*h;
+          if(hasPrevious)path.lineTo(x,y);else path.moveTo(x,y);
+          hasPrevious=true;c.drawCircle(Offset(x,y),4,Paint()..color=color);
+          _draw(c,'${e.weight.toStringAsFixed(1)} kg',Offset(x,y-12),TextAlign.center);
+        }else{hasPrevious=false;}
+        final showLabel=data.length<=7||i==0||i==data.length-1||(data.length>7&&i%5==0);
+        if(showLabel)_draw(c,DateFormat('dd/MM').format(startDate.add(Duration(days:i))),Offset(x,s.height-bottom+8),TextAlign.center);
+      }
+      for(var i=0;i<=4;i++){final y=top+h*i/4;final value=max-rawRange*i/4;_draw(c,'${value.toStringAsFixed(1)} kg',Offset(2,y),TextAlign.left);}
+      c.drawPath(path,line);
+    }else{
+      for(var i=0;i<data.length;i++){final x=data.length==1?left+w/2:left+i*w/(data.length-1);final showLabel=data.length<=7||i==0||i==data.length-1||(data.length>7&&i%5==0);if(showLabel)_draw(c,DateFormat('dd/MM').format(startDate.add(Duration(days:i))),Offset(x,s.height-bottom+8),TextAlign.center);}
     }
-    for(var i=0;i<data.length;i++){final x=data.length==1?left+w/2:left+i*w/(data.length-1);final y=top+h-((data[i].weight-min)/range)*h;if(i==0)path.moveTo(x,y);else path.lineTo(x,y);c.drawCircle(Offset(x,y),i==selected?7:4,Paint()..color=color);_draw(c,'${data[i].weight.toStringAsFixed(1)} kg',Offset(x,y-12),TextAlign.center);if(data.length<=6||i==0||i==data.length-1)_draw(c,DateFormat('dd/MM').format(DateTime.tryParse(data[i].date)??DateTime.now()),Offset(x,s.height-bottom+8),TextAlign.center);}
-    c.drawPath(path,line);_draw(c,'${max.toStringAsFixed(1)} kg',Offset(2,top),TextAlign.left);if((max-min).abs()>.01)_draw(c,'${min.toStringAsFixed(1)} kg',Offset(2,s.height-bottom),TextAlign.left);
+    c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
-  void _draw(Canvas c,String text,Offset center,TextAlign align){final tp=TextPainter(text:TextSpan(text:text,style:const TextStyle(fontSize:10)),textDirection:textDirection,textAlign:align)..layout(maxWidth:80);final dx=align==TextAlign.center?center.dx-tp.width/2:center.dx;tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),center.dy));}
-  @override bool shouldRepaint(covariant _WeightPainter old)=>old.data!=data||old.color!=color||old.selected!=selected;
+  void _draw(Canvas c,String text,Offset center,TextAlign align){
+    final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(fontSize:10)),textDirection:textDirection,textAlign:align)..layout(maxWidth:80);
+    final dx=align==TextAlign.center?center.dx-tp.width/2:center.dx;final dy=align==TextAlign.center?center.dy-tp.height/2:center.dy;
+    tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),dy.clamp(0.0,10000.0).toDouble()));
+  }
+  @override bool shouldRepaint(covariant _WeightPainter old)=>old.data!=data||old.color!=color||old.startDate!=startDate;
 }
