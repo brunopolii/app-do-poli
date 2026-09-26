@@ -242,61 +242,127 @@ class _FinanceScreenState extends State<FinanceScreen>{
 
 }
 
+class _FinancePoint{
+  final DateTime date;
+  final double balance;
+  final double delta;
+  _FinancePoint(this.date,this.balance,this.delta);
+}
 class _FinanceChart extends CustomPainter{
- final List<DateTime> months;final List<MoneyTransaction> items;final Color color;
- _FinanceChart(this.months,this.items,this.color);
- @override void paint(Canvas c,Size s){
-   if(months.isEmpty)return;
-   final inc=<double>[],out=<double>[];
-   for(final m in months){
-     final k=DateFormat('yyyy-MM').format(m);
-     inc.add(items.where((x)=>!x.isCancelled&&x.income&&x.date.startsWith(k)).fold(0.0,(a,x)=>a+x.amount));
-     out.add(items.where((x)=>!x.isCancelled&&!x.income&&x.dueDate.startsWith(k)).fold(0.0,(a,x)=>a+x.amount));
-   }
-   final maxV=[...inc,...out].fold<double>(0.0,(a,b)=>math.max(a,b).toDouble());
-   final range=maxV<=0?1.0:maxV;
-   const left=48.0,right=14.0,top=20.0,bottom=34.0;
-   final w=math.max(1.0,s.width-left-right).toDouble(),h=math.max(1.0,s.height-top-bottom).toDouble();
-   final grid=Paint()..color=color.withValues(alpha:.16)..strokeWidth=1;
-   final axis=Paint()..color=color.withValues(alpha:.35)..strokeWidth=1;
-   final p1=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
-   final p2=Paint()..color=Colors.grey..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
-   for(var row=0;row<=4;row++){
-     final y=top+h*row/4;
-     c.drawLine(Offset(left,y),Offset(s.width-right,y),grid);
-     final value=range*(1-row/4);
-     _text(c,moneyLabel(value),Offset(2,y-7),10,color.withValues(alpha:.75));
-   }
-   void line(List<double> values,Paint p){
-     final path=Path();
-     for(var i=0;i<values.length;i++){
-       final x=values.length==1?left+w/2:left+i*w/(values.length-1);
-       final y=top+h-values[i]/range*h;
-       if(i==0)path.moveTo(x,y);else path.lineTo(x,y);
-       c.drawCircle(Offset(x,y),4,Paint()..color=p.color);
-       if(values[i]>0)_text(c,moneyLabel(values[i]),Offset(x-26,y-22),9,p.color);
-     }
-     c.drawPath(path,p);
-   }
-   line(inc,p1);line(out,p2);
-   c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
-   c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
-   for(var i=0;i<months.length;i++){
-     final x=months.length==1?left+w/2:left+i*w/(months.length-1);
-     final label=DateFormat('MMM','pt_BR').format(months[i]);
-     _text(c,label,Offset(x-18,s.height-bottom+8),10,color.withValues(alpha:.75));
-   }
- }
- String moneyLabel(double value){
-   if(value>=1000)return 'R\$ ${(value/1000).toStringAsFixed(value%1000==0?0:1)}k';
-   return value.toStringAsFixed(value.truncateToDouble()==value?0:2);
- }
- void _text(Canvas c,String text,Offset position,double size,Color textColor){
-   final tp=TextPainter(
-     text:TextSpan(text:text,style:TextStyle(fontSize:size,color:textColor)),
-     textDirection:ui.TextDirection.ltr,
-   )..layout(maxWidth:60);
-   tp.paint(c,position);
- }
- @override bool shouldRepaint(covariant _FinanceChart old)=>old.months!=months||old.items!=items||old.color!=color;
+  final List<DateTime> months;final List<MoneyTransaction> items;final Color color;
+  _FinanceChart(this.months,this.items,this.color);
+
+  @override void paint(Canvas c,Size s){
+    if(months.isEmpty)return;
+    final startDate=DateTime(months.first.year,months.first.month,1);
+    final endDate=DateTime(months.last.year,months.last.month+1,1).subtract(const Duration(days:1));
+    final events=<MoneyTransaction>[];
+    for(final x in items){
+      if(x.isCancelled||!x.isPaid)continue;
+      final rawDate=x.income?x.date:(x.paidDate??x.date);
+      final d=DateTime.tryParse(rawDate);
+      if(d==null||d.isBefore(startDate)||d.isAfter(endDate))continue;
+      events.add(x);
+    }
+    events.sort((a,b){
+      final da=DateTime.tryParse(a.income?a.date:(a.paidDate??a.date))??DateTime.now();
+      final db=DateTime.tryParse(b.income?b.date:(b.paidDate??b.date))??DateTime.now();
+      return da.compareTo(db);
+    });
+
+    double opening=0;
+    for(final x in items){
+      if(x.isCancelled||!x.isPaid)continue;
+      final rawDate=x.income?x.date:(x.paidDate??x.date);
+      final d=DateTime.tryParse(rawDate);
+      if(d!=null&&d.isBefore(startDate))opening+=x.income?x.amount:-x.amount;
+    }
+
+    final points=< _FinancePoint>[_FinancePoint(startDate,opening,0)];
+    var balance=opening;
+    for(final x in events){
+      final d=DateTime.tryParse(x.income?x.date:(x.paidDate??x.date))!;
+      final delta=x.income?x.amount:-x.amount;
+      balance+=delta;
+      points.add(_FinancePoint(d,balance,delta));
+    }
+
+    const left=52.0,right=16.0,top=24.0,bottom=38.0;
+    final w=math.max(1.0,s.width-left-right).toDouble();
+    final h=math.max(1.0,s.height-top-bottom).toDouble();
+    final values=points.map((p)=>p.balance).toList();
+    var minV=values.reduce((a,b)=>math.min(a,b).toDouble());
+    var maxV=values.reduce((a,b)=>math.max(a,b).toDouble());
+    if((maxV-minV).abs()<.01){minV-=1;maxV+=1;}
+    final range=maxV-minV;
+    final grid=Paint()..color=color.withValues(alpha:.14)..strokeWidth=1;
+    final vertical=Paint()..color=color.withValues(alpha:.08)..strokeWidth=1;
+    final axis=Paint()..color=color.withValues(alpha:.35)..strokeWidth=1;
+    final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
+
+    for(var row=0;row<=4;row++){
+      final y=top+h*row/4;
+      c.drawLine(Offset(left,y),Offset(s.width-right,y),grid);
+      final value=maxV-range*row/4;
+      _text(c,moneyLabel(value),Offset(2,y-7),9,color.withValues(alpha:.75));
+    }
+
+    final totalDays=endDate.difference(startDate).inDays.toDouble();
+    for(var i=0;i<months.length;i++){
+      final md=DateTime(months[i].year,months[i].month,1);
+      final x=left+w*(md.difference(startDate).inDays/totalDays);
+      c.drawLine(Offset(x,top),Offset(x,s.height-bottom),vertical);
+      _text(c,DateFormat('MMM','pt_BR').format(md),Offset(x-16,s.height-bottom+8),9,color.withValues(alpha:.75));
+    }
+
+    double xFor(DateTime d){
+      final days=d.difference(startDate).inDays.toDouble();
+      return left+w*(days/totalDays);
+    }
+    double yFor(double v)=>top+h-(v-minV)/range*h;
+
+    final path=Path();
+    for(var i=0;i<points.length;i++){
+      final p=points[i];
+      final x=xFor(p.date),y=yFor(p.balance);
+      if(i==0)path.moveTo(x,y);else path.lineTo(x,y);
+    }
+    c.drawPath(path,line);
+
+    for(var i=0;i<points.length;i++){
+      final p=points[i];
+      final x=xFor(p.date),y=yFor(p.balance);
+      c.drawCircle(Offset(x,y),4,Paint()..color=color);
+      if(i>0){
+        final prev=points[i-1];
+        final px=xFor(prev.date),py=yFor(prev.balance);
+        final labelX=(px+x)/2;
+        final labelY=((py+y)/2)-13-(i.isEven?0:12);
+        _text(c,deltaLabel(p.delta),Offset(labelX-26,labelY),9,color);
+      }
+    }
+
+    c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
+    c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
+  }
+
+  String deltaLabel(double value){
+    final sign=value>=0?'+':'-';
+    final abs=value.abs();
+    return 'R\$'+sign+abs.toStringAsFixed(2).replaceAll('.',',');
+  }
+  String moneyLabel(double value){
+    final sign=value<0?'-':'';
+    final abs=value.abs();
+    if(abs>=1000)return 'R\$'+sign+(abs/1000).toStringAsFixed(abs%1000==0?0:1)+'k';
+    return 'R\$'+sign+abs.toStringAsFixed(abs.truncateToDouble()==abs?0:2);
+  }
+  void _text(Canvas c,String text,Offset position,double size,Color textColor){
+    final tp=TextPainter(
+      text:TextSpan(text:text,style:TextStyle(fontSize:size,color:textColor,fontWeight:FontWeight.w500)),
+      textDirection:ui.TextDirection.ltr,
+    )..layout(maxWidth:78);
+    tp.paint(c,position);
+  }
+  @override bool shouldRepaint(covariant _FinanceChart old)=>old.months!=months||old.items!=items||old.color!=color;
 }
