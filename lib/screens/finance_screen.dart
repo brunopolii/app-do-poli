@@ -246,13 +246,57 @@ class _FinanceChart extends CustomPainter{
  final List<DateTime> months;final List<MoneyTransaction> items;final Color color;
  _FinanceChart(this.months,this.items,this.color);
  @override void paint(Canvas c,Size s){
+   if(months.isEmpty)return;
    final inc=<double>[],out=<double>[];
-   for(final m in months){final k=DateFormat('yyyy-MM').format(m);inc.add(items.where((x)=>!x.isCancelled&&x.income&&x.date.startsWith(k)).fold(0.0,(a,x)=>a+x.amount));out.add(items.where((x)=>!x.isCancelled&&!x.income&&x.dueDate.startsWith(k)).fold(0.0,(a,x)=>a+x.amount));}
-   final maxV=[...inc,...out].fold<double>(0.0,(a,b)=>math.max(a,b).toDouble());final range=maxV<=0?1.0:maxV;final left=24.0,right=12.0,top=20.0,bottom=28.0;final w=math.max(1.0,s.width-left-right).toDouble(),h=math.max(1.0,s.height-top-bottom).toDouble();
-   final p1=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke;final p2=Paint()..color=Colors.grey..strokeWidth=3..style=PaintingStyle.stroke;
-   void line(List<double> values,Paint p){final path=Path();for(var i=0;i<values.length;i++){final x=values.length==1?left+w/2:left+i*w/(values.length-1);final y=top+h-values[i]/range*h;if(i==0)path.moveTo(x,y);else path.lineTo(x,y);c.drawCircle(Offset(x,y),4,Paint()..color=p.color);}c.drawPath(path,p);}
+   for(final m in months){
+     final k=DateFormat('yyyy-MM').format(m);
+     inc.add(items.where((x)=>!x.isCancelled&&x.income&&x.date.startsWith(k)).fold(0.0,(a,x)=>a+x.amount));
+     out.add(items.where((x)=>!x.isCancelled&&!x.income&&x.dueDate.startsWith(k)).fold(0.0,(a,x)=>a+x.amount));
+   }
+   final maxV=[...inc,...out].fold<double>(0.0,(a,b)=>math.max(a,b).toDouble());
+   final range=maxV<=0?1.0:maxV;
+   const left=48.0,right=14.0,top=20.0,bottom=34.0;
+   final w=math.max(1.0,s.width-left-right).toDouble(),h=math.max(1.0,s.height-top-bottom).toDouble();
+   final grid=Paint()..color=color.withValues(alpha:.16)..strokeWidth=1;
+   final axis=Paint()..color=color.withValues(alpha:.35)..strokeWidth=1;
+   final p1=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
+   final p2=Paint()..color=Colors.grey..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
+   for(var row=0;row<=4;row++){
+     final y=top+h*row/4;
+     c.drawLine(Offset(left,y),Offset(s.width-right,y),grid);
+     final value=range*(1-row/4);
+     _text(c,moneyLabel(value),Offset(2,y-7),10,color.withValues(alpha:.75));
+   }
+   void line(List<double> values,Paint p){
+     final path=Path();
+     for(var i=0;i<values.length;i++){
+       final x=values.length==1?left+w/2:left+i*w/(values.length-1);
+       final y=top+h-values[i]/range*h;
+       if(i==0)path.moveTo(x,y);else path.lineTo(x,y);
+       c.drawCircle(Offset(x,y),4,Paint()..color=p.color);
+       if(values[i]>0)_text(c,moneyLabel(values[i]),Offset(x-26,y-22),9,p.color);
+     }
+     c.drawPath(path,p);
+   }
    line(inc,p1);line(out,p2);
-   for(var i=0;i<months.length;i++){final x=left+i*w/(months.length-1);final tp=TextPainter(text:TextSpan(text:DateFormat('MMM','pt_BR').format(months[i]),style:const TextStyle(fontSize:10)),textDirection:ui.TextDirection.ltr)..layout();tp.paint(c,Offset(x-tp.width/2,s.height-18));}
+   c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
+   c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
+   for(var i=0;i<months.length;i++){
+     final x=months.length==1?left+w/2:left+i*w/(months.length-1);
+     final label=DateFormat('MMM','pt_BR').format(months[i]);
+     _text(c,label,Offset(x-18,s.height-bottom+8),10,color.withValues(alpha:.75));
+   }
+ }
+ String moneyLabel(double value){
+   if(value>=1000)return 'R\$ \${(value/1000).toStringAsFixed(value%1000==0?0:1)}k';
+   return value.toStringAsFixed(value.truncateToDouble()==value?0:2);
+ }
+ void _text(Canvas c,String text,Offset position,double size,Color textColor){
+   final tp=TextPainter(
+     text:TextSpan(text:text,style:TextStyle(fontSize:size,color:textColor)),
+     textDirection:ui.TextDirection.ltr,
+   )..layout(maxWidth:60);
+   tp.paint(c,position);
  }
  @override bool shouldRepaint(covariant _FinanceChart old)=>old.months!=months||old.items!=items||old.color!=color;
 }
