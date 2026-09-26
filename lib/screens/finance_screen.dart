@@ -288,7 +288,7 @@ class _FinanceChart extends CustomPainter{
    }
  }
  String moneyLabel(double value){
-   if(value>=1000)return 'R\$ \${(value/1000).toStringAsFixed(value%1000==0?0:1)}k';
+   if(value>=1000)return 'R\$ ${(value/1000).toStringAsFixed(value%1000==0?0:1)}k';
    return value.toStringAsFixed(value.truncateToDouble()==value?0:2);
  }
  void _text(Canvas c,String text,Offset position,double size,Color textColor){
