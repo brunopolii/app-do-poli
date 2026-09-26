@@ -18,7 +18,13 @@ class _FoodScreenState extends State<FoodScreen> {
   static DateTime _weekStart(DateTime d)=>_day(d).subtract(Duration(days:d.weekday-1));
   static DateTime _monthStart(DateTime d)=>DateTime(d.year,d.month,1);
   DateTime get periodStart=>mode==_FoodPeriodMode.week?_weekStart(period):_monthStart(period);
-  DateTime get periodEnd=>mode==_FoodPeriodMode.week?periodStart.add(const Duration(days:7)):DateTime(periodStart.year,periodStart.month+1,1);
+  DateTime get periodEnd{
+    final fullEnd=mode==_FoodPeriodMode.week?periodStart.add(const Duration(days:7)):DateTime(periodStart.year,periodStart.month+1,1);
+    final now=DateTime.now();
+    final current=mode==_FoodPeriodMode.week?_weekStart(now):_monthStart(now);
+    if(periodStart==current)return DateTime(now.year,now.month,now.day+1);
+    return fullEnd;
+  }
   DateTime get currentStart{final now=DateTime.now();return mode==_FoodPeriodMode.week?_weekStart(now):_monthStart(now);}
   bool get canGoNext=>periodStart.isBefore(currentStart);
   String get periodLabel{if(mode==_FoodPeriodMode.week){final end=periodStart.add(const Duration(days:6));return '${DateFormat('dd/MM').format(periodStart)} – ${DateFormat('dd/MM/yyyy').format(end)}';}return DateFormat('MMMM yyyy','pt_BR').format(periodStart);}
