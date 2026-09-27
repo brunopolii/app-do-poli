@@ -400,14 +400,14 @@ class _FinanceChart extends CustomPainter{
 
   String deltaLabel(double value){
     final sign=value>=0?'+':'-';
-    return 'R$'+sign+value.abs().toStringAsFixed(2).replaceAll('.',',');
+    return 'R\$'+sign+value.abs().toStringAsFixed(2).replaceAll('.',',');
   }
-  String moneyPoint(double value)=>'R$'+value.toStringAsFixed(value.truncateToDouble()==value?0:2).replaceAll('.',',');
+  String moneyPoint(double value)=>'R\$'+value.toStringAsFixed(value.truncateToDouble()==value?0:2).replaceAll('.',',');
   String moneyLabel(double value){
     final sign=value<0?'-':'';
     final abs=value.abs();
-    if(abs>=1000)return 'R$'+sign+(abs/1000).toStringAsFixed(abs%1000==0?0:1)+'k';
-    return 'R$'+sign+abs.toStringAsFixed(abs.truncateToDouble()==abs?0:2).replaceAll('.',',');
+    if(abs>=1000)return 'R\$'+sign+(abs/1000).toStringAsFixed(abs%1000==0?0:1)+'k';
+    return 'R\$'+sign+abs.toStringAsFixed(abs.truncateToDouble()==abs?0:2).replaceAll('.',',');
   }
   void _text(Canvas c,String text,Offset position,double size,Color textColor){
     final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(fontSize:size,color:textColor,fontWeight:FontWeight.w500)),textDirection:ui.TextDirection.ltr)..layout(maxWidth:88);
