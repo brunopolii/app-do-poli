@@ -147,19 +147,32 @@ class _WeightPainter extends CustomPainter{
     for(var i=0;i<=4;i++){final y=top+h*i/4;c.drawLine(Offset(left,y),Offset(s.width-right,y),grid);}
     for(var i=0;i<data.length;i++){final x=data.length==1?left+w/2:left+i*w/(data.length-1);c.drawLine(Offset(x,top),Offset(x,s.height-bottom),vertical);}
     if(values.isNotEmpty){
-      final min=values.reduce((a,b)=>a<b?a:b),max=values.reduce((a,b)=>a>b?a:b),rawRange=max-min,range=rawRange.abs()<.01?1.0:rawRange;
+      final min=values.reduce((a,b)=>a<b?a:b),max=values.reduce((a,b)=>a>b?a:b);
+      final rawRange=max-min,range=rawRange.abs()<.01?1.0:rawRange;
       final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
-      final path=Path();bool hasPrevious=false;
+      final path=Path();int? previousIndex;
       for(var i=0;i<data.length;i++){
         final e=data[i];final x=data.length==1?left+w/2:left+i*w/(data.length-1);
         if(e!=null){
           final y=top+h-((e.weight-min)/range)*h;
-          if(hasPrevious)path.lineTo(x,y);else path.moveTo(x,y);
-          hasPrevious=true;c.drawCircle(Offset(x,y),4,Paint()..color=color);
+          if(previousIndex==null)path.moveTo(x,y);
+          else{
+            final previous=data[previousIndex]!;
+            final px=data.length==1?left+w/2:left+previousIndex*w/(data.length-1);
+            final py=top+h-((previous.weight-min)/range)*h;
+            path.moveTo(px,py);path.lineTo(x,y);
+          }
+          previousIndex=i;c.drawCircle(Offset(x,y),4,Paint()..color=color);
           _draw(c,'${e.weight.toStringAsFixed(1)} kg',Offset(x,y-12),TextAlign.center);
-        }else{hasPrevious=false;}
+        }
         final showLabel=data.length<=7||i==0||i==data.length-1||(data.length>7&&i%5==0);
         if(showLabel)_draw(c,DateFormat('dd/MM').format(startDate.add(Duration(days:i))),Offset(x,s.height-bottom+8),TextAlign.center);
+      }
+      if(previousIndex!=null&&previousIndex<data.length-1){
+        final previous=data[previousIndex]!;
+        final px=data.length==1?left+w/2:left+previousIndex*w/(data.length-1);
+        final py=top+h-((previous.weight-min)/range)*h;
+        path.moveTo(px,py);path.lineTo(left+w,py);
       }
       for(var i=0;i<=4;i++){final y=top+h*i/4;final value=max-rawRange*i/4;_draw(c,'${value.toStringAsFixed(1)} kg',Offset(2,y),TextAlign.left);}
       c.drawPath(path,line);
