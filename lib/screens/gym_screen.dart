@@ -264,51 +264,42 @@ class _GymChartPainter extends CustomPainter{
     final grid=Paint()..color=labelColor.withValues(alpha:.16)..strokeWidth=1;
     final vertical=Paint()..color=labelColor.withValues(alpha:.08)..strokeWidth=1;
     final axis=Paint()..color=labelColor.withValues(alpha:.35)..strokeWidth=1;
-    for(var i=0;i<=4;i++){
-      final y=top+chartH*i/4;
-      c.drawLine(Offset(left,y),Offset(s.width-right,y),grid);
-    }
-    for(var i=0;i<data.length;i++){
-      final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);
-      c.drawLine(Offset(x,top),Offset(x,s.height-bottom),vertical);
-    }
+    for(var i=0;i<=4;i++){final y=top+chartH*i/4;c.drawLine(Offset(left,y),Offset(s.width-right,y),grid);}
+    for(var i=0;i<data.length;i++){final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);c.drawLine(Offset(x,top),Offset(x,s.height-bottom),vertical);}
     if(values.isNotEmpty){
-      final min=values.reduce((a,b)=>a<b?a:b),max=values.reduce((a,b)=>a>b?a:b),rawRange=max-min;
-      final range=rawRange.abs()<.01?1.0:rawRange;
+      final min=values.reduce((a,b)=>a<b?a:b),max=values.reduce((a,b)=>a>b?a:b);
+      final rawRange=max-min,range=rawRange.abs()<.01?1.0:rawRange;
       final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
-      final path=Path();
-      int? previousIndex;
+      final path=Path();int? previousIndex;
       for(var i=0;i<data.length;i++){
-        final p=data[i];
-        final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);
+        final p=data[i];final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);
         if(p!=null){
-          final normalized=(p.value-min)/range;
-          final y=top+chartH-normalized*chartH;
-          if(previousIndex==null)path.moveTo(x,y);else path.lineTo(x,y);
-          previousIndex=i;
-          c.drawCircle(Offset(x,y),4,Paint()..color=color);
+          final y=top+chartH-((p.value-min)/range)*chartH;
+          if(previousIndex==null)path.moveTo(x,y);
+          else{
+            final previous=data[previousIndex]!;
+            final px=data.length==1?left+chartW/2:left+previousIndex*chartW/(data.length-1);
+            final py=top+chartH-((previous.value-min)/range)*chartH;
+            path.moveTo(px,py);path.lineTo(x,y);
+          }
+          previousIndex=i;c.drawCircle(Offset(x,y),4,Paint()..color=color);
           _drawLabel(c,'${p.value.toStringAsFixed(p.value.truncateToDouble()==p.value?0:1)} kg',Offset(x,y-12),TextAlign.center);
-        }else{
-          previousIndex=null;
         }
         final showLabel=data.length<=7||i==0||i==data.length-1||(data.length>7&&i%5==0);
         if(showLabel)_drawLabel(c,DateFormat('dd/MM').format(startDate.add(Duration(days:i))),Offset(x,s.height-bottom+8),TextAlign.center);
       }
-      for(var i=0;i<=4;i++){
-        final y=top+chartH*i/4;
-        final value=max-rawRange*i/4;
-        _drawLabel(c,'${value.toStringAsFixed(value.truncateToDouble()==value?0:1)} kg',Offset(2,y),TextAlign.left);
+      if(previousIndex!=null&&previousIndex<data.length-1){
+        final previous=data[previousIndex]!;
+        final px=data.length==1?left+chartW/2:left+previousIndex*chartW/(data.length-1);
+        final py=top+chartH-((previous.value-min)/range)*chartH;
+        path.moveTo(px,py);path.lineTo(left+chartW,py);
       }
+      for(var i=0;i<=4;i++){final y=top+chartH*i/4;final value=max-rawRange*i/4;_drawLabel(c,'${value.toStringAsFixed(value.truncateToDouble()==value?0:1)} kg',Offset(2,y),TextAlign.left);}
       c.drawPath(path,line);
     }else{
-      for(var i=0;i<data.length;i++){
-        final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);
-        final showLabel=data.length<=7||i==0||i==data.length-1||(data.length>7&&i%5==0);
-        if(showLabel)_drawLabel(c,DateFormat('dd/MM').format(startDate.add(Duration(days:i))),Offset(x,s.height-bottom+8),TextAlign.center);
-      }
+      for(var i=0;i<data.length;i++){final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);final showLabel=data.length<=7||i==0||i==data.length-1||(data.length>7&&i%5==0);if(showLabel)_drawLabel(c,DateFormat('dd/MM').format(startDate.add(Duration(days:i))),Offset(x,s.height-bottom+8),TextAlign.center);}
     }
-    c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
-    c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
+    c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
   void _drawLabel(Canvas c,String text,Offset center,TextAlign align){
     final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(color:labelColor,fontSize:10,fontWeight:FontWeight.w500)),textDirection:textDirection,textAlign:align)..layout(maxWidth:90);
