@@ -283,17 +283,11 @@ class _FinanceScreenState extends State<FinanceScreen>{
 }
 
 class _FinancePoint{
-  final DateTime date;
-  final double balance;
-  final double delta;
+  final DateTime date;final double balance;final double delta;
   _FinancePoint(this.date,this.balance,this.delta);
 }
 class _FinanceChart extends CustomPainter{
-  final DateTime start;
-  final DateTime end;
-  final _FinancePeriodMode mode;
-  final List<MoneyTransaction> items;
-  final Color color;
+  final DateTime start;final DateTime end;final _FinancePeriodMode mode;final List<MoneyTransaction> items;final Color color;
   _FinanceChart({required this.start,required this.end,required this.mode,required this.items,required this.color});
   DateTime _movementDate(MoneyTransaction x)=>DateTime.tryParse(x.income?x.date:(x.paidDate??x.date))??DateTime(1900);
   double _delta(MoneyTransaction x)=>x.income?x.amount:-x.amount;
@@ -302,12 +296,15 @@ class _FinanceChart extends CustomPainter{
     if(!start.isBefore(end))return;
     final now=DateTime.now();
     final visibleEnd=end.isAfter(DateTime(now.year,now.month,now.day+1))?DateTime(now.year,now.month,now.day+1):end;
+    if(!start.isBefore(visibleEnd))return;
+
     double opening=0;
     for(final x in items){
       if(x.isCancelled||!x.isPaid)continue;
       final d=_movementDate(x);
       if(d.isBefore(start))opening+=_delta(x);
     }
+
     final events=<DateTime,double>{};
     for(final x in items){
       if(x.isCancelled||!x.isPaid)continue;
@@ -316,87 +313,86 @@ class _FinanceChart extends CustomPainter{
       final bucket=mode==_FinancePeriodMode.month?DateTime(d.year,d.month,d.day):DateTime(d.year,d.month,1);
       events[bucket]=(events[bucket]??0)+_delta(x);
     }
+
     final points=< _FinancePoint>[];
     var balance=opening;
-    if(mode==_FinancePeriodMode.month){
-      for(var d=start;d.isBefore(visibleEnd);d=d.add(const Duration(days:1))){
-        final delta=events[d]??0;
-        balance+=delta;
-        points.add(_FinancePoint(d,balance,delta));
-      }
-    }else{
-      for(var d=DateTime(start.year,start.month,1);d.isBefore(visibleEnd);d=DateTime(d.year,d.month+1,1)){
-        final monthEnd=DateTime(d.year,d.month+1,1);
-        final bucketEnd=monthEnd.isAfter(visibleEnd)?visibleEnd:monthEnd;
-        final delta=events[d]??0;
-        balance+=delta;
-        points.add(_FinancePoint(bucketEnd.subtract(const Duration(days:1)),balance,delta));
-      }
+    final buckets=events.keys.toList()..sort();
+    for(final bucket in buckets){
+      final delta=events[bucket]??0;
+      if(delta.abs()<.000001)continue;
+      balance+=delta;
+      final pointDate=mode==_FinancePeriodMode.month?bucket:(
+        DateTime(bucket.year,bucket.month+1,1).isAfter(visibleEnd)
+          ?visibleEnd.subtract(const Duration(days:1))
+          :DateTime(bucket.year,bucket.month+1,1).subtract(const Duration(days:1))
+      );
+      points.add(_FinancePoint(pointDate,balance,delta));
     }
-    if(points.isEmpty)return;
 
     const left=52.0,right=16.0,top=26.0,bottom=40.0;
     final w=math.max(1.0,s.width-left-right).toDouble();
     final h=math.max(1.0,s.height-top-bottom).toDouble();
-    final values=points.map((p)=>p.balance).toList();
-    var minV=values.reduce((a,b)=>math.min(a,b).toDouble());
-    var maxV=values.reduce((a,b)=>math.max(a,b).toDouble());
+    final scaleValues=<double>[opening,...points.map((p)=>p.balance)];
+    var minV=scaleValues.reduce((a,b)=>math.min(a,b).toDouble());
+    var maxV=scaleValues.reduce((a,b)=>math.max(a,b).toDouble());
     if((maxV-minV).abs()<.01){minV-=1;maxV+=1;}
     final range=maxV-minV;
     final grid=Paint()..color=color.withValues(alpha:.14)..strokeWidth=1;
     final vertical=Paint()..color=color.withValues(alpha:.08)..strokeWidth=1;
     final axis=Paint()..color=color.withValues(alpha:.35)..strokeWidth=1;
     final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
-    final totalDays=visibleEnd.difference(start).inDays.toDouble();
+    final totalDays=math.max(1,visibleEnd.difference(start).inDays).toDouble();
     double xFor(DateTime d){
-      if(totalDays<=1)return left+w/2;
+      final span=totalDays-1;
       final days=d.difference(start).inDays.toDouble();
-      return left+w*(days/(totalDays-1));
+      return left+w*(span<=0?0.5:days/span);
     }
     double yFor(double value)=>top+h-(value-minV)/range*h;
 
     for(var row=0;row<=4;row++){
       final y=top+h*row/4;
       c.drawLine(Offset(left,y),Offset(s.width-right,y),grid);
-      final value=maxV-range*row/4;
-      _text(c,moneyLabel(value),Offset(2,y-7),9,color.withValues(alpha:.75));
+      _text(c,moneyLabel(maxV-range*row/4),Offset(2,y-7),9,color.withValues(alpha:.75));
     }
 
     if(mode==_FinancePeriodMode.month){
-      for(var i=0;i<points.length;i++){
-        final x=xFor(points[i].date);
+      final days=visibleEnd.difference(start).inDays;
+      for(var i=0;i<days;i++){
+        final d=start.add(Duration(days:i));final x=xFor(d);
         c.drawLine(Offset(x,top),Offset(x,s.height-bottom),vertical);
-        final showLabel=points.length<=10||i==0||i==points.length-1||(i%5==0);
-        if(showLabel)_text(c,DateFormat('dd/MM').format(points[i].date),Offset(x-14,s.height-bottom+8),9,color.withValues(alpha:.75));
+        final showLabel=days<=10||i==0||i==days-1||(i%5==0);
+        if(showLabel)_text(c,DateFormat('dd/MM').format(d),Offset(x-14,s.height-bottom+8),9,color.withValues(alpha:.75));
       }
     }else{
-      for(var i=0;i<points.length;i++){
-        final x=xFor(points[i].date);
+      for(var d=DateTime(start.year,start.month,1);d.isBefore(visibleEnd);d=DateTime(d.year,d.month+1,1)){
+        final x=xFor(d);
         c.drawLine(Offset(x,top),Offset(x,s.height-bottom),vertical);
-        _text(c,DateFormat('MMM','pt_BR').format(DateTime(points[i].date.year,points[i].date.month,1)),Offset(x-16,s.height-bottom+8),9,color.withValues(alpha:.75));
+        _text(c,DateFormat('MMM','pt_BR').format(d),Offset(x-16,s.height-bottom+8),9,color.withValues(alpha:.75));
       }
     }
 
     final path=Path();
-    for(var i=0;i<points.length;i++){
-      final p=points[i];
-      final x=xFor(p.date),y=yFor(p.balance);
-      if(i==0)path.moveTo(x,y);else path.lineTo(x,y);
+    final finalDay=visibleEnd.subtract(const Duration(days:1));
+    path.moveTo(xFor(start),yFor(opening));
+    if(points.isEmpty){
+      path.lineTo(xFor(finalDay),yFor(opening));
+    }else{
+      for(final p in points)path.lineTo(xFor(p.date),yFor(p.balance));
+      final last=points.last;
+      if(last.date.isBefore(finalDay))path.lineTo(xFor(finalDay),yFor(last.balance));
+      var previousDate=start;
+      var previousBalance=opening;
+      for(final p in points){
+        final px=xFor(previousDate),py=yFor(previousBalance),x=xFor(p.date),y=yFor(p.balance);
+        _text(c,deltaLabel(p.delta),Offset((px+x)/2-28,(py+y)/2-11),9,color);
+        previousDate=p.date;previousBalance=p.balance;
+      }
     }
     c.drawPath(path,line);
-
-    for(var i=0;i<points.length;i++){
-      final p=points[i];
+    for(final p in points){
       final x=xFor(p.date),y=yFor(p.balance);
       c.drawCircle(Offset(x,y),4,Paint()..color=color);
       _text(c,moneyPoint(p.balance),Offset(x-30,y-23),9,color);
-      if(i>0&&p.delta.abs()>.0001){
-        final prev=points[i-1];
-        final px=xFor(prev.date),py=yFor(prev.balance);
-        final labelX=(px+x)/2-28;
-        final labelY=((py+y)/2)-11-(i.isEven?0:12);
-        _text(c,deltaLabel(p.delta),Offset(labelX,labelY),9,color);
-      }
     }
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
     c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
@@ -404,14 +400,14 @@ class _FinanceChart extends CustomPainter{
 
   String deltaLabel(double value){
     final sign=value>=0?'+':'-';
-    return 'R\$'+sign+value.abs().toStringAsFixed(2).replaceAll('.',',');
+    return 'R$'+sign+value.abs().toStringAsFixed(2).replaceAll('.',',');
   }
-  String moneyPoint(double value)=>'R\$'+value.toStringAsFixed(value.truncateToDouble()==value?0:2).replaceAll('.',',');
+  String moneyPoint(double value)=>'R$'+value.toStringAsFixed(value.truncateToDouble()==value?0:2).replaceAll('.',',');
   String moneyLabel(double value){
     final sign=value<0?'-':'';
     final abs=value.abs();
-    if(abs>=1000)return 'R\$'+sign+(abs/1000).toStringAsFixed(abs%1000==0?0:1)+'k';
-    return 'R\$'+sign+abs.toStringAsFixed(abs.truncateToDouble()==abs?0:2).replaceAll('.',',');
+    if(abs>=1000)return 'R$'+sign+(abs/1000).toStringAsFixed(abs%1000==0?0:1)+'k';
+    return 'R$'+sign+abs.toStringAsFixed(abs.truncateToDouble()==abs?0:2).replaceAll('.',',');
   }
   void _text(Canvas c,String text,Offset position,double size,Color textColor){
     final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(fontSize:size,color:textColor,fontWeight:FontWeight.w500)),textDirection:ui.TextDirection.ltr)..layout(maxWidth:88);
