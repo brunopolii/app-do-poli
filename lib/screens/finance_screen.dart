@@ -336,7 +336,7 @@ class _FinanceScreenState extends State<FinanceScreen>{
           if(_chartCanNext)IconButton(onPressed:()=>_moveChart(1),icon:const Icon(Icons.chevron_right))else const SizedBox(width:48),
         ]),
         const SizedBox(height:4),
-        SizedBox(height:230,child:CustomPaint(painter:_FinanceChart(start:_chartStart,end:_chartEnd,mode:chartMode,items:[...items],color:Theme.of(context).colorScheme.primary),child:const SizedBox.expand())),
+        SizedBox(height:230,child:CustomPaint(painter:_FinanceInteractiveChart(start:_chartStart,end:_chartEnd,mode:chartMode,items:[...items],color:Theme.of(context).colorScheme.primary),child:const SizedBox.expand())),
       ])),
       if(cats.isNotEmpty)AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Despesas por categoria',style:Theme.of(context).textTheme.titleLarge),for(final e in cats.entries)_category(e.key,e.value,cats.values.fold(0.0,(a,b)=>a+b))])),
       const SizedBox(height:8),Text('Movimentações',style:Theme.of(context).textTheme.titleLarge),
@@ -355,16 +355,24 @@ class _FinancePoint{
   final DateTime date;final double balance;final double delta;
   _FinancePoint(this.date,this.balance,this.delta);
 }
+class _FinanceInteractiveChart extends StatefulWidget{
+  final DateTime start,end;final _FinancePeriodMode mode;final List<MoneyTransaction> items;final Color color;
+  const _FinanceInteractiveChart({required this.start,required this.end,required this.mode,required this.items,required this.color});
+  @override State<_FinanceInteractiveChart> createState()=>_FinanceInteractiveChartState();
+}
+class _FinanceInteractiveChartState extends State<_FinanceInteractiveChart>{
+  double? selectionX;
+  @override Widget build(BuildContext context)=>GestureDetector(behavior:HitTestBehavior.opaque,onTapDown:(d)=>setState(()=>selectionX=d.localPosition.dx),onHorizontalDragUpdate:(d)=>setState(()=>selectionX=d.localPosition.dx),child:CustomPaint(painter:_FinanceChart(start:widget.start,end:widget.end,mode:widget.mode,items:widget.items,color:widget.color,selectedX:selectionX),child:const SizedBox.expand()));
+}
 class _FinanceChart extends CustomPainter{
-  final DateTime start;final DateTime end;final _FinancePeriodMode mode;final List<MoneyTransaction> items;final Color color;
-  _FinanceChart({required this.start,required this.end,required this.mode,required this.items,required this.color});
+  final DateTime start;final DateTime end;final _FinancePeriodMode mode;final List<MoneyTransaction> items;final Color color;final double? selectedX;
+  _FinanceChart({required this.start,required this.end,required this.mode,required this.items,required this.color,required this.selectedX});
   DateTime _movementDate(MoneyTransaction x)=>DateTime.tryParse(x.income?x.date:(x.paidDate??x.date))??DateTime(1900);
   double _delta(MoneyTransaction x)=>x.income?x.amount:-x.amount;
 
   @override void paint(Canvas c,Size s){
     if(!start.isBefore(end))return;
-    final now=DateTime.now();
-    final visibleEnd=end.isAfter(DateTime(now.year,now.month,now.day+1))?DateTime(now.year,now.month,now.day+1):end;
+    final visibleEnd=end;
     if(!start.isBefore(visibleEnd))return;
 
     double opening=0;
@@ -442,24 +450,12 @@ class _FinanceChart extends CustomPainter{
 
     final path=Path();
     if(points.isNotEmpty){
-      final first=points.first;
-      path.moveTo(xFor(first.date),yFor(first.balance));
-      for(var i=1;i<points.length;i++){
-        final p=points[i];
-        path.lineTo(xFor(p.date),yFor(p.balance));
-      }
-      var labelPrevious=points.first;
-      for(var i=1;i<points.length;i++){
-        final p=points[i];
-        _text(c,deltaLabel(p.delta),Offset((xFor(labelPrevious.date)+xFor(p.date))/2-28,(yFor(labelPrevious.balance)+yFor(p.balance))/2-11),9,color);
-        labelPrevious=p;
-      }
+      path.moveTo(left,yFor(opening));path.lineTo(xFor(points.first.date),yFor(points.first.balance));
+      for(var i=1;i<points.length;i++){path.moveTo(xFor(points[i-1].date),yFor(points[i-1].balance));path.lineTo(xFor(points[i].date),yFor(points[i].balance));}
       c.drawPath(path,line);
-      for(final p in points){
-        final x=xFor(p.date),y=yFor(p.balance);
-        c.drawCircle(Offset(x,y),4,Paint()..color=color);
-        _text(c,moneyPoint(p.balance),Offset(x-30,y-23),9,color);
-      }
+      int? selected;
+      if(selectedX!=null){selected=0;var best=(xFor(points.first.date)-selectedX!).abs();for(var i=0;i<points.length;i++){final d=(xFor(points[i].date)-selectedX!).abs();if(d<best){best=d;selected=i;}}}
+      for(var i=0;i<points.length;i++){final p=points[i],x=xFor(p.date),y=yFor(p.balance),big=i==selected;c.drawCircle(Offset(x,y),big?9:4,Paint()..color=color);if(big){_text(c,DateFormat('dd/MM/yyyy').format(p.date),Offset(x,math.max(top,y-40)),11,color);_text(c,moneyPoint(p.balance),Offset(x,math.max(top+14,y-22)),11,color);}}
     }
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
     c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
@@ -480,5 +476,5 @@ class _FinanceChart extends CustomPainter{
     final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(fontSize:size,color:textColor,fontWeight:FontWeight.w500)),textDirection:ui.TextDirection.ltr)..layout(maxWidth:88);
     tp.paint(c,position);
   }
-  @override bool shouldRepaint(covariant _FinanceChart old)=>old.start!=start||old.end!=end||old.mode!=mode||old.items!=items||old.color!=color;
+  @override bool shouldRepaint(covariant _FinanceChart old)=>old.start!=start||old.end!=end||old.mode!=mode||old.items!=items||old.color!=color||old.selectedX!=selectedX;
 }
