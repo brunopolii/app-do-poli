@@ -361,7 +361,7 @@ class _FinanceInteractiveChartState extends State<_FinanceInteractiveChart>{
 class _FinanceChart extends CustomPainter{
   final DateTime start;final DateTime end;final _FinancePeriodMode mode;final List<MoneyTransaction> items;final Color color;final double? selectedX;
   _FinanceChart({required this.start,required this.end,required this.mode,required this.items,required this.color,required this.selectedX});
-  DateTime _movementDate(MoneyTransaction x)=>DateTime.tryParse(x.income?x.date:(x.paidDate??x.date))??DateTime(1900);
+  DateTime _movementDate(MoneyTransaction x)=>DateTime.tryParse(x.date)??DateTime(1900);
   double _delta(MoneyTransaction x)=>x.income?x.amount:-x.amount;
 
   @override void paint(Canvas c,Size s){
