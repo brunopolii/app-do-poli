@@ -184,19 +184,9 @@ class _HistorySectionState extends State<HistorySection>{
   }
 
   List<_GymRecord> records(){
-    if(exercise==null)return[];
-    final out=< _GymRecord>[];
-    for(final w in history){
-      final d=DateTime.tryParse(w.date);
-      if(d==null||d.isBefore(periodStart)||!d.isBefore(periodEnd))continue;
-      for(final e in w.exercises.where((e)=>e.name==exercise)){
-        final values=e.weights.where((v)=>v.isFinite&&v>=0).toList();
-        if(values.isEmpty)continue;
-        out.add(_GymRecord(w.id,d,values.reduce((a,b)=>a>b?a:b)));
-      }
-    }
-    out.sort((a,b)=>b.date.compareTo(a.date));
-    return out;
+    return points().whereType<_GymDayPoint>()
+      .map((p)=>_GymRecord(p.workoutId,p.date,p.value)).toList()
+      ..sort((a,b)=>b.date.compareTo(a.date));
   }
 
   Workout? _workout(String id)=>history.cast<Workout?>().firstWhere((w)=>w?.id==id,orElse:()=>null);
@@ -318,70 +308,85 @@ class _GymRecord{
   final String workoutId;final DateTime date;final double value;
   _GymRecord(this.workoutId,this.date,this.value);
 }
-class _GymChart extends StatelessWidget{
-  final List<_GymDayPoint?> data;final Color color;final DateTime startDate;
+class _GymChart extends StatefulWidget{
+  final List<_GymDayPoint?> data; final Color color; final DateTime startDate;
   const _GymChart({required this.data,required this.color,required this.startDate});
+  @override State<_GymChart> createState()=>_GymChartState();
+}
+class _GymChartState extends State<_GymChart>{
+  int? selectedIndex;
+  void _select(Offset local,double width){
+    final count=widget.data.length;if(count==0)return;
+    const left=42.0,right=12.0;
+    final chartW=(width-left-right).clamp(1.0,10000.0).toDouble();
+    final raw=((local.dx-left)/chartW)*(count-1);
+    final index=raw.round().clamp(0,count-1).toInt();
+    if(widget.data[index]==null)return;
+    setState(()=>selectedIndex=index);
+  }
   @override Widget build(BuildContext context)=>SizedBox(
-    height:235,
-    child:CustomPaint(
-      painter:_GymChartPainter(data,color,Theme.of(context).colorScheme.onSurfaceVariant,Directionality.of(context),startDate),
-    ),
+    height:250,
+    child:LayoutBuilder(builder:(context,constraints)=>GestureDetector(
+      behavior:HitTestBehavior.opaque,
+      onTapDown:(details)=>_select(details.localPosition,constraints.maxWidth),
+      child:CustomPaint(painter:_GymChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,Directionality.of(context),widget.startDate,selectedIndex)),
+    )),
   );
 }
 class _GymChartPainter extends CustomPainter{
-  final List<_GymDayPoint?> data;final Color color;final Color labelColor;final ui.TextDirection textDirection;final DateTime startDate;
-  _GymChartPainter(this.data,this.color,this.labelColor,this.textDirection,this.startDate);
+  final List<_GymDayPoint?> data; final Color color; final Color labelColor;
+  final ui.TextDirection textDirection; final DateTime startDate; final int? selectedIndex;
+  _GymChartPainter(this.data,this.color,this.labelColor,this.textDirection,this.startDate,this.selectedIndex);
   @override void paint(Canvas c,Size s){
     if(data.isEmpty)return;
     const left=42.0,right=12.0,top=26.0,bottom=40.0;
     final chartW=(s.width-left-right).clamp(1.0,10000.0).toDouble();
     final chartH=(s.height-top-bottom).clamp(1.0,10000.0).toDouble();
     final values=data.whereType<_GymDayPoint>().map((p)=>p.value).toList();
-    final grid=Paint()..color=labelColor.withValues(alpha:.16)..strokeWidth=1;
-    final vertical=Paint()..color=labelColor.withValues(alpha:.08)..strokeWidth=1;
-    final axis=Paint()..color=labelColor.withValues(alpha:.35)..strokeWidth=1;
+    final grid=Paint()..color=color.withValues(alpha:.14)..strokeWidth=1;
+    final vertical=Paint()..color=color.withValues(alpha:.08)..strokeWidth=1;
+    final axis=Paint()..color=color.withValues(alpha:.35)..strokeWidth=1;
     for(var i=0;i<=4;i++){final y=top+chartH*i/4;c.drawLine(Offset(left,y),Offset(s.width-right,y),grid);}
-    for(var i=0;i<data.length;i++){final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);c.drawLine(Offset(x,top),Offset(x,s.height-bottom),vertical);}
+    double xForIndex(int i)=>data.length<=1?left+chartW/2:left+i*chartW/(data.length-1);
+    final labelStep=math.max(1,(data.length/(chartW/58)).ceil());
+    for(var i=0;i<data.length;i++){
+      final show=i==0||i==data.length-1||i%labelStep==0;if(!show)continue;
+      final x=xForIndex(i);
+      c.drawLine(Offset(x,top),Offset(x,s.height-bottom),vertical);
+      _draw(c,DateFormat('dd/MM').format(startDate.add(Duration(days:i))),Offset(x,s.height-bottom+8),TextAlign.center);
+    }
     if(values.isNotEmpty){
       final min=values.reduce((a,b)=>a<b?a:b),max=values.reduce((a,b)=>a>b?a:b);
       final rawRange=max-min,range=rawRange.abs()<.01?1.0:rawRange;
       final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
-      final path=Path();int? previousIndex;
+      final path=Path();_GymDayPoint? previous;int? previousIndex;
       for(var i=0;i<data.length;i++){
-        final p=data[i];final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);
-        if(p!=null){
-          final y=top+chartH-((p.value-min)/range)*chartH;
-          if(previousIndex==null)path.moveTo(x,y);
-          else{
-            final previous=data[previousIndex]!;
-            final px=data.length==1?left+chartW/2:left+previousIndex*chartW/(data.length-1);
-            final py=top+chartH-((previous.value-min)/range)*chartH;
-            path.moveTo(px,py);path.lineTo(x,py);path.lineTo(x,y);
-          }
-          previousIndex=i;c.drawCircle(Offset(x,y),4,Paint()..color=color);
-          _drawLabel(c,'${p.value.toStringAsFixed(p.value.truncateToDouble()==p.value?0:1)} kg',Offset(x,y-12),TextAlign.center);
-        }
-        final showLabel=data.length<=7||i==0||i==data.length-1||(data.length>7&&i%5==0);
-        if(showLabel)_drawLabel(c,DateFormat('dd/MM').format(startDate.add(Duration(days:i))),Offset(x,s.height-bottom+8),TextAlign.center);
+        final p=data[i];if(p==null)continue;
+        final x=xForIndex(i),y=top+chartH-((p.value-min)/range)*chartH;
+        if(previous!=null&&previousIndex!=null){
+          path.moveTo(xForIndex(previousIndex),top+chartH-((previous.value-min)/range)*chartH);path.lineTo(x,y);
+        }else{path.moveTo(x,y);}
+        previous=p;previousIndex=i;
       }
-      if(previousIndex!=null&&previousIndex<data.length-1){
-        final previous=data[previousIndex]!;
-        final px=data.length==1?left+chartW/2:left+previousIndex*chartW/(data.length-1);
-        final py=top+chartH-((previous.value-min)/range)*chartH;
-        path.moveTo(px,py);path.lineTo(left+chartW,py);
-      }
-      for(var i=0;i<=4;i++){final y=top+chartH*i/4;final value=max-rawRange*i/4;_drawLabel(c,'${value.toStringAsFixed(value.truncateToDouble()==value?0:1)} kg',Offset(2,y),TextAlign.left);}
       c.drawPath(path,line);
-    }else{
-      for(var i=0;i<data.length;i++){final x=data.length==1?left+chartW/2:left+i*chartW/(data.length-1);final showLabel=data.length<=7||i==0||i==data.length-1||(data.length>7&&i%5==0);if(showLabel)_drawLabel(c,DateFormat('dd/MM').format(startDate.add(Duration(days:i))),Offset(x,s.height-bottom+8),TextAlign.center);}
+      for(var i=0;i<data.length;i++){
+        final p=data[i];if(p==null)continue;
+        final x=xForIndex(i),y=top+chartH-((p.value-min)/range)*chartH,selected=i==selectedIndex;
+        c.drawCircle(Offset(x,y),selected?6:4,Paint()..color=color);
+        if(selected){
+          final labelY=(y-18).clamp(top,s.height-bottom).toDouble();
+          _draw(c,'${p.value.toStringAsFixed(p.value.truncateToDouble()==p.value?0:1)} kg',Offset(x,labelY),TextAlign.center);
+        }
+      }
+      for(var i=0;i<=4;i++){final y=top+chartH*i/4;final value=max-rawRange*i/4;_draw(c,'${value.toStringAsFixed(1)} kg',Offset(2,y),TextAlign.left);}
     }
-    c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
+    c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
+    c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
-  void _drawLabel(Canvas c,String text,Offset center,TextAlign align){
-    final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(color:labelColor,fontSize:10,fontWeight:FontWeight.w500)),textDirection:textDirection,textAlign:align)..layout(maxWidth:90);
-    final dx=(align==TextAlign.center?center.dx-tp.width/2:center.dx).toDouble();
-    final dy=(align==TextAlign.center?center.dy-tp.height/2:center.dy).toDouble();
+  void _draw(Canvas c,String text,Offset center,TextAlign align){
+    final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(fontSize:10,color:labelColor,fontWeight:FontWeight.w500)),textDirection:textDirection,textAlign:align)..layout(maxWidth:90);
+    final dx=(align==TextAlign.center?center.dx-tp.width/2:center.dx).toDouble(),dy=(align==TextAlign.center?center.dy-tp.height/2:center.dy).toDouble();
     tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),dy.clamp(0.0,10000.0).toDouble()));
   }
-  @override bool shouldRepaint(covariant _GymChartPainter old)=>old.data!=data||old.color!=color||old.labelColor!=labelColor||old.startDate!=startDate;
+  @override bool shouldRepaint(covariant _GymChartPainter old)=>old.data!=data||old.color!=color||old.labelColor!=labelColor||old.startDate!=startDate||old.selectedIndex!=selectedIndex;
 }

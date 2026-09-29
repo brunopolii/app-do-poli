@@ -441,35 +441,25 @@ class _FinanceChart extends CustomPainter{
     }
 
     final path=Path();
-    final finalDay=visibleEnd.subtract(const Duration(days:1));
-    path.moveTo(xFor(start),yFor(opening));
-    if(points.isEmpty){
-      path.lineTo(xFor(finalDay),yFor(opening));
-    }else{
-      var previousDate=start;
-      var previousBalance=opening;
-      for(final p in points){
-        final px=xFor(previousDate),py=yFor(previousBalance),x=xFor(p.date),y=yFor(p.balance);
-        path.lineTo(x,py);
-        path.lineTo(x,y);
-        previousDate=p.date;
-        previousBalance=p.balance;
+    if(points.isNotEmpty){
+      final first=points.first;
+      path.moveTo(xFor(first.date),yFor(first.balance));
+      for(var i=1;i<points.length;i++){
+        final p=points[i];
+        path.lineTo(xFor(p.date),yFor(p.balance));
       }
-      final last=points.last;
-      if(last.date.isBefore(finalDay))path.lineTo(xFor(finalDay),yFor(last.balance));
-      var labelPreviousDate=start;
-      var labelPreviousBalance=opening;
-      for(final p in points){
-        final px=xFor(labelPreviousDate),py=yFor(labelPreviousBalance),x=xFor(p.date),y=yFor(p.balance);
-        _text(c,deltaLabel(p.delta),Offset((px+x)/2-28,(py+y)/2-11),9,color);
-        labelPreviousDate=p.date;labelPreviousBalance=p.balance;
+      var labelPrevious=points.first;
+      for(var i=1;i<points.length;i++){
+        final p=points[i];
+        _text(c,deltaLabel(p.delta),Offset((xFor(labelPrevious.date)+xFor(p.date))/2-28,(yFor(labelPrevious.balance)+yFor(p.balance))/2-11),9,color);
+        labelPrevious=p;
       }
-    }
-    c.drawPath(path,line);
-    for(final p in points){
-      final x=xFor(p.date),y=yFor(p.balance);
-      c.drawCircle(Offset(x,y),4,Paint()..color=color);
-      _text(c,moneyPoint(p.balance),Offset(x-30,y-23),9,color);
+      c.drawPath(path,line);
+      for(final p in points){
+        final x=xFor(p.date),y=yFor(p.balance);
+        c.drawCircle(Offset(x,y),4,Paint()..color=color);
+        _text(c,moneyPoint(p.balance),Offset(x-30,y-23),9,color);
+      }
     }
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
     c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
