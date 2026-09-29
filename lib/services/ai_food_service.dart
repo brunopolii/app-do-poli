@@ -40,17 +40,6 @@ class AiFoodService {
     return local;
   }
 
-  Future<FoodResult> estimateImage(String path) async {
-    if (endpoint == null || endpoint!.isEmpty) return FoodResult(items: [FoodItem(name: 'Foto capturada', grams: 0, calories: 0, protein: 0, carbs: 0, fat: 0)], note: 'A foto foi capturada, mas não há um backend de visão/IA configurado. Nenhum valor foi inventado.');
-    final request = http.MultipartRequest('POST', Uri.parse(endpoint!));
-    if (apiKey?.isNotEmpty == true) request.headers['Authorization'] = 'Bearer $apiKey';
-    request.files.add(await http.MultipartFile.fromPath('image', path));
-    final r = await request.send();
-    final body = await r.stream.bytesToString();
-    if (r.statusCode < 200 || r.statusCode >= 300) throw Exception('Falha na análise da foto.');
-    return _fromJson(Map<String, dynamic>.from(jsonDecode(body) as Map));
-  }
-
   Future<FoodResult?> _openFoodFacts(String text) async {
     try {
       final query = text.trim();
@@ -118,7 +107,7 @@ class AiFoodService {
     final aliases = <String, List<String>>{
       'bolo de chocolate': ['bolo de chocolate'], 'nhoque': ['nhoque'], 'pão de queijo': ['pão de queijo', 'pao de queijo'], 'leite integral': ['leite integral'],
       'suco de laranja': ['suco de laranja'], 'água de coco': ['água de coco', 'agua de coco'], 'coca cola': ['coca cola'], 'guaraná': ['guaraná', 'guarana'],
-      'carne moída': ['carne moída', 'carne moida'], 'batata doce': ['batata doce', 'batata-doce'], 'grão de bico': ['grão de bico', 'grao de bico'],
+      'carne moída': ['carne moída', 'carne moida'], 'carne suína': ['carne suína', 'carne suina', 'carne de porco', 'porco'], 'batata doce': ['batata doce', 'batata-doce'], 'grão de bico': ['grão de bico', 'grao de bico'],
     };
     for (final key in specs.keys) { aliases.putIfAbsent(key, () => [key]); }
     final keys = aliases.keys.toList()..sort((a, b) => b.length.compareTo(a.length));
