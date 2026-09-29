@@ -322,10 +322,18 @@ class _GymChart extends StatefulWidget{
 }
 class _GymChartState extends State<_GymChart>{
   double? selectionX;
-  @override Widget build(BuildContext context)=>SizedBox(height:250,child:LayoutBuilder(builder:(context,c)=>GestureDetector(
-    behavior:HitTestBehavior.opaque,onTapDown:(d)=>setState(()=>selectionX=d.localPosition.dx),onHorizontalDragUpdate:(d)=>setState(()=>selectionX=d.localPosition.dx),
-    child:CustomPaint(painter:_GymChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,Directionality.of(context),widget.startDate,widget.previousValue,selectionX)),
-  )));
+  @override Widget build(BuildContext context)=>SizedBox(
+    height:250,
+    child:GestureDetector(
+      behavior:HitTestBehavior.opaque,
+      onTapDown:(d)=>setState(()=>selectionX=d.localPosition.dx),
+      onHorizontalDragUpdate:(d)=>setState(()=>selectionX=d.localPosition.dx),
+      child:CustomPaint(
+        painter:_GymChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,Directionality.of(context),widget.startDate,widget.previousValue,selectionX),
+        child:const SizedBox.expand(),
+      ),
+    ),
+  );
 }
 class _GymChartPainter extends CustomPainter{
   final List<_GymDayPoint?> data;final Color color;final Color labelColor;final ui.TextDirection textDirection;final DateTime startDate;final double? previousValue;final double? selectionX;
