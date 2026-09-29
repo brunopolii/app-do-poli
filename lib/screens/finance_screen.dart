@@ -355,6 +355,7 @@ class _FinancePoint{
   final DateTime date;final double balance;final double delta;
   _FinancePoint(this.date,this.balance,this.delta);
 }
+// Gráficos reconstruídos: interação por toque e arraste.
 class _FinanceInteractiveChart extends StatefulWidget{
   final DateTime start,end;final _FinancePeriodMode mode;final List<MoneyTransaction> items;final Color color;
   const _FinanceInteractiveChart({required this.start,required this.end,required this.mode,required this.items,required this.color});
