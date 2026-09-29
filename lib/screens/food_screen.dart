@@ -135,10 +135,18 @@ class _WeightChart extends StatefulWidget{
 }
 class _WeightChartState extends State<_WeightChart>{
   double? selectionX;
-  @override Widget build(BuildContext context)=>SizedBox(height:250,child:LayoutBuilder(builder:(context,c)=>GestureDetector(
-    behavior:HitTestBehavior.opaque,onTapDown:(d)=>setState(()=>selectionX=d.localPosition.dx),onHorizontalDragUpdate:(d)=>setState(()=>selectionX=d.localPosition.dx),
-    child:CustomPaint(painter:_WeightChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,Directionality.of(context),widget.startDate,widget.previousValue,selectionX)),
-  )));
+  @override Widget build(BuildContext context)=>SizedBox(
+    height:250,
+    child:GestureDetector(
+      behavior:HitTestBehavior.opaque,
+      onTapDown:(d)=>setState(()=>selectionX=d.localPosition.dx),
+      onHorizontalDragUpdate:(d)=>setState(()=>selectionX=d.localPosition.dx),
+      child:CustomPaint(
+        painter:_WeightChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,Directionality.of(context),widget.startDate,widget.previousValue,selectionX),
+        child:const SizedBox.expand(),
+      ),
+    ),
+  );
 }
 class _WeightChartPainter extends CustomPainter{
   final List<WeightEntry?> data;final Color color;final Color labelColor;final ui.TextDirection textDirection;final DateTime startDate;final double? previousValue;final double? selectionX;
