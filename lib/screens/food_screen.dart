@@ -154,12 +154,12 @@ class _WeightChartPainter extends CustomPainter{
     for(var k=0;k<data.length;k++){final xx=x(k);c.drawLine(Offset(xx,top),Offset(xx,s.height-bottom),ticks);final show=data.length<=7||k==0||k==data.length-1||k%5==0;if(show)_txt(c,DateFormat('dd/MM').format(startDate.add(Duration(days:k))),Offset(xx,s.height-bottom+8),9,labelColor,TextAlign.center);}
     final pts=<MapEntry<int,WeightEntry>>[];for(var k=0;k<data.length;k++){final p=data[k];if(p!=null)pts.add(MapEntry(k,p));}
     final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;final path=Path();
-    if(previousValue!=null&&pts.isNotEmpty){path.moveTo(left,y(previousValue!));path.lineTo(x(pts.first.key),y(pts.first.value.value));}
-    for(var k=1;k<pts.length;k++){path.moveTo(x(pts[k-1].key),y(pts[k-1].value.value));path.lineTo(x(pts[k].key),y(pts[k].value.value));}
-    if(previousValue==null&&pts.length==1){path.moveTo(x(pts.first.key),y(pts.first.value.value));}c.drawPath(path,line);
+    if(previousValue!=null&&pts.isNotEmpty){path.moveTo(left,y(previousValue!));path.lineTo(x(pts.first.key),y(pts.first.value.weight));}
+    for(var k=1;k<pts.length;k++){path.moveTo(x(pts[k-1].key),y(pts[k-1].value.weight));path.lineTo(x(pts[k].key),y(pts[k].value.weight));}
+    if(previousValue==null&&pts.length==1){path.moveTo(x(pts.first.key),y(pts.first.value.weight));}c.drawPath(path,line);
     int? selected;
     if(selectionX!=null&&pts.isNotEmpty){selected=pts.first.key;var best=(x(selected!)-selectionX!).abs();for(final e in pts){final d=(x(e.key)-selectionX!).abs();if(d<best){best=d;selected=e.key;}}}
-    for(final e in pts){final yy=y(e.value.weight),big=e.key==selected;c.drawCircle(Offset(x(e.key),yy),big?9:4,Paint()..color=color);if(big){_txt(c,DateFormat('dd/MM/yyyy').format(e.value.date),Offset(x(e.key),math.max(top,yy-40)),11,labelColor,TextAlign.center);_txt(c,'\${e.value.weight.toStringAsFixed(e.value.weight.truncateToDouble()==e.value.weight?0:1)} kg',Offset(x(e.key),math.max(top+14,yy-22)),11,labelColor,TextAlign.center);}}
+    for(final e in pts){final yy=y(e.value.weight),big=e.key==selected;c.drawCircle(Offset(x(e.key),yy),big?9:4,Paint()..color=color);if(big){_txt(c,DateFormat('dd/MM/yyyy').format(DateTime.parse(e.value.date)),Offset(x(e.key),math.max(top,yy-40)),11,labelColor,TextAlign.center);_txt(c,'\${e.value.weight.toStringAsFixed(e.value.weight.truncateToDouble()==e.value.weight?0:1)} kg',Offset(x(e.key),math.max(top+14,yy-22)),11,labelColor,TextAlign.center);}}
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
   void _txt(Canvas c,String v,Offset p,double size,Color col,TextAlign a){final tp=TextPainter(text:TextSpan(text:v,style:TextStyle(fontSize:size,color:col,fontWeight:FontWeight.w500)),textDirection:textDirection,textAlign:a)..layout(maxWidth:100);tp.paint(c,Offset((a==TextAlign.center?p.dx-tp.width/2:p.dx).clamp(0.0,10000.0).toDouble(),p.dy));}
