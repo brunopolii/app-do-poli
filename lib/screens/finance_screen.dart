@@ -267,15 +267,8 @@ class _FinanceScreenState extends State<FinanceScreen>{
     return DateTime(chartAnchor.year,chartAnchor.month+1,1);
   }
   DateTime get _chartEnd{
-    final fullEnd=_chartFullEnd;
-    final now=DateTime.now();
-    if(chartMode==_FinancePeriodMode.week){
-      final current=_weekStart(now);
-      if(_chartStart==current)return DateTime(now.year,now.month,now.day+1);
-    }else if(chartAnchor.year==now.year&&chartAnchor.month==now.month){
-      return DateTime(now.year,now.month,now.day+1);
-    }
-    return fullEnd;
+    // Sempre mostra o período completo, inclusive os dias futuros.
+    return _chartFullEnd;
   }
   bool get _chartCanNext{
     final current=chartMode==_FinancePeriodMode.week?_weekStart(DateTime.now()):_chartCurrentMonth;
