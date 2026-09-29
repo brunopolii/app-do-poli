@@ -336,7 +336,7 @@ class _FinanceScreenState extends State<FinanceScreen>{
           if(_chartCanNext)IconButton(onPressed:()=>_moveChart(1),icon:const Icon(Icons.chevron_right))else const SizedBox(width:48),
         ]),
         const SizedBox(height:4),
-        SizedBox(height:230,child:CustomPaint(painter:_FinanceInteractiveChart(start:_chartStart,end:_chartEnd,mode:chartMode,items:[...items],color:Theme.of(context).colorScheme.primary),child:const SizedBox.expand())),
+        SizedBox(height:230,child:_FinanceInteractiveChart(start:_chartStart,end:_chartEnd,mode:chartMode,items:[...items],color:Theme.of(context).colorScheme.primary)),
       ])),
       if(cats.isNotEmpty)AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Despesas por categoria',style:Theme.of(context).textTheme.titleLarge),for(final e in cats.entries)_category(e.key,e.value,cats.values.fold(0.0,(a,b)=>a+b))])),
       const SizedBox(height:8),Text('Movimentações',style:Theme.of(context).textTheme.titleLarge),
