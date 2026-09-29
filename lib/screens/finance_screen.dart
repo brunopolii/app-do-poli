@@ -9,7 +9,7 @@ import '../widgets/app_card.dart';
 
 const expenseCategories=['Alimentação','Transporte','Moradia','Lazer','Educação','Saúde','Compras','Outros'];
 const incomeCategories=['Salário','Freelance','Investimentos','Outros'];
-enum _FinancePeriodMode{month,semester}
+enum _FinancePeriodMode{week,month,semester}
 
 class FinanceScreen extends StatefulWidget{const FinanceScreen({super.key});@override State<FinanceScreen> createState()=>_FinanceScreenState();}
 
@@ -59,7 +59,7 @@ class _FinanceScreenState extends State<FinanceScreen>{
         if(!exists){
           items.add(MoneyTransaction(
             id:'r-${master.recurrenceGroupId}-$date',
-            date:date,description:master.description,category:master.category,amount:master.amount,income:false,
+            date:date,description:master.description,category:master.category,amount:master.amount,income:master.income,
             paymentStatus:'pending',isRecurring:true,recurrenceGroupId:master.recurrenceGroupId,
             recurrenceFrequency:'monthly',recurrenceStartDate:master.recurrenceStartDate,dueDate:date,
           ));
@@ -149,6 +149,42 @@ class _FinanceScreenState extends State<FinanceScreen>{
     await _save();if(mounted)setState((){});
   }
 
+  Future<void> _salary({MoneyTransaction? editing})async{
+    final d=TextEditingController(text:editing?.description??'Salário');
+    final a=TextEditingController(text:editing?.amount.toStringAsFixed(2)??'');
+    DateTime due=editing==null?DateTime(DateTime.now().year,DateTime.now().month,1):_date(editing.dueDate);
+    int day=editing?.recurrenceStartDate.isNotEmpty==true?(int.tryParse(editing!.recurrenceStartDate.split('-').last)??due.day):due.day;
+    final ok=await showDialog<bool>(context:context,builder:(c)=>StatefulBuilder(builder:(c,setD)=>AlertDialog(
+      title:Text(editing==null?'Cadastrar salário':'Editar salário'),
+      content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+        TextField(controller:d,decoration:const InputDecoration(labelText:'Descrição')),
+        TextField(controller:a,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'Valor mensal')),
+        ListTile(contentPadding:EdgeInsets.zero,title:Text('Dia de recebimento: \$day'),trailing:const Icon(Icons.calendar_month),onTap:()async{final r=await _pickDate(due);if(r!=null)setD((){due=r;day=r.day;});}),
+      ])),
+      actions:[TextButton(onPressed:()=>Navigator.pop(c,false),child:const Text('Cancelar')),FilledButton(onPressed:()=>Navigator.pop(c,true),child:const Text('Salvar'))],
+    )));
+    final value=double.tryParse(a.text.replaceAll(',','.'));final desc=d.text.trim();d.dispose();a.dispose();
+    if(ok!=true||value==null||value<=0||desc.isEmpty)return;
+    final now=DateTime.now();
+    final group=editing?.recurrenceGroupId??DateTime.now().microsecondsSinceEpoch.toString();
+    if(editing!=null){
+      for(final x in items.where((e)=>e.isRecurring&&e.income&&e.recurrenceGroupId==group)){
+        x.description=desc;x.category='Salário';x.amount=value;x.totalAmount=value;x.installmentAmount=value;
+      }
+      editing.recurrenceStartDate='${due.year}-${due.month.toString().padLeft(2,'0')}-${day.toString().padLeft(2,'0')}';
+      final safeDay=math.min(day,DateUtils.getDaysInMonth(due.year,due.month));
+      editing.dueDate=DateFormat('yyyy-MM-dd').format(DateTime(due.year,due.month,safeDay));
+      editing.date=editing.dueDate;
+    }else{
+      final safeDay=math.min(day,DateUtils.getDaysInMonth(now.year,now.month));
+      final first=DateTime(now.year,now.month,safeDay);
+      final ds=DateFormat('yyyy-MM-dd').format(first);
+      final status=first.isAfter(DateTime(now.year,now.month,now.day))?'pending':'paid';
+      items.add(MoneyTransaction(id:'r-$group-$ds',date:ds,description:desc,category:'Salário',amount:value,income:true,paymentStatus:status,isRecurring:true,recurrenceGroupId:group,recurrenceFrequency:'monthly',recurrenceStartDate:ds,dueDate:ds,paidDate:status=='paid'?DateFormat('yyyy-MM-dd').format(first):null));
+    }
+    await _ensureRecurring();await _save();if(mounted)setState((){});
+  }
+
   Future<void> _recurring({MoneyTransaction? editing})async{
     final d=TextEditingController(text:editing?.description??'');final a=TextEditingController(text:editing?.amount.toStringAsFixed(2)??'');
     String cat=editing?.category??'Outros';bool paid=editing?.isPaid??false;DateTime due=editing==null?DateTime.now():_date(editing.dueDate);
@@ -193,6 +229,7 @@ class _FinanceScreenState extends State<FinanceScreen>{
 
   Future<void> _edit(MoneyTransaction x)async{
     if(x.isInstallment)await _installment(editing:x);
+    else if(x.isRecurring&&x.income)await _salary(editing:x);
     else if(x.isRecurring)await _recurring(editing:x);
     else await _single(x.income,editing:x);
   }
@@ -213,47 +250,79 @@ class _FinanceScreenState extends State<FinanceScreen>{
       ListTile(title:const Text('Nova entrada'),onTap:()=>Navigator.pop(c,'in')),
       ListTile(title:const Text('Nova despesa'),onTap:()=>Navigator.pop(c,'out')),
       ListTile(title:const Text('Compra parcelada'),onTap:()=>Navigator.pop(c,'inst')),
-      ListTile(title:const Text('Despesa recorrente'),onTap:()=>Navigator.pop(c,'rec')),
+      ListTile(title:const Text('Despesa recorrente'),onTap:()=>Navigator.pop(c,'rec')),ListTile(title:const Text('Salário mensal'),onTap:()=>Navigator.pop(c,'salary')),
     ])));
-    if(choice=='in')await _single(true);else if(choice=='out')await _single(false);else if(choice=='inst')await _installment();else if(choice=='rec')await _recurring();
+    if(choice=='in')await _single(true);else if(choice=='out')await _single(false);else if(choice=='inst')await _installment();else if(choice=='rec')await _recurring();else if(choice=='salary')await _salary();
   }
 
   DateTime get _chartCurrentMonth=>DateTime(DateTime.now().year,DateTime.now().month);
-  DateTime get _chartStart=>chartMode==_FinancePeriodMode.month?DateTime(chartAnchor.year,chartAnchor.month,1):DateTime(chartAnchor.year,chartAnchor.month-5,1);
-  DateTime get _chartFullEnd=>DateTime(chartAnchor.year,chartAnchor.month+1,1);
+  DateTime _weekStart(DateTime d)=>DateTime(d.year,d.month,d.day).subtract(Duration(days:d.weekday%7));
+  DateTime get _chartStart{
+    if(chartMode==_FinancePeriodMode.week)return _weekStart(DateTime(chartAnchor.year,chartAnchor.month,chartAnchor.day));
+    if(chartMode==_FinancePeriodMode.month)return DateTime(chartAnchor.year,chartAnchor.month,1);
+    return DateTime(chartAnchor.year,chartAnchor.month-5,1);
+  }
+  DateTime get _chartFullEnd{
+    if(chartMode==_FinancePeriodMode.week)return _chartStart.add(const Duration(days:7));
+    return DateTime(chartAnchor.year,chartAnchor.month+1,1);
+  }
   DateTime get _chartEnd{
     final fullEnd=_chartFullEnd;
     final now=DateTime.now();
-    if(chartMode==_FinancePeriodMode.month&&chartAnchor.year==now.year&&chartAnchor.month==now.month)return DateTime(now.year,now.month,now.day+1);
-    if(chartMode==_FinancePeriodMode.semester&&chartAnchor.year==now.year&&chartAnchor.month==now.month)return DateTime(now.year,now.month,now.day+1);
+    if(chartMode==_FinancePeriodMode.week){
+      final current=_weekStart(now);
+      if(_chartStart==current)return DateTime(now.year,now.month,now.day+1);
+    }else if(chartAnchor.year==now.year&&chartAnchor.month==now.month){
+      return DateTime(now.year,now.month,now.day+1);
+    }
     return fullEnd;
   }
-  bool get _chartCanNext=>chartAnchor.isBefore(_chartCurrentMonth);
+  bool get _chartCanNext{
+    final current=chartMode==_FinancePeriodMode.week?_weekStart(DateTime.now()):_chartCurrentMonth;
+    return _chartStart.isBefore(current);
+  }
   String get _chartLabel{
+    if(chartMode==_FinancePeriodMode.week){
+      final end=_chartEnd.subtract(const Duration(days:1));
+      return '${DateFormat('dd/MM').format(_chartStart)} – ${DateFormat('dd/MM/yyyy').format(end)}';
+    }
     if(chartMode==_FinancePeriodMode.month)return DateFormat('MMMM yyyy','pt_BR').format(chartAnchor);
     final start=_chartStart;
     return '${DateFormat('MMM','pt_BR').format(start)} – ${DateFormat('MMM yyyy','pt_BR').format(chartAnchor)}';
   }
-  void _setChartMode(_FinancePeriodMode next){setState((){chartMode=next;chartAnchor=_chartCurrentMonth;});}
-  void _moveChart(int delta){setState((){final step=chartMode==_FinancePeriodMode.month?delta:delta*6;chartAnchor=DateTime(chartAnchor.year,chartAnchor.month+step,1);});}
+  void _setChartMode(_FinancePeriodMode next){setState((){chartMode=next;chartAnchor=next==_FinancePeriodMode.week?_weekStart(DateTime.now()):_chartCurrentMonth;});}
+  void _moveChart(int delta){setState((){
+    if(chartMode==_FinancePeriodMode.week)chartAnchor=_chartStart.add(Duration(days:7*delta));
+    else if(chartMode==_FinancePeriodMode.month)chartAnchor=DateTime(chartAnchor.year,chartAnchor.month+delta,1);
+    else chartAnchor=DateTime(chartAnchor.year,chartAnchor.month+(delta*6),1);
+  });}
 
   @override Widget build(BuildContext context){
     if(loading)return const Center(child:CircularProgressIndicator());
     final cur=_month(month);
-    final incPaid=_sum(cur,income:true,paidOnly:true),outPaid=_sum(cur,paidOnly:true);
-    final projectedOut=_sum(cur,paidOnly:false),projectedBalance=_sum(cur,income:true)-projectedOut;
+    final incPaid=_sum(cur,income:true,paidOnly:true);
+    final outPaid=_sum(cur,paidOnly:true);
+    final pendingExpenses=cur.where((x)=>!x.income&&!x.isPaid&&!x.isCancelled).fold(0.0,(a,x)=>a+x.amount);
+    final nextExpenses=items.where((x){
+      if(x.income||x.isPaid||x.isCancelled||(!x.isRecurring&&!x.isInstallment))return false;
+      final d=_date(x.dueDate);
+      return d.isAfter(DateTime(month.year,month.month+1,0));
+    }).fold(0.0,(a,x)=>a+x.amount);
+    final projectedBalance=_balance()-pendingExpenses-nextExpenses;
     final cats=<String,double>{};for(final x in cur.where((x)=>!x.income)){cats[x.category]=(cats[x.category]??0)+x.amount;}
     return SafeArea(child:ListView(padding:const EdgeInsets.all(16),children:[
       Row(children:[Expanded(child:Text('Financeiro',style:Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.bold))),FilledButton.icon(onPressed:_menu,icon:const Icon(Icons.add),label:const Text('Adicionar'))]),
       AppCard(child:Row(children:[IconButton(onPressed:()=>setState(()=>month=DateTime(month.year,month.month-1)),icon:const Icon(Icons.chevron_left)),Expanded(child:Text(DateFormat('MMMM yyyy','pt_BR').format(month),textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.bold))),IconButton(onPressed:()=>setState(()=>month=DateTime(month.year,month.month+1)),icon:const Icon(Icons.chevron_right))])),
-      Row(children:[Expanded(child:_metric('Entradas pagas',incPaid)),Expanded(child:_metric('Despesas pagas',outPaid))]),
-      Row(children:[Expanded(child:_metric('Saldo atual',_balance())),Expanded(child:_metric('Próximo/previsto',projectedOut))]),
-      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Previsão do mês',style:Theme.of(context).textTheme.titleLarge),Text('Despesas previstas: ${money(projectedOut)}'),Text('Saldo projetado: ${money(projectedBalance)}'),Text('Pendentes: ${money(cur.where((x)=>!x.income&&!x.isPaid).fold(0.0,(a,x)=>a+x.amount))}')])) ,
+      Row(children:[Expanded(child:_metric('Entradas recebidas',incPaid)),Expanded(child:_metric('Despesas pagas',outPaid))]),
+      Row(children:[Expanded(child:_metric('Despesas pendentes',pendingExpenses)),Expanded(child:_metric('Saldo atual',_balance()))]),
+      Row(children:[Expanded(child:_metric('Próximas despesas',nextExpenses)),Expanded(child:_metric('Saldo previsto',projectedBalance))]),
+      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Previsão do mês',style:Theme.of(context).textTheme.titleLarge),Text('Despesas pendentes: ${money(pendingExpenses)}'),Text('Próximas despesas: ${money(nextExpenses)}'),Text('Saldo previsto: ${money(projectedBalance)}')])) ,
       AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text('Entradas x despesas',style:Theme.of(context).textTheme.titleLarge),
         const SizedBox(height:8),
         SegmentedButton<_FinancePeriodMode>(
           segments:const[
+            ButtonSegment(value:_FinancePeriodMode.week,label:Text('Semanal')),
             ButtonSegment(value:_FinancePeriodMode.month,label:Text('Mensal')),
             ButtonSegment(value:_FinancePeriodMode.semester,label:Text('Semestral')),
           ],
@@ -267,7 +336,7 @@ class _FinanceScreenState extends State<FinanceScreen>{
           if(_chartCanNext)IconButton(onPressed:()=>_moveChart(1),icon:const Icon(Icons.chevron_right))else const SizedBox(width:48),
         ]),
         const SizedBox(height:4),
-        SizedBox(height:230,child:CustomPaint(painter:_FinanceChart(start:_chartStart,end:_chartEnd,mode:chartMode,items:items,color:Theme.of(context).colorScheme.primary),child:const SizedBox.expand())),
+        SizedBox(height:230,child:CustomPaint(painter:_FinanceChart(start:_chartStart,end:_chartEnd,mode:chartMode,items:[...items],color:Theme.of(context).colorScheme.primary),child:const SizedBox.expand())),
       ])),
       if(cats.isNotEmpty)AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Despesas por categoria',style:Theme.of(context).textTheme.titleLarge),for(final e in cats.entries)_category(e.key,e.value,cats.values.fold(0.0,(a,b)=>a+b))])),
       const SizedBox(height:8),Text('Movimentações',style:Theme.of(context).textTheme.titleLarge),
