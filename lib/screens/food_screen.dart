@@ -18,13 +18,7 @@ class _FoodScreenState extends State<FoodScreen> {
   static DateTime _weekStart(DateTime d)=>_day(d).subtract(Duration(days:d.weekday%7));
   static DateTime _monthStart(DateTime d)=>DateTime(d.year,d.month,1);
   DateTime get periodStart=>mode==_FoodPeriodMode.week?_weekStart(period):_monthStart(period);
-  DateTime get periodEnd{
-    final fullEnd=mode==_FoodPeriodMode.week?periodStart.add(const Duration(days:7)):DateTime(periodStart.year,periodStart.month+1,1);
-    final now=DateTime.now();
-    final current=mode==_FoodPeriodMode.week?_weekStart(now):_monthStart(now);
-    if(periodStart==current)return DateTime(now.year,now.month,now.day+1);
-    return fullEnd;
-  }
+  DateTime get periodEnd=>mode==_FoodPeriodMode.week?periodStart.add(const Duration(days:7)):DateTime(periodStart.year,periodStart.month+1,1);
   DateTime get currentStart{final now=DateTime.now();return mode==_FoodPeriodMode.week?_weekStart(now):_monthStart(now);}
   bool get canGoNext=>periodStart.isBefore(currentStart);
   String get periodLabel{if(mode==_FoodPeriodMode.week){final end=periodEnd.subtract(const Duration(days:1));return '${DateFormat('dd/MM').format(periodStart)} – ${DateFormat('dd/MM/yyyy').format(end)}';}return DateFormat('MMMM yyyy','pt_BR').format(periodStart);}
@@ -68,6 +62,12 @@ class _FoodScreenState extends State<FoodScreen> {
     return out;
   }
 
+  double? _previousWeight(){
+    WeightEntry? best;
+    for(final e in weights){final d=DateTime.tryParse(e.date);if(d==null||!d.isBefore(periodStart))continue;final bd=best==null?null:DateTime.tryParse(best!.date);if(best==null||bd==null||d.isAfter(bd))best=e;}
+    return best?.weight;
+  }
+
   List<WeightEntry> _periodRecords(){
     final out=weights.where((e){
       final d=DateTime.tryParse(e.date);
@@ -107,7 +107,7 @@ class _FoodScreenState extends State<FoodScreen> {
         ]),
         Text(mode==_FoodPeriodMode.week?'Uma pesagem por dia • última pesagem do dia':'Uma pesagem por dia • última pesagem de cada dia',style:Theme.of(context).textTheme.bodySmall),
         const SizedBox(height:4),
-        _WeightChart(data:chart,color:Theme.of(context).colorScheme.primary,startDate:periodStart),
+        _WeightChart(data:chart,color:Theme.of(context).colorScheme.primary,startDate:periodStart,previousValue:_previousWeight()),
         Text('${chart.whereType<WeightEntry>().length} dia(s) com registro • ${weights.length} registro(s) total'),
       ])),
       const SizedBox(height:8),
@@ -129,82 +129,39 @@ class _FoodScreenState extends State<FoodScreen> {
   Widget _bar(String n,double v,double goal,String unit){final ratio=goal<=0?0.0:(v/goal).clamp(0.0,1.0).toDouble();return Padding(padding:const EdgeInsets.only(top:8),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[Text(n),Text('${v.toStringAsFixed(0)} / ${goal.toStringAsFixed(0)} $unit')]),LinearProgressIndicator(value:ratio)]));}
 }
 class _WeightChart extends StatefulWidget{
-  final List<WeightEntry?> data; final Color color; final DateTime startDate;
-  const _WeightChart({required this.data,required this.color,required this.startDate});
+  final List<WeightEntry?> data;final Color color;final DateTime startDate;final double? previousValue;
+  const _WeightChart({required this.data,required this.color,required this.startDate,this.previousValue});
   @override State<_WeightChart> createState()=>_WeightChartState();
 }
 class _WeightChartState extends State<_WeightChart>{
-  int? selectedIndex;
-  void _select(Offset local,double width){
-    final count=widget.data.length;if(count==0)return;
-    const left=36.0,right=10.0;
-    final chartW=(width-left-right).clamp(1.0,10000.0).toDouble();
-    final raw=((local.dx-left)/chartW)*(count-1);
-    final index=raw.round().clamp(0,count-1).toInt();
-    if(widget.data[index]==null)return;
-    setState(()=>selectedIndex=index);
-  }
-  @override Widget build(BuildContext context)=>SizedBox(
-    height:225,
-    child:LayoutBuilder(builder:(context,constraints)=>GestureDetector(
-      behavior:HitTestBehavior.opaque,
-      onTapDown:(details)=>_select(details.localPosition,constraints.maxWidth),
-      child:CustomPaint(painter:_WeightPainter(widget.data,widget.color,Directionality.of(context),widget.startDate,selectedIndex)),
-    )),
-  );
+  double? selectionX;
+  @override Widget build(BuildContext context)=>SizedBox(height:250,child:LayoutBuilder(builder:(context,c)=>GestureDetector(
+    behavior:HitTestBehavior.opaque,onTapDown:(d)=>setState(()=>selectionX=d.localPosition.dx),onHorizontalDragUpdate:(d)=>setState(()=>selectionX=d.localPosition.dx),
+    child:CustomPaint(painter:_WeightChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,Directionality.of(context),widget.startDate,widget.previousValue,selectionX)),
+  )));
 }
-class _WeightPainter extends CustomPainter{
-  final List<WeightEntry?> data; final Color color; final ui.TextDirection textDirection;
-  final DateTime startDate; final int? selectedIndex;
-  _WeightPainter(this.data,this.color,this.textDirection,this.startDate,this.selectedIndex);
+class _WeightChartPainter extends CustomPainter{
+  final List<WeightEntry?> data;final Color color;final Color labelColor;final ui.TextDirection textDirection;final DateTime startDate;final double? previousValue;final double? selectionX;
+  _WeightChartPainter(this.data,this.color,this.labelColor,this.textDirection,this.startDate,this.previousValue,this.selectionX);
   @override void paint(Canvas c,Size s){
-    if(data.isEmpty)return;
-    const left=36.0,right=10.0,top=26.0,bottom=38.0;
-    final w=(s.width-left-right).clamp(1.0,10000.0).toDouble(),h=(s.height-top-bottom).clamp(1.0,10000.0).toDouble();
-    final values=data.whereType<WeightEntry>().map((e)=>e.weight).toList();
-    final grid=Paint()..color=color.withValues(alpha:.14)..strokeWidth=1;
-    final vertical=Paint()..color=color.withValues(alpha:.08)..strokeWidth=1;
-    final axis=Paint()..color=color.withValues(alpha:.35)..strokeWidth=1;
-    for(var i=0;i<=4;i++){final y=top+h*i/4;c.drawLine(Offset(left,y),Offset(s.width-right,y),grid);}
-    double xForIndex(int i)=>data.length<=1?left+w/2:left+i*w/(data.length-1);
-    final labelStep=math.max(1,(data.length/(w/58)).ceil());
-    for(var i=0;i<data.length;i++){
-      final show=i==0||i==data.length-1||i%labelStep==0;if(!show)continue;
-      final x=xForIndex(i);c.drawLine(Offset(x,top),Offset(x,s.height-bottom),vertical);
-      _draw(c,DateFormat('dd/MM').format(startDate.add(Duration(days:i))),Offset(x,s.height-bottom+8),TextAlign.center);
-    }
-    if(values.isNotEmpty){
-      final min=values.reduce((a,b)=>a<b?a:b),max=values.reduce((a,b)=>a>b?a:b);
-      final rawRange=max-min,range=rawRange.abs()<.01?1.0:rawRange;
-      final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
-      final path=Path();WeightEntry? previous;int? previousIndex;
-      for(var i=0;i<data.length;i++){
-        final e=data[i];if(e==null)continue;
-        final x=xForIndex(i),y=top+h-((e.weight-min)/range)*h;
-        if(previous!=null&&previousIndex!=null){
-          path.moveTo(xForIndex(previousIndex),top+h-((previous.weight-min)/range)*h);path.lineTo(x,y);
-        }else{path.moveTo(x,y);}
-        previous=e;previousIndex=i;
-      }
-      c.drawPath(path,line);
-      for(var i=0;i<data.length;i++){
-        final e=data[i];if(e==null)continue;
-        final x=xForIndex(i),y=top+h-((e.weight-min)/range)*h,selected=i==selectedIndex;
-        c.drawCircle(Offset(x,y),selected?6:4,Paint()..color=color);
-        if(selected){
-          final labelY=(y-18).clamp(top,s.height-bottom).toDouble();
-          _draw(c,'${e.weight.toStringAsFixed(1)} kg',Offset(x,labelY),TextAlign.center);
-        }
-      }
-      for(var i=0;i<=4;i++){final y=top+h*i/4;final value=max-rawRange*i/4;_draw(c,'${value.toStringAsFixed(1)} kg',Offset(2,y),TextAlign.left);}
-    }
-    c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
-    c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
+    if(data.isEmpty)return;const left=42.0,right=12.0,top=26.0,bottom=40.0;
+    final w=math.max(1.0,s.width-left-right),h=math.max(1.0,s.height-top-bottom);
+    final vals=<double>[];if(previousValue!=null)vals.add(previousValue!);for(final p in data)if(p!=null)vals.add(p.weight);if(vals.isEmpty)return;
+    final minV=vals.reduce(math.min),maxV=vals.reduce(math.max),raw=math.max(.01,maxV-minV),pad=raw*.12,lo=minV-pad,hi=maxV+pad;
+    double x(int i)=>data.length==1?left+w/2:left+w*i/(data.length-1);double y(double v)=>top+h-(v-lo)/(hi-lo)*h;
+    final grid=Paint()..color=color.withValues(alpha:.14),ticks=Paint()..color=color.withValues(alpha:.10),axis=Paint()..color=color.withValues(alpha:.35);
+    for(var j=0;j<=4;j++){final yy=top+h*j/4;c.drawLine(Offset(left,yy),Offset(s.width-right,yy),grid);_txt(c,'\${(hi-(hi-lo)*j/4).toStringAsFixed(1)} kg',Offset(2,yy-7),9,labelColor,TextAlign.left);}
+    for(var k=0;k<data.length;k++){final xx=x(k);c.drawLine(Offset(xx,top),Offset(xx,s.height-bottom),ticks);final show=data.length<=7||k==0||k==data.length-1||k%5==0;if(show)_txt(c,DateFormat('dd/MM').format(startDate.add(Duration(days:k))),Offset(xx,s.height-bottom+8),9,labelColor,TextAlign.center);}
+    final pts=<MapEntry<int,WeightEntry>>[];for(var k=0;k<data.length;k++){final p=data[k];if(p!=null)pts.add(MapEntry(k,p));}
+    final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;final path=Path();
+    if(previousValue!=null&&pts.isNotEmpty){path.moveTo(left,y(previousValue!));path.lineTo(x(pts.first.key),y(pts.first.value.value));}
+    for(var k=1;k<pts.length;k++){path.moveTo(x(pts[k-1].key),y(pts[k-1].value.value));path.lineTo(x(pts[k].key),y(pts[k].value.value));}
+    if(previousValue==null&&pts.length==1){path.moveTo(x(pts.first.key),y(pts.first.value.value));}c.drawPath(path,line);
+    int? selected;
+    if(selectionX!=null&&pts.isNotEmpty){selected=pts.first.key;var best=(x(selected!)-selectionX!).abs();for(final e in pts){final d=(x(e.key)-selectionX!).abs();if(d<best){best=d;selected=e.key;}}}
+    for(final e in pts){final yy=y(e.value.value),big=e.key==selected;c.drawCircle(Offset(x(e.key),yy),big?9:4,Paint()..color=color);if(big){_txt(c,DateFormat('dd/MM/yyyy').format(e.value.date),Offset(x(e.key),math.max(top,yy-40)),11,labelColor,TextAlign.center);_txt(c,'\${e.value.value.toStringAsFixed(e.value.value.truncateToDouble()==e.value.value?0:1)} kg',Offset(x(e.key),math.max(top+14,yy-22)),11,labelColor,TextAlign.center);}}
+    c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
-  void _draw(Canvas c,String text,Offset center,TextAlign align){
-    final tp=TextPainter(text:TextSpan(text:text,style:const TextStyle(fontSize:10)),textDirection:textDirection,textAlign:align)..layout(maxWidth:80);
-    final dx=align==TextAlign.center?center.dx-tp.width/2:center.dx,dy=align==TextAlign.center?center.dy-tp.height/2:center.dy;
-    tp.paint(c,Offset(dx.clamp(0.0,10000.0).toDouble(),dy.clamp(0.0,10000.0).toDouble()));
-  }
-  @override bool shouldRepaint(covariant _WeightPainter old)=>old.data!=data||old.color!=color||old.startDate!=startDate||old.selectedIndex!=selectedIndex;
+  void _txt(Canvas c,String v,Offset p,double size,Color col,TextAlign a){final tp=TextPainter(text:TextSpan(text:v,style:TextStyle(fontSize:size,color:col,fontWeight:FontWeight.w500)),textDirection:textDirection,textAlign:a)..layout(maxWidth:100);tp.paint(c,Offset((a==TextAlign.center?p.dx-tp.width/2:p.dx).clamp(0.0,10000.0).toDouble(),p.dy));}
+  @override bool shouldRepaint(covariant _WeightChartPainter o)=>o.data!=data||o.color!=color||o.previousValue!=previousValue||o.selectionX!=selectionX||o.startDate!=startDate;
 }
