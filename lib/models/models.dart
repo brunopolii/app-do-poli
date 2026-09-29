@@ -4,6 +4,7 @@ class Exercise {
   String muscle;
   int sets;
   int reps;
+  String imagePath;
   // Kept for workout execution/history compatibility. WorkoutPlan serialization excludes them.
   List<double> weights;
   List<bool> done;
@@ -14,6 +15,7 @@ class Exercise {
     required this.muscle,
     required this.sets,
     required this.reps,
+    this.imagePath = '',
     List<double>? weights,
     List<bool>? done,
   })  : weights = _fitDoubles(weights ?? const [], sets),
@@ -30,6 +32,7 @@ class Exercise {
         muscle: muscle,
         sets: sets,
         reps: reps,
+        imagePath: imagePath,
         weights: [...weights],
         done: [...done],
       );
@@ -40,6 +43,7 @@ class Exercise {
         'muscle': muscle,
         'sets': sets,
         'reps': reps,
+        'imagePath': imagePath,
         'weights': weights,
         'done': done,
       };
@@ -50,6 +54,7 @@ class Exercise {
         'muscle': muscle,
         'sets': sets,
         'reps': reps,
+        'imagePath': imagePath,
       };
 
   factory Exercise.fromJson(Map<String, dynamic> j) => Exercise(
@@ -58,6 +63,7 @@ class Exercise {
         muscle: (j['muscle'] ?? '').toString(),
         sets: (j['sets'] as num?)?.toInt() ?? 3,
         reps: (j['reps'] as num?)?.toInt() ?? 10,
+        imagePath: (j['imagePath'] ?? '').toString(),
         weights: ((j['weights'] as List?) ?? const [])
             .map((e) => (e as num).toDouble())
             .toList(),
@@ -70,6 +76,7 @@ class Exercise {
         muscle: (j['muscle'] ?? '').toString(),
         sets: (j['sets'] as num?)?.toInt() ?? 3,
         reps: (j['reps'] as num?)?.toInt() ?? 10,
+        imagePath: (j['imagePath'] ?? '').toString(),
       );
 }
 
