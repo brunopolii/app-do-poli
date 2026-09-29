@@ -379,7 +379,7 @@ class _FinanceChart extends CustomPainter{
       if(x.isCancelled||!x.isPaid)continue;
       final d=_movementDate(x);
       if(d.isBefore(start)||!d.isBefore(visibleEnd))continue;
-      final bucket=mode==_FinancePeriodMode.month?DateTime(d.year,d.month,d.day):DateTime(d.year,d.month,1);
+      final bucket=(mode==_FinancePeriodMode.week||mode==_FinancePeriodMode.month)?DateTime(d.year,d.month,d.day):DateTime(d.year,d.month,1);
       events[bucket]=(events[bucket]??0)+_delta(x);
     }
 
@@ -390,7 +390,7 @@ class _FinanceChart extends CustomPainter{
       final delta=events[bucket]??0;
       if(delta.abs()<.000001)continue;
       balance+=delta;
-      final pointDate=mode==_FinancePeriodMode.month?bucket:(
+      final pointDate=(mode==_FinancePeriodMode.week||mode==_FinancePeriodMode.month)?bucket:(
         DateTime(bucket.year,bucket.month+1,1).isAfter(visibleEnd)
           ?visibleEnd.subtract(const Duration(days:1))
           :DateTime(bucket.year,bucket.month+1,1).subtract(const Duration(days:1))
@@ -424,7 +424,7 @@ class _FinanceChart extends CustomPainter{
       _text(c,moneyLabel(maxV-range*row/4),Offset(2,y-7),9,color.withValues(alpha:.75));
     }
 
-    if(mode==_FinancePeriodMode.month){
+    if(mode==_FinancePeriodMode.week||mode==_FinancePeriodMode.month){
       final days=visibleEnd.difference(start).inDays;
       for(var i=0;i<days;i++){
         final d=start.add(Duration(days:i));final x=xFor(d);
@@ -446,15 +446,23 @@ class _FinanceChart extends CustomPainter{
     if(points.isEmpty){
       path.lineTo(xFor(finalDay),yFor(opening));
     }else{
-      for(final p in points)path.lineTo(xFor(p.date),yFor(p.balance));
-      final last=points.last;
-      if(last.date.isBefore(finalDay))path.lineTo(xFor(finalDay),yFor(last.balance));
       var previousDate=start;
       var previousBalance=opening;
       for(final p in points){
         final px=xFor(previousDate),py=yFor(previousBalance),x=xFor(p.date),y=yFor(p.balance);
+        path.lineTo(x,py);
+        path.lineTo(x,y);
+        previousDate=p.date;
+        previousBalance=p.balance;
+      }
+      final last=points.last;
+      if(last.date.isBefore(finalDay))path.lineTo(xFor(finalDay),yFor(last.balance));
+      var labelPreviousDate=start;
+      var labelPreviousBalance=opening;
+      for(final p in points){
+        final px=xFor(labelPreviousDate),py=yFor(labelPreviousBalance),x=xFor(p.date),y=yFor(p.balance);
         _text(c,deltaLabel(p.delta),Offset((px+x)/2-28,(py+y)/2-11),9,color);
-        previousDate=p.date;previousBalance=p.balance;
+        labelPreviousDate=p.date;labelPreviousBalance=p.balance;
       }
     }
     c.drawPath(path,line);
