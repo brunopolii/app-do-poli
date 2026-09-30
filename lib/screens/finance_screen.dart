@@ -408,7 +408,7 @@ class _FinanceChart extends CustomPainter{
     for(final x in items){
       if(x.isCancelled||!x.isPaid)continue;
       final d=_movementDate(x);
-      if(!d.isAfter(visibleEnd.subtract(const Duration(days:1))))continue;
+      if(d.isBefore(visibleEnd))continue;
       final bucket=DateTime(d.year,d.month,d.day);
       futureEvents[bucket]=(futureEvents[bucket]??0)+_delta(x);
     }
