@@ -403,7 +403,23 @@ class _FinanceChart extends CustomPainter{
     const left=52.0,right=16.0,top=26.0,bottom=40.0;
     final w=math.max(1.0,s.width-left-right).toDouble();
     final h=math.max(1.0,s.height-top-bottom).toDouble();
-    final scaleValues=<double>[opening,...points.map((p)=>p.balance)];
+    double? nextBalance;
+    final futureEvents=<DateTime,double>{};
+    for(final x in items){
+      if(x.isCancelled||!x.isPaid)continue;
+      final d=_movementDate(x);
+      if(!d.isAfter(visibleEnd.subtract(const Duration(days:1))))continue;
+      final bucket=DateTime(d.year,d.month,d.day);
+      futureEvents[bucket]=(futureEvents[bucket]??0)+_delta(x);
+    }
+    if(futureEvents.isNotEmpty){
+      final firstFuture=futureEvents.keys.toList()..sort();
+      final delta=futureEvents[firstFuture.first]??0;
+      var futureOpening=opening+events.values.fold(0.0,(a,b)=>a+b);
+      nextBalance=futureOpening+delta;
+    }
+
+    final scaleValues=<double>[opening,...points.map((p)=>p.balance),if(nextBalance!=null)nextBalance!];
     var minV=scaleValues.reduce((a,b)=>math.min(a,b).toDouble());
     var maxV=scaleValues.reduce((a,b)=>math.max(a,b).toDouble());
     if((maxV-minV).abs()<.01){minV-=1;maxV+=1;}
@@ -446,11 +462,13 @@ class _FinanceChart extends CustomPainter{
     if(points.isNotEmpty){
       path.moveTo(left,yFor(opening));path.lineTo(xFor(points.first.date),yFor(points.first.balance));
       for(var i=1;i<points.length;i++){path.moveTo(xFor(points[i-1].date),yFor(points[i-1].balance));path.lineTo(xFor(points[i].date),yFor(points[i].balance));}
+      if(nextBalance!=null){path.moveTo(xFor(points.last.date),yFor(points.last.balance));path.lineTo(s.width-right,yFor(nextBalance!));}
       c.drawPath(path,line);
       int? selected;
       if(selectedX!=null){selected=0;var best=(xFor(points.first.date)-selectedX!).abs();for(var i=0;i<points.length;i++){final d=(xFor(points[i].date)-selectedX!).abs();if(d<best){best=d;selected=i;}}}
       for(var i=0;i<points.length;i++){final p=points[i],x=xFor(p.date),y=yFor(p.balance),big=i==selected;c.drawCircle(Offset(x,y),big?9:4,Paint()..color=color);if(big){_text(c,DateFormat('dd/MM/yyyy').format(p.date),Offset(x,math.max(top,y-40)),11,color);_text(c,moneyPoint(p.balance),Offset(x,math.max(top+14,y-22)),11,color);}}
     }
+    if(points.isEmpty){_text(c,'Nada registrado',Offset(s.width/2,s.height/2-10),14,color,TextAlign.center);}
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
     c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
