@@ -68,6 +68,17 @@ class _FoodScreenState extends State<FoodScreen> {
     return best?.weight;
   }
 
+  double? _nextWeight(){
+    WeightEntry? best;
+    for(final e in weights){
+      final d=DateTime.tryParse(e.date);
+      if(d==null||!d.isAfter(periodEnd))continue;
+      final bd=best==null?null:DateTime.tryParse(best!.date);
+      if(best==null||bd==null||d.isBefore(bd))best=e;
+    }
+    return best?.weight;
+  }
+
   List<WeightEntry> _periodRecords(){
     final out=weights.where((e){
       final d=DateTime.tryParse(e.date);
@@ -107,7 +118,7 @@ class _FoodScreenState extends State<FoodScreen> {
         ]),
         Text(mode==_FoodPeriodMode.week?'Uma pesagem por dia • última pesagem do dia':'Uma pesagem por dia • última pesagem de cada dia',style:Theme.of(context).textTheme.bodySmall),
         const SizedBox(height:4),
-        _WeightChart(data:chart,color:Theme.of(context).colorScheme.primary,startDate:periodStart,previousValue:_previousWeight()),
+        _WeightChart(data:chart,color:Theme.of(context).colorScheme.primary,startDate:periodStart,previousValue:_previousWeight(),nextValue:_nextWeight()),
         Text('${chart.whereType<WeightEntry>().length} dia(s) com registro • ${weights.length} registro(s) total'),
       ])),
       const SizedBox(height:8),
@@ -129,8 +140,8 @@ class _FoodScreenState extends State<FoodScreen> {
   Widget _bar(String n,double v,double goal,String unit){final ratio=goal<=0?0.0:(v/goal).clamp(0.0,1.0).toDouble();return Padding(padding:const EdgeInsets.only(top:8),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[Text(n),Text('${v.toStringAsFixed(0)} / ${goal.toStringAsFixed(0)} $unit')]),LinearProgressIndicator(value:ratio)]));}
 }
 class _WeightChart extends StatefulWidget{
-  final List<WeightEntry?> data;final Color color;final DateTime startDate;final double? previousValue;
-  const _WeightChart({required this.data,required this.color,required this.startDate,this.previousValue});
+  final List<WeightEntry?> data;final Color color;final DateTime startDate;final double? previousValue;final double? nextValue;
+  const _WeightChart({required this.data,required this.color,required this.startDate,this.previousValue,this.nextValue});
   @override State<_WeightChart> createState()=>_WeightChartState();
 }
 class _WeightChartState extends State<_WeightChart>{
@@ -142,34 +153,36 @@ class _WeightChartState extends State<_WeightChart>{
       onTapDown:(d)=>setState(()=>selectionX=d.localPosition.dx),
       onHorizontalDragUpdate:(d)=>setState(()=>selectionX=d.localPosition.dx),
       child:CustomPaint(
-        painter:_WeightChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,Directionality.of(context),widget.startDate,widget.previousValue,selectionX),
+        painter:_WeightChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,Directionality.of(context),widget.startDate,widget.previousValue,widget.nextValue,selectionX),
         child:const SizedBox.expand(),
       ),
     ),
   );
 }
 class _WeightChartPainter extends CustomPainter{
-  final List<WeightEntry?> data;final Color color;final Color labelColor;final ui.TextDirection textDirection;final DateTime startDate;final double? previousValue;final double? selectionX;
-  _WeightChartPainter(this.data,this.color,this.labelColor,this.textDirection,this.startDate,this.previousValue,this.selectionX);
+  final List<WeightEntry?> data;final Color color;final Color labelColor;final ui.TextDirection textDirection;final DateTime startDate;final double? previousValue;final double? nextValue;final double? selectionX;
+  _WeightChartPainter(this.data,this.color,this.labelColor,this.textDirection,this.startDate,this.previousValue,this.nextValue,this.selectionX);
   @override void paint(Canvas c,Size s){
     if(data.isEmpty)return;const left=42.0,right=12.0,top=26.0,bottom=40.0;
     final w=math.max(1.0,s.width-left-right),h=math.max(1.0,s.height-top-bottom);
-    final vals=<double>[];if(previousValue!=null)vals.add(previousValue!);for(final p in data)if(p!=null)vals.add(p.weight);if(vals.isEmpty)return;
+    final pts=<MapEntry<int,WeightEntry>>[];for(var k=0;k<data.length;k++){final p=data[k];if(p!=null)pts.add(MapEntry(k,p));}
+    if(pts.isEmpty){_txt(c,'Nada registrado',Offset(s.width/2,s.height/2-10),14,labelColor,TextAlign.center);return;}
+    final vals=<double>[];if(previousValue!=null)vals.add(previousValue!);if(nextValue!=null)vals.add(nextValue!);for(final p in data)if(p!=null)vals.add(p.weight);
     final minV=vals.reduce(math.min),maxV=vals.reduce(math.max),raw=math.max(.01,maxV-minV),pad=raw*.12,lo=minV-pad,hi=maxV+pad;
     double x(int i)=>data.length==1?left+w/2:left+w*i/(data.length-1);double y(double v)=>top+h-(v-lo)/(hi-lo)*h;
     final grid=Paint()..color=color.withValues(alpha:.14),ticks=Paint()..color=color.withValues(alpha:.10),axis=Paint()..color=color.withValues(alpha:.35);
     for(var j=0;j<=4;j++){final yy=top+h*j/4;c.drawLine(Offset(left,yy),Offset(s.width-right,yy),grid);_txt(c,'${(hi-(hi-lo)*j/4).toStringAsFixed(1)} kg',Offset(2,yy-7),9,labelColor,TextAlign.left);}
     for(var k=0;k<data.length;k++){final xx=x(k);c.drawLine(Offset(xx,top),Offset(xx,s.height-bottom),ticks);final show=data.length<=7||k==0||k==data.length-1||k%5==0;if(show)_txt(c,DateFormat('dd/MM').format(startDate.add(Duration(days:k))),Offset(xx,s.height-bottom+8),9,labelColor,TextAlign.center);}
-    final pts=<MapEntry<int,WeightEntry>>[];for(var k=0;k<data.length;k++){final p=data[k];if(p!=null)pts.add(MapEntry(k,p));}
     final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;final path=Path();
-    if(previousValue!=null&&pts.isNotEmpty){path.moveTo(left,y(previousValue!));path.lineTo(x(pts.first.key),y(pts.first.value.weight));}
+    if(previousValue!=null){path.moveTo(left,y(previousValue!));path.lineTo(x(pts.first.key),y(pts.first.value.weight));}
     for(var k=1;k<pts.length;k++){path.moveTo(x(pts[k-1].key),y(pts[k-1].value.weight));path.lineTo(x(pts[k].key),y(pts[k].value.weight));}
-    if(previousValue==null&&pts.length==1){path.moveTo(x(pts.first.key),y(pts.first.value.weight));}c.drawPath(path,line);
+    if(nextValue!=null){path.moveTo(x(pts.last.key),y(pts.last.value.weight));path.lineTo(s.width-right,y(nextValue!));}
+    if(previousValue==null&&pts.length==1&&nextValue==null){path.moveTo(x(pts.first.key),y(pts.first.value.weight));}c.drawPath(path,line);
     int? selected;
     if(selectionX!=null&&pts.isNotEmpty){selected=pts.first.key;var best=(x(selected!)-selectionX!).abs();for(final e in pts){final d=(x(e.key)-selectionX!).abs();if(d<best){best=d;selected=e.key;}}}
     for(final e in pts){final yy=y(e.value.weight),big=e.key==selected;c.drawCircle(Offset(x(e.key),yy),big?9:4,Paint()..color=color);if(big){_txt(c,DateFormat('dd/MM/yyyy').format(DateTime.parse(e.value.date)),Offset(x(e.key),math.max(top,yy-40)),11,labelColor,TextAlign.center);_txt(c,'${e.value.weight.toStringAsFixed(e.value.weight.truncateToDouble()==e.value.weight?0:1)} kg',Offset(x(e.key),math.max(top+14,yy-22)),11,labelColor,TextAlign.center);}}
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
   void _txt(Canvas c,String v,Offset p,double size,Color col,TextAlign a){final tp=TextPainter(text:TextSpan(text:v,style:TextStyle(fontSize:size,color:col,fontWeight:FontWeight.w500)),textDirection:textDirection,textAlign:a)..layout(maxWidth:100);tp.paint(c,Offset((a==TextAlign.center?p.dx-tp.width/2:p.dx).clamp(0.0,10000.0).toDouble(),p.dy));}
-  @override bool shouldRepaint(covariant _WeightChartPainter o)=>o.data!=data||o.color!=color||o.previousValue!=previousValue||o.selectionX!=selectionX||o.startDate!=startDate;
+  @override bool shouldRepaint(covariant _WeightChartPainter o)=>o.data!=data||o.color!=color||o.previousValue!=previousValue||o.nextValue!=nextValue||o.selectionX!=selectionX||o.startDate!=startDate;
 }
