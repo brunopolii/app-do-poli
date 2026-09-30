@@ -190,6 +190,18 @@ class _HistorySectionState extends State<HistorySection>{
     return bestValue;
   }
 
+  double? nextValue(){
+    if(exercise==null)return null;
+    DateTime? bestDate;double? bestValue;
+    for(final w in history){
+      final d=DateTime.tryParse(w.date);if(d==null||!d.isAfter(periodEnd))continue;
+      double? value;
+      for(final e in w.exercises.where((e)=>e.name==exercise)){for(final v in e.weights){if(v.isFinite&&v>0&&(value==null||v>value))value=v;}}
+      if(value!=null&&(bestDate==null||d.isBefore(bestDate!))){bestDate=d;bestValue=value;}
+    }
+    return bestValue;
+  }
+
   List<_GymRecord> records(){
     return points().whereType<_GymDayPoint>()
       .map((p)=>_GymRecord(p.workoutId,p.date,p.value)).toList()
@@ -285,7 +297,7 @@ class _HistorySectionState extends State<HistorySection>{
       const SizedBox(height:6),
       const Text('Uma carga por dia • treino mais recente do dia'),
       const SizedBox(height:6),
-      if(chartData.isNotEmpty)_GymChart(data:chartData,color:Theme.of(context).colorScheme.primary,startDate:periodStart,previousValue:previousValue())
+      if(chartData.isNotEmpty)_GymChart(data:chartData,color:Theme.of(context).colorScheme.primary,startDate:periodStart,previousValue:previousValue(),nextValue:nextValue())
       else const Padding(padding:EdgeInsets.symmetric(vertical:24),child:Text('Nenhum registro de carga neste período.')),
       if(registered>0)Text('${registered} dia(s) com registro • maior carga do treino selecionado'),
       const SizedBox(height:8),
@@ -316,8 +328,8 @@ class _GymRecord{
   _GymRecord(this.workoutId,this.date,this.value);
 }
 class _GymChart extends StatefulWidget{
-  final List<_GymDayPoint?> data;final Color color;final DateTime startDate;final double? previousValue;
-  const _GymChart({required this.data,required this.color,required this.startDate,this.previousValue});
+  final List<_GymDayPoint?> data;final Color color;final DateTime startDate;final double? previousValue;final double? nextValue;
+  const _GymChart({required this.data,required this.color,required this.startDate,this.previousValue,this.nextValue});
   @override State<_GymChart> createState()=>_GymChartState();
 }
 class _GymChartState extends State<_GymChart>{
@@ -329,34 +341,36 @@ class _GymChartState extends State<_GymChart>{
       onTapDown:(d)=>setState(()=>selectionX=d.localPosition.dx),
       onHorizontalDragUpdate:(d)=>setState(()=>selectionX=d.localPosition.dx),
       child:CustomPaint(
-        painter:_GymChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,Directionality.of(context),widget.startDate,widget.previousValue,selectionX),
+        painter:_GymChartPainter(widget.data,widget.color,Theme.of(context).colorScheme.onSurfaceVariant,Directionality.of(context),widget.startDate,widget.previousValue,widget.nextValue,selectionX),
         child:const SizedBox.expand(),
       ),
     ),
   );
 }
 class _GymChartPainter extends CustomPainter{
-  final List<_GymDayPoint?> data;final Color color;final Color labelColor;final ui.TextDirection textDirection;final DateTime startDate;final double? previousValue;final double? selectionX;
-  _GymChartPainter(this.data,this.color,this.labelColor,this.textDirection,this.startDate,this.previousValue,this.selectionX);
+  final List<_GymDayPoint?> data;final Color color;final Color labelColor;final ui.TextDirection textDirection;final DateTime startDate;final double? previousValue;final double? nextValue;final double? selectionX;
+  _GymChartPainter(this.data,this.color,this.labelColor,this.textDirection,this.startDate,this.previousValue,this.nextValue,this.selectionX);
   @override void paint(Canvas c,Size s){
     if(data.isEmpty)return;const left=42.0,right=12.0,top=26.0,bottom=40.0;
     final w=math.max(1.0,s.width-left-right),h=math.max(1.0,s.height-top-bottom);
-    final vals=<double>[];if(previousValue!=null)vals.add(previousValue!);for(final p in data)if(p!=null)vals.add(p.value);if(vals.isEmpty)return;
+    final pts=<MapEntry<int,_GymDayPoint>>[];for(var k=0;k<data.length;k++){final p=data[k];if(p!=null)pts.add(MapEntry(k,p));}
+    if(pts.isEmpty){_txt(c,'Nada registrado',Offset(s.width/2,s.height/2-10),14,labelColor,TextAlign.center);return;}
+    final vals=<double>[];if(previousValue!=null)vals.add(previousValue!);if(nextValue!=null)vals.add(nextValue!);for(final p in data)if(p!=null)vals.add(p.value);
     final minV=vals.reduce(math.min),maxV=vals.reduce(math.max),raw=math.max(.01,maxV-minV),pad=raw*.12,lo=minV-pad,hi=maxV+pad;
     double x(int i)=>data.length==1?left+w/2:left+w*i/(data.length-1);double y(double v)=>top+h-(v-lo)/(hi-lo)*h;
     final grid=Paint()..color=color.withValues(alpha:.14),ticks=Paint()..color=color.withValues(alpha:.10),axis=Paint()..color=color.withValues(alpha:.35);
     for(var j=0;j<=4;j++){final yy=top+h*j/4;c.drawLine(Offset(left,yy),Offset(s.width-right,yy),grid);_txt(c,'${(hi-(hi-lo)*j/4).toStringAsFixed(1)} kg',Offset(2,yy-7),9,labelColor,TextAlign.left);}
     for(var k=0;k<data.length;k++){final xx=x(k);c.drawLine(Offset(xx,top),Offset(xx,s.height-bottom),ticks);final show=data.length<=7||k==0||k==data.length-1||k%5==0;if(show)_txt(c,DateFormat('dd/MM').format(startDate.add(Duration(days:k))),Offset(xx,s.height-bottom+8),9,labelColor,TextAlign.center);}
-    final pts=<MapEntry<int,_GymDayPoint>>[];for(var k=0;k<data.length;k++){final p=data[k];if(p!=null)pts.add(MapEntry(k,p));}
     final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;final path=Path();
-    if(previousValue!=null&&pts.isNotEmpty){path.moveTo(left,y(previousValue!));path.lineTo(x(pts.first.key),y(pts.first.value.value));}
+    if(previousValue!=null){path.moveTo(left,y(previousValue!));path.lineTo(x(pts.first.key),y(pts.first.value.value));}
     for(var k=1;k<pts.length;k++){path.moveTo(x(pts[k-1].key),y(pts[k-1].value.value));path.lineTo(x(pts[k].key),y(pts[k].value.value));}
-    if(previousValue==null&&pts.length==1){path.moveTo(x(pts.first.key),y(pts.first.value.value));}c.drawPath(path,line);
+    if(nextValue!=null){path.moveTo(x(pts.last.key),y(pts.last.value.value));path.lineTo(s.width-right,y(nextValue!));}
+    if(previousValue==null&&pts.length==1&&nextValue==null){path.moveTo(x(pts.first.key),y(pts.first.value.value));}c.drawPath(path,line);
     int? selected;
     if(selectionX!=null&&pts.isNotEmpty){selected=pts.first.key;var best=(x(selected!)-selectionX!).abs();for(final e in pts){final d=(x(e.key)-selectionX!).abs();if(d<best){best=d;selected=e.key;}}}
     for(final e in pts){final yy=y(e.value.value),big=e.key==selected;c.drawCircle(Offset(x(e.key),yy),big?9:4,Paint()..color=color);if(big){_txt(c,DateFormat('dd/MM/yyyy').format(e.value.date),Offset(x(e.key),math.max(top,yy-40)),11,labelColor,TextAlign.center);_txt(c,'${e.value.value.toStringAsFixed(e.value.value.truncateToDouble()==e.value.value?0:1)} kg',Offset(x(e.key),math.max(top+14,yy-22)),11,labelColor,TextAlign.center);}}
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
   void _txt(Canvas c,String v,Offset p,double size,Color col,TextAlign a){final tp=TextPainter(text:TextSpan(text:v,style:TextStyle(fontSize:size,color:col,fontWeight:FontWeight.w500)),textDirection:textDirection,textAlign:a)..layout(maxWidth:100);tp.paint(c,Offset((a==TextAlign.center?p.dx-tp.width/2:p.dx).clamp(0.0,10000.0).toDouble(),p.dy));}
-  @override bool shouldRepaint(covariant _GymChartPainter o)=>o.data!=data||o.color!=color||o.previousValue!=previousValue||o.selectionX!=selectionX||o.startDate!=startDate;
+  @override bool shouldRepaint(covariant _GymChartPainter o)=>o.data!=data||o.color!=color||o.previousValue!=previousValue||o.nextValue!=nextValue||o.selectionX!=selectionX||o.startDate!=startDate;
 }
