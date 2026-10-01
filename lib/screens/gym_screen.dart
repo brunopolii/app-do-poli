@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../utils/date_formatters.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
@@ -138,7 +139,7 @@ class _HistorySectionState extends State<HistorySection>{
       final end=periodEnd.subtract(const Duration(days:1));
       return '${DateFormat('dd/MM').format(periodStart)} – ${DateFormat('dd/MM/yyyy').format(end)}';
     }
-    return DateFormat('MMMM yyyy','pt_BR').format(periodStart);
+    return formatMonthYearPtBr(periodStart);
   }
   void _setMode(_GymPeriodMode next){
     setState((){
