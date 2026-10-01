@@ -16,3 +16,5 @@ String formatFullDatePtBr(DateTime date) {
   final month = DateFormat('MMMM', 'pt_BR').format(date);
   return capitalizeFirst(formatted.replaceFirst(month, capitalizeFirst(month)));
 }
+
+// Localização de datas centralizada para o Poliroutines.
