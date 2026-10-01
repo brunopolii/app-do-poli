@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/activation_screen.dart';
@@ -245,6 +246,13 @@ class _AppDoPoliState extends State<AppDoPoli> {
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
     title: 'Poliroutines',
+    locale: const Locale('pt', 'BR'),
+    localizationsDelegates: const [
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    supportedLocales: const [Locale('pt', 'BR')],
     navigatorKey: _navigatorKey,
     theme: _theme(Brightness.light),
     darkTheme: _theme(Brightness.dark),
