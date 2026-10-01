@@ -2,7 +2,7 @@ import 'package:intl/intl.dart';
 
 String capitalizeFirst(String value) {
   if (value.isEmpty) return value;
-  return '\${value[0].toUpperCase()}\${value.substring(1)}';
+  return '${value[0].toUpperCase()}${value.substring(1)}';
 }
 
 String formatMonthYearPtBr(DateTime date) =>
