@@ -469,7 +469,7 @@ class _FinanceChart extends CustomPainter{
       if(selectedX!=null){selected=0;var best=(xFor(points.first.date)-selectedX!).abs();for(var i=0;i<points.length;i++){final d=(xFor(points[i].date)-selectedX!).abs();if(d<best){best=d;selected=i;}}}
       for(var i=0;i<points.length;i++){final p=points[i],x=xFor(p.date),y=yFor(p.balance),big=i==selected;c.drawCircle(Offset(x,y),big?9:4,Paint()..color=color);if(big){_text(c,DateFormat('dd/MM/yyyy').format(p.date),Offset(x,math.max(top,y-40)),11,color);_text(c,moneyPoint(p.balance),Offset(x,math.max(top+14,y-22)),11,color);}}
     }
-    if(points.isEmpty){_text(c,'Nada registrado',Offset(s.width/2,s.height/2-10),14,color,TextAlign.center);}
+    if(points.isEmpty){_text(c,'Nada registrado',Offset(s.width/2,s.height/2-10),14,color);}
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
     c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
