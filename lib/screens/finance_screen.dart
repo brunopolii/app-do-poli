@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../utils/date_formatters.dart';
 import '../models/models.dart';
 import '../services/storage_service.dart';
 import '../services/notification_service.dart';
@@ -159,7 +160,7 @@ class _FinanceScreenState extends State<FinanceScreen>{
       content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
         TextField(controller:d,decoration:const InputDecoration(labelText:'Descrição')),
         TextField(controller:a,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'Valor mensal')),
-        ListTile(contentPadding:EdgeInsets.zero,title:Text('Dia de recebimento: \$day'),trailing:const Icon(Icons.calendar_month),onTap:()async{final r=await _pickDate(due);if(r!=null)setD((){due=r;day=r.day;});}),
+        ListTile(contentPadding:EdgeInsets.zero,title:Text('Dia de recebimento: ${DateFormat('dd/MM/yyyy').format(due)}'),trailing:const Icon(Icons.calendar_month),onTap:()async{final r=await _pickDate(due);if(r!=null)setD((){due=r;day=r.day;});}),
       ])),
       actions:[TextButton(onPressed:()=>Navigator.pop(c,false),child:const Text('Cancelar')),FilledButton(onPressed:()=>Navigator.pop(c,true),child:const Text('Salvar'))],
     )));
@@ -279,9 +280,9 @@ class _FinanceScreenState extends State<FinanceScreen>{
       final end=_chartEnd.subtract(const Duration(days:1));
       return '${DateFormat('dd/MM').format(_chartStart)} – ${DateFormat('dd/MM/yyyy').format(end)}';
     }
-    if(chartMode==_FinancePeriodMode.month)return DateFormat('MMMM yyyy','pt_BR').format(chartAnchor);
+    if(chartMode==_FinancePeriodMode.month)return formatMonthYearPtBr(chartAnchor);
     final start=_chartStart;
-    return '${DateFormat('MMM','pt_BR').format(start)} – ${DateFormat('MMM yyyy','pt_BR').format(chartAnchor)}';
+    return '${formatShortMonthPtBr(start)} – ${'${formatShortMonthPtBr(chartAnchor)} ${chartAnchor.year}'}';
   }
   void _setChartMode(_FinancePeriodMode next){setState((){chartMode=next;chartAnchor=next==_FinancePeriodMode.week?_weekStart(DateTime.now()):_chartCurrentMonth;});}
   void _moveChart(int delta){setState((){
@@ -305,7 +306,7 @@ class _FinanceScreenState extends State<FinanceScreen>{
     final cats=<String,double>{};for(final x in cur.where((x)=>!x.income)){cats[x.category]=(cats[x.category]??0)+x.amount;}
     return SafeArea(child:ListView(padding:const EdgeInsets.all(16),children:[
       Row(children:[Expanded(child:Text('Financeiro',style:Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.bold))),FilledButton.icon(onPressed:_menu,icon:const Icon(Icons.add),label:const Text('Adicionar'))]),
-      AppCard(child:Row(children:[IconButton(onPressed:()=>setState(()=>month=DateTime(month.year,month.month-1)),icon:const Icon(Icons.chevron_left)),Expanded(child:Text(DateFormat('MMMM yyyy','pt_BR').format(month),textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.bold))),IconButton(onPressed:()=>setState(()=>month=DateTime(month.year,month.month+1)),icon:const Icon(Icons.chevron_right))])),
+      AppCard(child:Row(children:[IconButton(onPressed:()=>setState(()=>month=DateTime(month.year,month.month-1)),icon:const Icon(Icons.chevron_left)),Expanded(child:Text(formatMonthYearPtBr(month),textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.bold))),IconButton(onPressed:()=>setState(()=>month=DateTime(month.year,month.month+1)),icon:const Icon(Icons.chevron_right))])),
       Row(children:[Expanded(child:_metric('Entradas recebidas',incPaid)),Expanded(child:_metric('Despesas pagas',outPaid))]),
       Row(children:[Expanded(child:_metric('Despesas pendentes',pendingExpenses)),Expanded(child:_metric('Saldo atual',_balance()))]),
       Row(children:[Expanded(child:_metric('Próximas despesas',nextExpenses)),Expanded(child:_metric('Saldo previsto',projectedBalance))]),
@@ -454,7 +455,7 @@ class _FinanceChart extends CustomPainter{
       for(var d=DateTime(start.year,start.month,1);d.isBefore(visibleEnd);d=DateTime(d.year,d.month+1,1)){
         final x=xFor(d);
         c.drawLine(Offset(x,top),Offset(x,s.height-bottom),vertical);
-        _text(c,DateFormat('MMM','pt_BR').format(d),Offset(x-16,s.height-bottom+8),9,color.withValues(alpha:.75));
+        _text(c,formatShortMonthPtBr(d),Offset(x-16,s.height-bottom+8),9,color.withValues(alpha:.75));
       }
     }
 
