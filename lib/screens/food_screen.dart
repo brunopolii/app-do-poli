@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../utils/date_formatters.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/ai_food_service.dart';
@@ -21,7 +22,7 @@ class _FoodScreenState extends State<FoodScreen> {
   DateTime get periodEnd=>mode==_FoodPeriodMode.week?periodStart.add(const Duration(days:7)):DateTime(periodStart.year,periodStart.month+1,1);
   DateTime get currentStart{final now=DateTime.now();return mode==_FoodPeriodMode.week?_weekStart(now):_monthStart(now);}
   bool get canGoNext=>periodStart.isBefore(currentStart);
-  String get periodLabel{if(mode==_FoodPeriodMode.week){final end=periodEnd.subtract(const Duration(days:1));return '${DateFormat('dd/MM').format(periodStart)} – ${DateFormat('dd/MM/yyyy').format(end)}';}return DateFormat('MMMM yyyy','pt_BR').format(periodStart);}
+  String get periodLabel{if(mode==_FoodPeriodMode.week){final end=periodEnd.subtract(const Duration(days:1));return '${DateFormat('dd/MM').format(periodStart)} – ${DateFormat('dd/MM/yyyy').format(end)}';}return formatMonthYearPtBr(periodStart);}
   void _setMode(_FoodPeriodMode next){setState((){mode=next;period=next==_FoodPeriodMode.week?_weekStart(DateTime.now()):_monthStart(DateTime.now());});}
   void _move(int delta){setState((){period=mode==_FoodPeriodMode.week?periodStart.add(Duration(days:7*delta)):DateTime(periodStart.year,periodStart.month+delta,1);});}
   Future<void> _load()async{meals=(await StorageService.read('meals')).map(Meal.fromJson).toList();weights=(await StorageService.read('body_weights')).map(WeightEntry.fromJson).toList()..sort((a,b)=>a.date.compareTo(b.date));final p=await SharedPreferences.getInstance();final r=p.getString('nutrition_goals');if(r!=null){final a=r.split('|');if(a.length==4){goals={'calories':double.tryParse(a[0])??0,'protein':double.tryParse(a[1])??0,'carbs':double.tryParse(a[2])??0,'fat':double.tryParse(a[3])??0};}}if(mounted)setState(()=>loading=false);}
