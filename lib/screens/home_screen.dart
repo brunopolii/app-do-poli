@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../utils/date_formatters.dart';
 import '../models/models.dart';
 import '../services/storage_service.dart';
 import '../widgets/app_card.dart';
@@ -81,7 +82,7 @@ class HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Olá! 👋', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-                    Text(DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(now)),
+                    Text(capitalizeFirst(DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(now))),
                   ],
                 ),
               ),
