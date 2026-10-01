@@ -8,6 +8,12 @@ on:
 permissions:
   contents: write
 
+# Evita duas gerações de APK ao mesmo tempo, o que poderia fazer ambas
+# calcularem o mesmo versionCode.
+concurrency:
+  group: poliroutines-apk-release
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,11 +31,51 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      - name: Calculate next Android versionCode
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CURRENT_CODE="$(sed -n 's/^version: .*+\([0-9][0-9]*\)$/\1/p' pubspec.yaml | head -n 1)"
+
+          if [ -z "$CURRENT_CODE" ]; then
+            echo "Não foi possível encontrar o versionCode atual no pubspec.yaml."
+            exit 1
+          fi
+
+          LATEST_APK="/tmp/Poliroutines-latest.apk"
+          NEXT_CODE=""
+
+          if curl -fL --retry 3 --retry-delay 2 \
+              "https://github.com/brunopolii/app-do-poli/releases/latest/download/Poliroutines.apk" \
+              -o "$LATEST_APK"; then
+
+            AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1 || true)"
+
+            if [ -n "$AAPT" ]; then
+              NEXT_CODE="$("$AAPT" dump badging "$LATEST_APK" | sed -n "s/.*versionCode='\\([0-9][0-9]*\\)'.*/\\1/p" | head -n 1)"
+            fi
+          fi
+
+          if [ -z "$NEXT_CODE" ]; then
+            NEXT_CODE="$CURRENT_CODE"
+          else
+            NEXT_CODE=$((NEXT_CODE + 1))
+          fi
+
+          if [ "$NEXT_CODE" -le "$CURRENT_CODE" ]; then
+            NEXT_CODE=$((CURRENT_CODE + 1))
+          fi
+
+          echo "versionCode atual no projeto: $CURRENT_CODE"
+          echo "próximo versionCode do APK: $NEXT_CODE"
+          echo "NEXT_VERSION_CODE=$NEXT_CODE" >> "$GITHUB_ENV"
+
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --build-number "$NEXT_VERSION_CODE"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -48,5 +94,6 @@ jobs:
           body: |
             APK do Poliroutines pronto para instalar no Android.
             Baixe o arquivo Poliroutines.apk abaixo e instale no celular.
+            versionCode: ${{ env.NEXT_VERSION_CODE }}
           files: Poliroutines.apk
           make_latest: true
