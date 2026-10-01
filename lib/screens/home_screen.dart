@@ -82,7 +82,7 @@ class HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Olá! 👋', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-                    Text(capitalizeFirst(DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(now))),
+                    Text(formatFullDatePtBr(now)),
                   ],
                 ),
               ),
