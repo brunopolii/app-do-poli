@@ -10,3 +10,9 @@ String formatMonthYearPtBr(DateTime date) =>
 
 String formatShortMonthPtBr(DateTime date) =>
     capitalizeFirst(DateFormat('MMM', 'pt_BR').format(date));
+
+String formatFullDatePtBr(DateTime date) {
+  final formatted = DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(date);
+  final month = DateFormat('MMMM', 'pt_BR').format(date);
+  return capitalizeFirst(formatted.replaceFirst(month, capitalizeFirst(month)));
+}
