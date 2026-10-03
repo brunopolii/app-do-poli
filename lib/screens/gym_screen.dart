@@ -433,12 +433,10 @@ class _ExerciseSelectorState extends State<_ExerciseSelector>{
       child:Column(children:[
         GestureDetector(
           behavior:HitTestBehavior.opaque,
-          onTap:()=>setState(()=>expanded=true),
-          onVerticalDragUpdate:(d){if(expanded&&d.delta.dy>0)setState(()=>dragOffset+=d.delta.dy);},
-          onVerticalDragEnd:(_){if(expanded&&dragOffset>45)setState((){expanded=false;dragOffset=0;});else setState(()=>dragOffset=0);},
+          onTap:()=>setState(()=>expanded=!expanded),
           child:Padding(padding:const EdgeInsets.symmetric(horizontal:16,vertical:8),child:Column(children:[
             if(expanded)Container(width:42,height:4,margin:const EdgeInsets.only(bottom:7),decoration:BoxDecoration(color:Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha:.45),borderRadius:BorderRadius.circular(4))),
-            Row(children:[Expanded(child:Text(selected,style:Theme.of(context).textTheme.titleMedium)),Icon(expanded?Icons.keyboard_arrow_down:Icons.keyboard_arrow_up)]),
+            Row(children:[Expanded(child:Text(selected,style:Theme.of(context).textTheme.titleMedium)),Icon(expanded?Icons.keyboard_arrow_up:Icons.keyboard_arrow_down)]),
           ])),
         ),
         if(expanded)Expanded(child:ListView.builder(padding:const EdgeInsets.fromLTRB(8,0,8,8),itemCount:widget.options.length,itemBuilder:(context,i){final e=widget.options[i];return ListTile(dense:true,leading:_ExerciseThumb(path:e['imagePath']??''),title:Text(e['name']!),subtitle:Text(e['muscle']!),selected:e['name']==widget.selected,onTap:(){widget.onChanged(e['name']!);setState(()=>dragOffset=0);});}))

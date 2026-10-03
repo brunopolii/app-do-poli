@@ -24,3 +24,8 @@ flutter analyze
 ```
 
 Para Android, o ambiente precisa ter Android SDK/Gradle configurados. Se estiver usando GitHub Actions, o APK pode ser compilado na nuvem.
+
+
+## Créditos das ilustrações de exercícios
+As ilustrações da biblioteca padrão de exercícios são provenientes do projeto Workout Guide, com arte derivada de Everkinetic e licenciada sob CC BY-SA 4.0.
+Fonte: https://github.com/bryllim/workout-guide
