@@ -477,7 +477,7 @@ class _FinanceChart extends CustomPainter{
     final range=maxV-minV;
     final grid=Paint()..color=color.withValues(alpha:.14)..strokeWidth=1;
     final vertical=Paint()..color=color.withValues(alpha:.08)..strokeWidth=1;
-    final axis=Paint()..color=color.withValues(alpha:.35)..strokeWidth=1;
+    final axis=Paint()..color=this.color.withValues(alpha:.35)..strokeWidth=1;
     final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
     final totalDays=math.max(1,visibleEnd.difference(start).inDays).toDouble();
     double xFor(DateTime d){
@@ -524,7 +524,8 @@ class _FinanceChart extends CustomPainter{
         final labelTop=(above?math.max(top+2,y-46):math.min(s.height-bottom-34,y+12)).toDouble();
         final labelX=x+(i.isEven?-8.0:8.0);
         final label=DateFormat('dd/MM/yyyy').format(p.date)+'\n'+moneyPoint(p.balance);
-        final tp=TextPainter(text:TextSpan(text:label,style:TextStyle(fontSize:10,color=color,fontWeight:FontWeight.w600)),textDirection:ui.TextDirection.ltr,textAlign:TextAlign.center)..layout(maxWidth:92);
+        final labelPaintColor=this.color;
+        final tp=TextPainter(text:TextSpan(text:label,style:TextStyle(fontSize:10,color:labelPaintColor,fontWeight:FontWeight.w600)),textDirection:ui.TextDirection.ltr,textAlign:TextAlign.center)..layout(maxWidth:92);
         c.drawLine(Offset(x,y),Offset(x,labelTop+(above?tp.height:0)),Paint()..color=color.withValues(alpha:.35)..strokeWidth=1);
         tp.paint(c,Offset((labelX-tp.width/2).clamp(0.0,math.max(0.0,s.width-tp.width)).toDouble(),labelTop));
       }
