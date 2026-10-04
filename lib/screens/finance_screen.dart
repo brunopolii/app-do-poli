@@ -303,16 +303,50 @@ class _FinanceScreenState extends State<FinanceScreen>{
       return d.isAfter(DateTime(month.year,month.month+1,0));
     }).fold(0.0,(a,x)=>a+x.amount);
     final projectedBalance=_balance()-pendingExpenses-nextExpenses;
-    final cats=<String,double>{};for(final x in cur.where((x)=>!x.income)){cats[x.category]=(cats[x.category]??0)+x.amount;}
+    final cats=<String,double>{};
+    for(final x in cur.where((x)=>!x.income)){cats[x.category]=(cats[x.category]??0)+x.amount;}
     return SafeArea(child:ListView(padding:const EdgeInsets.all(16),children:[
-      Row(children:[Expanded(child:Text('Financeiro',style:Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.bold))),FilledButton.icon(onPressed:_menu,icon:const Icon(Icons.add),label:const Text('Adicionar'))]),
-      AppCard(child:Row(children:[IconButton(onPressed:()=>setState(()=>month=DateTime(month.year,month.month-1)),icon:const Icon(Icons.chevron_left)),Expanded(child:Text(formatMonthYearPtBr(month),textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.bold))),IconButton(onPressed:()=>setState(()=>month=DateTime(month.year,month.month+1)),icon:const Icon(Icons.chevron_right))])),
-      Row(children:[Expanded(child:_metric('Entradas recebidas',incPaid)),Expanded(child:_metric('Despesas pagas',outPaid))]),
-      Row(children:[Expanded(child:_metric('Despesas pendentes',pendingExpenses)),Expanded(child:_metric('Saldo atual',_balance()))]),
-      Row(children:[Expanded(child:_metric('Próximas despesas',nextExpenses)),Expanded(child:_metric('Saldo previsto',projectedBalance))]),
-      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Previsão do mês',style:Theme.of(context).textTheme.titleLarge),Text('Despesas pendentes: ${money(pendingExpenses)}'),Text('Próximas despesas: ${money(nextExpenses)}'),Text('Saldo previsto: ${money(projectedBalance)}')])) ,
+      Row(children:[
+        Expanded(child:Text('Financeiro',style:Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.bold))),
+        FilledButton.icon(onPressed:_menu,icon:const Icon(Icons.add),label:const Text('Adicionar')),
+      ]),
+      const SizedBox(height:8),
+      AppCard(child:Row(children:[
+        IconButton(onPressed:()=>setState(()=>month=DateTime(month.year,month.month-1)),icon:const Icon(Icons.chevron_left)),
+        Expanded(child:Text(formatMonthYearPtBr(month),textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.bold))),
+        IconButton(onPressed:()=>setState(()=>month=DateTime(month.year,month.month+1)),icon:const Icon(Icons.chevron_right)),
+      ])),
       AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Text('Entradas x despesas',style:Theme.of(context).textTheme.titleLarge),
+        Text('Saldo atual',style:Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height:4),
+        Text(money(_balance()),style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
+        const SizedBox(height:4),
+        Text('Resultado disponível considerando apenas movimentações pagas.',style:Theme.of(context).textTheme.bodySmall),
+      ])),
+      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text('Resumo do mês',style:Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height:8),
+        Row(children:[
+          Expanded(child:_metricTile('Entradas recebidas',incPaid,Icons.arrow_downward)),
+          const SizedBox(width:10),
+          Expanded(child:_metricTile('Despesas pagas',outPaid,Icons.arrow_upward)),
+        ]),
+        const SizedBox(height:10),
+        Row(children:[
+          Expanded(child:_metricTile('Despesas pendentes',pendingExpenses,Icons.schedule)),
+          const SizedBox(width:10),
+          Expanded(child:_metricTile('Resultado do mês',incPaid-outPaid,Icons.account_balance_wallet_outlined)),
+        ]),
+      ])),
+      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text('Próximas despesas',style:Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height:6),
+        Text(nextExpenses==0?'Nenhuma próxima despesa registrada.':'Total previsto: '+money(nextExpenses)),
+        const SizedBox(height:4),
+        Text('Saldo previsto: '+money(projectedBalance),style:Theme.of(context).textTheme.bodySmall),
+      ])),
+      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text('Evolução financeira',style:Theme.of(context).textTheme.titleLarge),
         const SizedBox(height:8),
         SegmentedButton<_FinancePeriodMode>(
           segments:const[
@@ -332,15 +366,31 @@ class _FinanceScreenState extends State<FinanceScreen>{
         const SizedBox(height:4),
         SizedBox(height:230,child:_FinanceInteractiveChart(start:_chartStart,end:_chartEnd,mode:chartMode,items:[...items],color:Theme.of(context).colorScheme.primary)),
       ])),
-      if(cats.isNotEmpty)AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Despesas por categoria',style:Theme.of(context).textTheme.titleLarge),for(final e in cats.entries)_category(e.key,e.value,cats.values.fold(0.0,(a,b)=>a+b))])),
-      const SizedBox(height:8),Text('Movimentações',style:Theme.of(context).textTheme.titleLarge),
+      if(cats.isNotEmpty)AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text('Despesas por categoria',style:Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height:8),
+        for(final e in cats.entries)_category(e.key,e.value,cats.values.fold(0.0,(a,b)=>a+b)),
+      ])),
+      const SizedBox(height:8),
+      Text('Últimas movimentações',style:Theme.of(context).textTheme.titleLarge),
       if(cur.isEmpty)const AppCard(child:Text('Nenhuma movimentação neste mês.')),
       for(final x in cur)_movement(x),
     ]));
   }
 
-  Widget _metric(String l,double v)=>AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(money(v),style:const TextStyle(fontWeight:FontWeight.bold)),Text(l,style:Theme.of(context).textTheme.bodySmall)]));
-  Widget _category(String n,double v,double total)=>Padding(padding:const EdgeInsets.only(bottom:10),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[Text(n),Text(money(v))]),LinearProgressIndicator(value:total==0?0:v/total)]));
+
+  Widget _metricTile(String label,double value,IconData icon)=>Container(
+    padding:const EdgeInsets.all(12),
+    decoration:BoxDecoration(color:Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha:.45),borderRadius:BorderRadius.circular(14)),
+    child:Row(children:[
+      Icon(icon,size:20),
+      const SizedBox(width:8),
+      Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text(money(value),style:const TextStyle(fontWeight:FontWeight.bold)),
+        Text(label,style:Theme.of(context).textTheme.bodySmall),
+      ])),
+    ]),
+  );  Widget _category(String n,double v,double total)=>Padding(padding:const EdgeInsets.only(bottom:10),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[Text(n),Text(money(v))]),LinearProgressIndicator(value:total==0?0:v/total)]));
   Widget _movement(MoneyTransaction x)=>AppCard(child:ListTile(contentPadding:EdgeInsets.zero,title:Text(x.description),subtitle:Text('${money(x.amount)} • Venc. ${DateFormat('dd/MM/yyyy').format(_date(x.dueDate))} • ${x.isPaid?'Pago':x.isOverdue?'Atrasado':'Previsto'}${x.isInstallment?' • Parcela ${x.installmentNumber}/${x.totalInstallments}':''}${x.isRecurring?' • Recorrente':''}'),trailing:PopupMenuButton<String>(onSelected:(v){if(v=='pay')_toggle(x);if(v=='edit')_edit(x);if(v=='delete')_remove(x);},itemBuilder:(_)=>const[PopupMenuItem(value:'pay',child:Text('Marcar pago/previsto')),PopupMenuItem(value:'edit',child:Text('Editar')),PopupMenuItem(value:'delete',child:Text('Excluir futuras'))])));
 
 }
@@ -467,7 +517,17 @@ class _FinanceChart extends CustomPainter{
       c.drawPath(path,line);
       int? selected;
       if(selectedX!=null){selected=0;var best=(xFor(points.first.date)-selectedX!).abs();for(var i=0;i<points.length;i++){final d=(xFor(points[i].date)-selectedX!).abs();if(d<best){best=d;selected=i;}}}
-      for(var i=0;i<points.length;i++){final p=points[i],x=xFor(p.date),y=yFor(p.balance),big=i==selected;c.drawCircle(Offset(x,y),big?9:4,Paint()..color=color);if(big){_text(c,DateFormat('dd/MM/yyyy').format(p.date),Offset(x,math.max(top,y-40)),11,color);_text(c,moneyPoint(p.balance),Offset(x,math.max(top+14,y-22)),11,color);}}
+      for(var i=0;i<points.length;i++){
+        final p=points[i],x=xFor(p.date),y=yFor(p.balance),big=i==selected;
+        c.drawCircle(Offset(x,y),big?9:4,Paint()..color=color);
+        final above=y>top+52||y>top+34&&i.isEven;
+        final labelTop=above?math.max(top+2,y-46):math.min(s.height-bottom-34,y+12);
+        final labelX=x+(i.isEven?-8.0:8.0);
+        final label=DateFormat('dd/MM/yyyy').format(p.date)+'\n'+moneyPoint(p.balance);
+        final tp=TextPainter(text:TextSpan(text:label,style:TextStyle(fontSize:10,color=color,fontWeight:FontWeight.w600)),textDirection:ui.TextDirection.ltr,textAlign:TextAlign.center)..layout(maxWidth:92);
+        c.drawLine(Offset(x,y),Offset(x,labelTop+(above?tp.height:0)),Paint()..color=color.withValues(alpha:.35)..strokeWidth=1);
+        tp.paint(c,Offset((labelX-tp.width/2).clamp(0.0,math.max(0.0,s.width-tp.width)),labelTop));
+      }
     }
     if(points.isEmpty){_text(c,'Nada registrado',Offset(s.width/2,s.height/2-10),14,color);}
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);
