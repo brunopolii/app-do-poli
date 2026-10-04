@@ -93,11 +93,6 @@ class _FoodScreenState extends State<FoodScreen> {
     final dayMeals=meals.where((m)=>m.date==dayKey);
     return <String,double>{'calories':dayMeals.fold<double>(0,(s,m)=>s+m.calories),'protein':dayMeals.fold<double>(0,(s,m)=>s+m.protein),'carbs':dayMeals.fold<double>(0,(s,m)=>s+m.carbs),'fat':dayMeals.fold<double>(0,(s,m)=>s+m.fat)};
   }
-  List<_DailyGoalValue> _goalValues(String dayKey){
-    final totals=_totalsForDay(dayKey); if(goals==null)return const[];
-    return [_DailyGoalValue('Calorias',totals['calories']!,goals!['calories']!,'kcal'),_DailyGoalValue('Proteína',totals['protein']!,goals!['protein']!,'g'),_DailyGoalValue('Carboidratos',totals['carbs']!,goals!['carbs']!,'g'),_DailyGoalValue('Gorduras',totals['fat']!,goals!['fat']!,'g')];
-  }
-
   @override Widget build(BuildContext context){
     if(loading)return const Center(child:CircularProgressIndicator());
     final todayMeals=meals.where((m)=>m.date==todayKey);
