@@ -498,7 +498,7 @@ class _GymChartPainter extends CustomPainter{
       final xx=x(e.key),yy=y(e.value.value),big=e.key==selected;
       c.drawCircle(Offset(xx,yy),big?9:4,Paint()..color=color);
       final above=yy>top+52||yy>top+34&&i.isEven;
-      final labelTop=above?math.max(top+2,yy-46):math.min(s.height-bottom-34,yy+12);
+      final labelTop=(above?math.max(top+2,yy-46):math.min(s.height-bottom-34,yy+12)).toDouble();
       final labelX=xx+(i.isEven?-8.0:8.0);
       final label=DateFormat('dd/MM/yyyy').format(e.value.date)+'\n'+e.value.value.toStringAsFixed(e.value.value.truncateToDouble()==e.value.value?0:1)+' kg';
       final tp=TextPainter(text:TextSpan(text:label,style:TextStyle(fontSize:10,color:labelColor,fontWeight:FontWeight.w600)),textDirection:textDirection,textAlign:TextAlign.center)..layout(maxWidth:92);
