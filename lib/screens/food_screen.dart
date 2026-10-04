@@ -172,7 +172,7 @@ class _DailyGoalChart extends StatelessWidget{
             return SizedBox(height:12,child:Stack(children:[
               Positioned.fill(child:DecoratedBox(decoration:BoxDecoration(color:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(8)))),
               Align(alignment:Alignment.centerLeft,child:SizedBox(width:width*ratio,height:12,child:DecoratedBox(decoration:BoxDecoration(color:color,borderRadius:BorderRadius.circular(8))))),
-              Positioned(left:(width*target).clamp(0.0,math.max(0.0,width-2)),top:0,bottom:0,child:Container(width:2,color:Theme.of(context).colorScheme.onSurface)),
+              Positioned(left:(width*target).clamp(0.0,math.max(0.0,width-2).toDouble()).toDouble(),top:0,bottom:0,child:Container(width:2,color:Theme.of(context).colorScheme.onSurface)),
             ]));
           }),
         ]));
@@ -226,7 +226,7 @@ class _WeightChartPainter extends CustomPainter{
       final xx=x(e.key),yy=y(e.value.weight),big=e.key==selected;
       c.drawCircle(Offset(xx,yy),big?9:4,Paint()..color=color);
       final above=yy>top+52||yy>top+34&&i.isEven;
-      final labelTop=above?math.max(top+2,yy-46):math.min(s.height-bottom-34,yy+12);
+      final labelTop=(above?math.max(top+2,yy-46):math.min(s.height-bottom-34,yy+12)).toDouble();
       final labelX=xx+(i.isEven?-8.0:8.0);
       final label=DateFormat('dd/MM/yyyy').format(DateTime.parse(e.value.date))+'\n'+e.value.weight.toStringAsFixed(e.value.weight.truncateToDouble()==e.value.weight?0:1)+' kg';
       final tp=TextPainter(text:TextSpan(text:label,style:TextStyle(fontSize:10,color:labelColor,fontWeight:FontWeight.w600)),textDirection:textDirection,textAlign:TextAlign.center)..layout(maxWidth:92);
