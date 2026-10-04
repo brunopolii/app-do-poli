@@ -526,7 +526,7 @@ class _FinanceChart extends CustomPainter{
         final label=DateFormat('dd/MM/yyyy').format(p.date)+'\n'+moneyPoint(p.balance);
         final tp=TextPainter(text:TextSpan(text:label,style:TextStyle(fontSize:10,color=color,fontWeight:FontWeight.w600)),textDirection:ui.TextDirection.ltr,textAlign:TextAlign.center)..layout(maxWidth:92);
         c.drawLine(Offset(x,y),Offset(x,labelTop+(above?tp.height:0)),Paint()..color=color.withValues(alpha:.35)..strokeWidth=1);
-        tp.paint(c,Offset((labelX-tp.width/2).clamp(0.0,math.max(0.0,s.width-tp.width)),labelTop));
+        tp.paint(c,Offset((labelX-tp.width/2).clamp(0.0,math.max(0.0,s.width-tp.width)).toDouble(),labelTop));
       }
     }
     if(points.isEmpty){_text(c,'Nada registrado',Offset(s.width/2,s.height/2-10),14,color);}
