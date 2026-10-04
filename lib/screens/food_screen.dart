@@ -100,8 +100,10 @@ class _FoodScreenState extends State<FoodScreen> {
 
   @override Widget build(BuildContext context){
     if(loading)return const Center(child:CircularProgressIndicator());
-    final tm=meals.where((m)=>m.date==today);
-    final kcal=tm.fold<double>(0,(s,m)=>s+m.calories),pro=tm.fold<double>(0,(s,m)=>s+m.protein),carb=tm.fold<double>(0,(s,m)=>s+m.carbs),fat=tm.fold<double>(0,(s,m)=>s+m.fat);
+    final todayMeals=meals.where((m)=>m.date==todayKey);
+    final selectedMeals=meals.where((m)=>m.date==selectedDayKey);
+    final todayTotals=_totalsForDay(todayKey);
+    final todayKcal=todayTotals['calories']!,todayPro=todayTotals['protein']!,todayCarb=todayTotals['carbs']!,todayFat=todayTotals['fat']!;
     final current=weights.isEmpty?null:weights.last;
     final chart=_chartWeights();
     final records=_periodRecords();
