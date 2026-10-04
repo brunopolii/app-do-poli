@@ -493,7 +493,18 @@ class _GymChartPainter extends CustomPainter{
     if(previousValue==null&&pts.length==1&&nextValue==null){path.moveTo(x(pts.first.key),y(pts.first.value.value));}c.drawPath(path,line);
     int? selected;
     if(selectionX!=null&&pts.isNotEmpty){selected=pts.first.key;var best=(x(selected!)-selectionX!).abs();for(final e in pts){final d=(x(e.key)-selectionX!).abs();if(d<best){best=d;selected=e.key;}}}
-    for(final e in pts){final yy=y(e.value.value),big=e.key==selected;c.drawCircle(Offset(x(e.key),yy),big?9:4,Paint()..color=color);if(big){_txt(c,DateFormat('dd/MM/yyyy').format(e.value.date),Offset(x(e.key),math.max(top,yy-40)),11,labelColor,TextAlign.center);_txt(c,'${e.value.value.toStringAsFixed(e.value.value.truncateToDouble()==e.value.value?0:1)} kg',Offset(x(e.key),math.max(top+14,yy-22)),11,labelColor,TextAlign.center);}}
+    for(var i=0;i<pts.length;i++){
+      final e=pts[i];
+      final xx=x(e.key),yy=y(e.value.value),big=e.key==selected;
+      c.drawCircle(Offset(xx,yy),big?9:4,Paint()..color=color);
+      final above=yy>top+52||yy>top+34&&i.isEven;
+      final labelTop=above?math.max(top+2,yy-46):math.min(s.height-bottom-34,yy+12);
+      final labelX=xx+(i.isEven?-8.0:8.0);
+      final label=DateFormat('dd/MM/yyyy').format(e.value.date)+'\n'+e.value.value.toStringAsFixed(e.value.value.truncateToDouble()==e.value.value?0:1)+' kg';
+      final tp=TextPainter(text:TextSpan(text:label,style:TextStyle(fontSize:10,color:labelColor,fontWeight:FontWeight.w600)),textDirection:textDirection,textAlign:TextAlign.center)..layout(maxWidth:92);
+      c.drawLine(Offset(xx,yy),Offset(xx,labelTop+(above?tp.height:0)),Paint()..color=labelColor.withValues(alpha:.35)..strokeWidth=1);
+      tp.paint(c,Offset((labelX-tp.width/2).clamp(0.0,math.max(0.0,s.width-tp.width)),labelTop));
+    }
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
   void _txt(Canvas c,String v,Offset p,double size,Color col,TextAlign a){final tp=TextPainter(text:TextSpan(text:v,style:TextStyle(fontSize:size,color:col,fontWeight:FontWeight.w500)),textDirection:textDirection,textAlign:a)..layout(maxWidth:100);tp.paint(c,Offset((a==TextAlign.center?p.dx-tp.width/2:p.dx).clamp(0.0,10000.0).toDouble(),p.dy));}
