@@ -521,7 +521,7 @@ class _FinanceChart extends CustomPainter{
         final p=points[i],x=xFor(p.date),y=yFor(p.balance),big=i==selected;
         c.drawCircle(Offset(x,y),big?9:4,Paint()..color=color);
         final above=y>top+52||y>top+34&&i.isEven;
-        final labelTop=above?math.max(top+2,y-46):math.min(s.height-bottom-34,y+12);
+        final labelTop=(above?math.max(top+2,y-46):math.min(s.height-bottom-34,y+12)).toDouble();
         final labelX=x+(i.isEven?-8.0:8.0);
         final label=DateFormat('dd/MM/yyyy').format(p.date)+'\n'+moneyPoint(p.balance);
         final tp=TextPainter(text:TextSpan(text:label,style:TextStyle(fontSize:10,color=color,fontWeight:FontWeight.w600)),textDirection:ui.TextDirection.ltr,textAlign:TextAlign.center)..layout(maxWidth:92);
