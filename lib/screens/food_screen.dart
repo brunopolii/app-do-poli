@@ -109,7 +109,7 @@ class _FoodScreenState extends State<FoodScreen> {
     final records=_periodRecords();
     return SafeArea(child:ListView(padding:const EdgeInsets.all(16),children:[
       Row(children:[Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Alimentação',style:Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.bold)),Text('${todayMeals.length} refeição(ões) hoje')])),IconButton(onPressed:_setupGoals,icon:const Icon(Icons.settings_outlined))]),
-      if(goals!=null)AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Metas diárias',style:Theme.of(context).textTheme.titleLarge),_bar('Calorias',todayKcal,goals!['calories']!,'kcal'),_bar('Proteína',todayPro,goals!['protein']!,'g'),_bar('Carboidratos',todayCarb,goals!['carbs']!,'g'),_bar('Gorduras',todayFat,goals!['fat']!,'g'),const SizedBox(height:14),_DailyGoalChart(values:_goalValues(todayKey),title:'Progresso das metas de hoje',color:Theme.of(context).colorScheme.primary)])),
+      if(goals!=null)AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Metas diárias',style:Theme.of(context).textTheme.titleLarge),_bar('Calorias',todayKcal,goals!['calories']!,'kcal'),_bar('Proteína',todayPro,goals!['protein']!,'g'),_bar('Carboidratos',todayCarb,goals!['carbs']!,'g'),_bar('Gorduras',todayFat,goals!['fat']!,'g')])),
       AppCard(child:Row(children:[const Icon(Icons.monitor_weight_outlined,size:32),const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('Peso corporal'),Text(current==null?'—':'${current.weight.toStringAsFixed(1)} kg',style:Theme.of(context).textTheme.titleLarge)])),OutlinedButton(onPressed:_weight,child:const Text('Registrar'))])),
       AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text('Evolução do peso',style:Theme.of(context).textTheme.titleLarge),
@@ -146,41 +146,10 @@ class _FoodScreenState extends State<FoodScreen> {
         ),
       ),
       Row(children:[Expanded(child:OutlinedButton.icon(onPressed:_manual,icon:const Icon(Icons.add),label:const Text('Manual'))),const SizedBox(width:8),Expanded(child:OutlinedButton.icon(onPressed:_textAI,icon:const Icon(Icons.auto_awesome),label:const Text('IA texto')))]),
-      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[IconButton(onPressed:()=>_changeSelectedDay(-1),icon:const Icon(Icons.chevron_left)),Expanded(child:Text(DateUtils.dateOnly(selectedDay)==DateUtils.dateOnly(DateTime.now())?'Hoje':DateFormat('dd/MM/yyyy').format(selectedDay),textAlign:TextAlign.center,style:Theme.of(context).textTheme.titleLarge)),IconButton(onPressed:()=>_changeSelectedDay(1),icon:const Icon(Icons.chevron_right)),IconButton(onPressed:_pickSelectedDay,icon:const Icon(Icons.calendar_month))]),if(selectedMeals.isEmpty)const Text('Nenhuma refeição registrada neste dia.'),if(selectedMeals.isNotEmpty&&goals!=null)Padding(padding:const EdgeInsets.only(bottom:12),child:_DailyGoalChart(values:_goalValues(selectedDayKey),title:'Metas de '+DateFormat('dd/MM/yyyy').format(selectedDay),color:Theme.of(context).colorScheme.primary)),for(final m in selectedMeals)ListTile(contentPadding:EdgeInsets.zero,title:Text(m.food),subtitle:Text('${m.calories.toStringAsFixed(0)} kcal • P ${m.protein.toStringAsFixed(1)}g • C ${m.carbs.toStringAsFixed(1)}g • G ${m.fat.toStringAsFixed(1)}g'),trailing:PopupMenuButton<String>(onSelected:(v)async{if(v=='edit')await _editMeal(m);if(v=='delete')await _deleteMeal(m);},itemBuilder:(_)=>const[PopupMenuItem(value:'edit',child:Text('Editar')),PopupMenuItem(value:'delete',child:Text('Excluir'))]))])),
+      AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[IconButton(onPressed:()=>_changeSelectedDay(-1),icon:const Icon(Icons.chevron_left)),Expanded(child:Text(DateUtils.dateOnly(selectedDay)==DateUtils.dateOnly(DateTime.now())?'Hoje':DateFormat('dd/MM/yyyy').format(selectedDay),textAlign:TextAlign.center,style:Theme.of(context).textTheme.titleLarge)),IconButton(onPressed:()=>_changeSelectedDay(1),icon:const Icon(Icons.chevron_right)),IconButton(onPressed:_pickSelectedDay,icon:const Icon(Icons.calendar_month))]),if(selectedMeals.isEmpty)const Text('Nenhuma refeição registrada neste dia.'),if(selectedMeals.isNotEmpty&&goals!=null)Padding(padding:const EdgeInsets.only(bottom:12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Metas diárias',style:Theme.of(context).textTheme.titleMedium),_bar('Calorias',_totalsForDay(selectedDayKey)['calories']!,goals!['calories']!,'kcal'),_bar('Proteína',_totalsForDay(selectedDayKey)['protein']!,goals!['protein']!,'g'),_bar('Carboidratos',_totalsForDay(selectedDayKey)['carbs']!,goals!['carbs']!,'g'),_bar('Gorduras',_totalsForDay(selectedDayKey)['fat']!,goals!['fat']!,'g')])),for(final m in selectedMeals)ListTile(contentPadding:EdgeInsets.zero,title:Text(m.food),subtitle:Text('${m.calories.toStringAsFixed(0)} kcal • P ${m.protein.toStringAsFixed(1)}g • C ${m.carbs.toStringAsFixed(1)}g • G ${m.fat.toStringAsFixed(1)}g'),trailing:PopupMenuButton<String>(onSelected:(v)async{if(v=='edit')await _editMeal(m);if(v=='delete')await _deleteMeal(m);},itemBuilder:(_)=>const[PopupMenuItem(value:'edit',child:Text('Editar')),PopupMenuItem(value:'delete',child:Text('Excluir'))]))])),
     ]));
   }
   Widget _bar(String n,double v,double goal,String unit){final ratio=goal<=0?0.0:(v/goal).clamp(0.0,1.0).toDouble();return Padding(padding:const EdgeInsets.only(top:8),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[Text(n),Text('${v.toStringAsFixed(0)} / ${goal.toStringAsFixed(0)} $unit')]),LinearProgressIndicator(value:ratio)]));}
-}
-class _DailyGoalValue{
-  final String label; final double actual; final double goal; final String unit;
-  const _DailyGoalValue(this.label,this.actual,this.goal,this.unit);
-}
-class _DailyGoalChart extends StatelessWidget{
-  final List<_DailyGoalValue> values; final String title; final Color color;
-  const _DailyGoalChart({required this.values,required this.title,required this.color});
-  @override Widget build(BuildContext context){
-    if(values.isEmpty)return const SizedBox.shrink();
-    return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Text(title,style:Theme.of(context).textTheme.titleMedium),const SizedBox(height:10),
-      ...values.map((v){
-        final scale=math.max(v.goal,v.actual);
-        final ratio=scale<=0?0.0:(v.actual/scale).clamp(0.0,1.0).toDouble();
-        final target=scale<=0?0.0:(v.goal/scale).clamp(0.0,1.0).toDouble();
-        return Padding(padding:const EdgeInsets.only(bottom:10),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-          Row(children:[Expanded(child:Text(v.label)),Text(v.actual.toStringAsFixed(0)+' / '+v.goal.toStringAsFixed(0)+' '+v.unit,style:Theme.of(context).textTheme.bodySmall)]),
-          const SizedBox(height:4),
-          LayoutBuilder(builder:(context,constraints){
-            final width=constraints.maxWidth;
-            return SizedBox(height:12,child:Stack(children:[
-              Positioned.fill(child:DecoratedBox(decoration:BoxDecoration(color:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(8)))),
-              Align(alignment:Alignment.centerLeft,child:SizedBox(width:width*ratio,height:12,child:DecoratedBox(decoration:BoxDecoration(color:color,borderRadius:BorderRadius.circular(8))))),
-              Positioned(left:(width*target).clamp(0.0,math.max(0.0,width-2).toDouble()).toDouble(),top:0,bottom:0,child:Container(width:2,color:Theme.of(context).colorScheme.onSurface)),
-            ]));
-          }),
-        ]));
-      }),
-    ]);
-  }
 }
 class _WeightChart extends StatefulWidget{
   final List<WeightEntry?> data;final Color color;final DateTime startDate;final double? previousValue;final double? nextValue;
