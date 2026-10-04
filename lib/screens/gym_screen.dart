@@ -503,7 +503,7 @@ class _GymChartPainter extends CustomPainter{
       final label=DateFormat('dd/MM/yyyy').format(e.value.date)+'\n'+e.value.value.toStringAsFixed(e.value.value.truncateToDouble()==e.value.value?0:1)+' kg';
       final tp=TextPainter(text:TextSpan(text:label,style:TextStyle(fontSize:10,color:labelColor,fontWeight:FontWeight.w600)),textDirection:textDirection,textAlign:TextAlign.center)..layout(maxWidth:92);
       c.drawLine(Offset(xx,yy),Offset(xx,labelTop+(above?tp.height:0)),Paint()..color=labelColor.withValues(alpha:.35)..strokeWidth=1);
-      tp.paint(c,Offset((labelX-tp.width/2).clamp(0.0,math.max(0.0,s.width-tp.width)),labelTop));
+      tp.paint(c,Offset((labelX-tp.width/2).clamp(0.0,math.max(0.0,s.width-tp.width)).toDouble(),labelTop));
     }
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
