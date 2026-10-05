@@ -204,7 +204,7 @@ class _WeightChartPainter extends CustomPainter{
       final e=pts[i];
       final point=Offset(x(e.key),y(e.value.weight));
       final value=e.value.weight.toStringAsFixed(e.value.weight.truncateToDouble()==e.value.weight?0:1);
-      final label=DateFormat('dd/MM/yyyy').format(e.value.date)+'\n'+value+' kg';
+      final label=DateFormat('dd/MM/yyyy').format(DateTime.parse(e.value.date))+'\n'+value+' kg';
       _drawLabel(c,s,point,label,segments,occupied,top,bottom);
       c.drawCircle(point,i==selected?9:4,Paint()..color=color);
     }
