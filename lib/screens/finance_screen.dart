@@ -451,9 +451,10 @@ class _FinanceChart extends CustomPainter{
       points.add(_FinancePoint(pointDate,balance,delta));
     }
 
-    const left=52.0,right=16.0,top=26.0,bottom=40.0;
+    const left=52.0,right=16.0,top=26.0,bottom=40.0,edgeInset=10.0;
     final w=math.max(1.0,s.width-left-right).toDouble();
     final h=math.max(1.0,s.height-top-bottom).toDouble();
+    final innerW=math.max(1.0,w-edgeInset*2).toDouble();
     double? nextBalance;
     final futureEvents=<DateTime,double>{};
     for(final x in items){
@@ -483,7 +484,7 @@ class _FinanceChart extends CustomPainter{
     double xFor(DateTime d){
       final span=totalDays-1;
       final days=d.difference(start).inDays.toDouble();
-      return left+w*(span<=0?0.5:days/span);
+      return left+edgeInset+innerW*(span<=0?0.5:days/span);
     }
     double yFor(double value)=>top+h-(value-minV)/range*h;
 
@@ -509,25 +510,35 @@ class _FinanceChart extends CustomPainter{
       }
     }
 
-    final path=Path();
+    final segments=<List<Offset>>[];
     if(points.isNotEmpty){
-      path.moveTo(left,yFor(opening));path.lineTo(xFor(points.first.date),yFor(points.first.balance));
-      for(var i=1;i<points.length;i++){path.moveTo(xFor(points[i-1].date),yFor(points[i-1].balance));path.lineTo(xFor(points[i].date),yFor(points[i].balance));}
-      if(nextBalance!=null){path.moveTo(xFor(points.last.date),yFor(points.last.balance));path.lineTo(s.width-right,yFor(nextBalance!));}
+      segments.add([Offset(left,yFor(opening)),Offset(xFor(points.first.date),yFor(points.first.balance))]);
+      for(var i=1;i<points.length;i++)segments.add([Offset(xFor(points[i-1].date),yFor(points[i-1].balance)),Offset(xFor(points[i].date),yFor(points[i].balance))]);
+      if(nextBalance!=null)segments.add([Offset(xFor(points.last.date),yFor(points.last.balance)),Offset(left+w-edgeInset,yFor(nextBalance!))]);
+      final path=Path();
+      for(final seg in segments){path.moveTo(seg[0].dx,seg[0].dy);path.lineTo(seg[1].dx,seg[1].dy);}
       c.drawPath(path,line);
       int? selected;
-      if(selectedX!=null){selected=0;var best=(xFor(points.first.date)-selectedX!).abs();for(var i=0;i<points.length;i++){final d=(xFor(points[i].date)-selectedX!).abs();if(d<best){best=d;selected=i;}}}
-      for(var i=0;i<points.length;i++){
-        final p=points[i],x=xFor(p.date),y=yFor(p.balance),big=i==selected;
-        c.drawCircle(Offset(x,y),big?9:4,Paint()..color=color);
-        final above=y>top+52||y>top+34&&i.isEven;
-        final labelTop=(above?math.max(top+2,y-46):math.min(s.height-bottom-34,y+12)).toDouble();
-        final labelX=x+(i.isEven?-8.0:8.0);
+      if(selectedX!=null){
+        selected=0;var best=(xFor(points.first.date)-selectedX!).abs();
+        for(var i=0;i<points.length;i++){final d=(xFor(points[i].date)-selectedX!).abs();if(d<best){best=d;selected=i;}}
+      }
+      final values=points.map((p)=>p.balance).toList();
+      final minIndex=_indexOfMin(values),maxIndex=_indexOfMax(values);
+      final labelIndices=<int>{minIndex,maxIndex};
+      if(selected!=null)labelIndices.add(selected!);
+      final occupied=<Rect>[];
+      for(final i in labelIndices.toList()..sort()){
+        final p=points[i];
+        final point=Offset(xFor(p.date),yFor(p.balance));
         final label=DateFormat('dd/MM/yyyy').format(p.date)+'\n'+moneyPoint(p.balance);
-        final labelPaintColor=this.color;
-        final tp=TextPainter(text:TextSpan(text:label,style:TextStyle(fontSize:10,color:labelPaintColor,fontWeight:FontWeight.w600)),textDirection:ui.TextDirection.ltr,textAlign:TextAlign.center)..layout(maxWidth:92);
-        c.drawLine(Offset(x,y),Offset(x,labelTop+(above?tp.height:0)),Paint()..color=color.withValues(alpha:.35)..strokeWidth=1);
-        tp.paint(c,Offset((labelX-tp.width/2).clamp(0.0,math.max(0.0,s.width-tp.width)).toDouble(),labelTop));
+        _drawLabel(c,s,point,label,segments,occupied,top,bottom);
+        c.drawCircle(point,i==selected?9:4,Paint()..color=color);
+      }
+      for(var i=0;i<points.length;i++){
+        if(labelIndices.contains(i))continue;
+        final p=points[i];
+        c.drawCircle(Offset(xFor(p.date),yFor(p.balance)),i==selected?9:4,Paint()..color=color);
       }
     }
     if(points.isEmpty){_text(c,'Nada registrado',Offset(s.width/2,s.height/2-10),14,color);}
@@ -535,6 +546,53 @@ class _FinanceChart extends CustomPainter{
     c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
 
+  int _indexOfMin(List<double> values){var index=0;for(var i=1;i<values.length;i++)if(values[i]<values[index])index=i;return index;}
+  int _indexOfMax(List<double> values){var index=0;for(var i=1;i<values.length;i++)if(values[i]>values[index])index=i;return index;}
+  bool _segmentsIntersect(Offset a,Offset b,Offset c,Offset d){
+    double cross(Offset p,Offset q,Offset r)=>(q.dx-p.dx)*(r.dy-p.dy)-(q.dy-p.dy)*(r.dx-p.dx);
+    bool on(Offset p,Offset q,Offset r)=>q.dx>=math.min(p.dx,r.dx)-.01&&q.dx<=math.max(p.dx,r.dx)+.01&&q.dy>=math.min(p.dy,r.dy)-.01&&q.dy<=math.max(p.dy,r.dy)+.01;
+    final d1=cross(a,b,c),d2=cross(a,b,d),d3=cross(c,d,a),d4=cross(c,d,b);
+    if(d1.abs()<.01&&on(a,c,b))return true;if(d2.abs()<.01&&on(a,d,b))return true;if(d3.abs()<.01&&on(c,a,d))return true;if(d4.abs()<.01&&on(c,b,d))return true;
+    return ((d1>0)!=(d2>0))&&((d3>0)!=(d4>0));
+  }
+  bool _lineHitsRect(List<List<Offset>> segments,Rect rect){
+    for(final seg in segments){
+      if(rect.contains(seg[0])||rect.contains(seg[1]))return true;
+      if(_segmentsIntersect(seg[0],seg[1],rect.topLeft,rect.topRight))return true;
+      if(_segmentsIntersect(seg[0],seg[1],rect.topRight,rect.bottomRight))return true;
+      if(_segmentsIntersect(seg[0],seg[1],rect.bottomRight,rect.bottomLeft))return true;
+      if(_segmentsIntersect(seg[0],seg[1],rect.bottomLeft,rect.topLeft))return true;
+    }
+    return false;
+  }
+  void _drawLabel(Canvas c,Size s,Offset point,String label,List<List<Offset>> segments,List<Rect> occupied,double top,double bottom){
+    final tp=TextPainter(text:TextSpan(text:label,style:TextStyle(fontSize:10,color:color,fontWeight:FontWeight.w600)),textDirection:ui.TextDirection.ltr,textAlign:TextAlign.center)..layout(maxWidth:92);
+    const gap=7.0,pad=3.0;
+    final candidates=[
+      Offset(point.dx-tp.width/2,point.dy-tp.height-gap),Offset(point.dx-tp.width/2,point.dy+gap),
+      Offset(point.dx-tp.width-gap,point.dy-tp.height/2),Offset(point.dx+gap,point.dy-tp.height/2),
+      Offset(point.dx-tp.width-gap,point.dy-tp.height-gap),Offset(point.dx+gap,point.dy-tp.height-gap),
+      Offset(point.dx-tp.width-gap,point.dy+gap),Offset(point.dx+gap,point.dy+gap),
+    ];
+    final bounds=Rect.fromLTRB(2,2,s.width-2,s.height-bottom-2);
+    Offset? chosen;Rect? chosenRect;
+    for(final pos in candidates){
+      final rect=Rect.fromLTWH(pos.dx-pad,pos.dy-pad,tp.width+pad*2,tp.height+pad*2);
+      if(rect.left<bounds.left||rect.top<bounds.top||rect.right>bounds.right||rect.bottom>bounds.bottom)continue;
+      if(occupied.any((r)=>r.overlaps(rect)))continue;
+      if(_lineHitsRect(segments,rect))continue;
+      chosen=pos;chosenRect=rect;break;
+    }
+    if(chosen==null){
+      final fallbackX=(point.dx-tp.width/2).clamp(bounds.left+pad,bounds.right-tp.width-pad).toDouble();
+      final fallbackY=(point.dy-tp.height-gap).clamp(bounds.top+pad,bounds.bottom-tp.height-pad).toDouble();
+      chosen=Offset(fallbackX,fallbackY);chosenRect=Rect.fromLTWH(chosen.dx-pad,chosen.dy-pad,tp.width+pad*2,tp.height+pad*2);
+    }
+    occupied.add(chosenRect!);
+    final edge=Offset(point.dx.clamp(chosenRect.left,chosenRect.right).toDouble(),point.dy.clamp(chosenRect.top,chosenRect.bottom).toDouble());
+    c.drawLine(point,edge,Paint()..color=color.withValues(alpha:.35)..strokeWidth=1);
+    tp.paint(c,chosen);
+  }
   String deltaLabel(double value){
     final sign=value>=0?'+':'-';
     return 'R\$'+sign+value.abs().toStringAsFixed(2).replaceAll('.',',');
