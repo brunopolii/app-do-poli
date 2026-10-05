@@ -170,36 +170,99 @@ class _WeightChartPainter extends CustomPainter{
   final List<WeightEntry?> data;final Color color;final Color labelColor;final ui.TextDirection textDirection;final DateTime startDate;final double? previousValue;final double? nextValue;final double? selectionX;
   _WeightChartPainter(this.data,this.color,this.labelColor,this.textDirection,this.startDate,this.previousValue,this.nextValue,this.selectionX);
   @override void paint(Canvas c,Size s){
-    if(data.isEmpty)return;const left=42.0,right=12.0,top=26.0,bottom=40.0;
+    if(data.isEmpty)return;const left=42.0,right=12.0,top=26.0,bottom=40.0,edgeInset=10.0;
     final w=math.max(1.0,s.width-left-right),h=math.max(1.0,s.height-top-bottom);
     final pts=<MapEntry<int,WeightEntry>>[];for(var k=0;k<data.length;k++){final p=data[k];if(p!=null)pts.add(MapEntry(k,p));}
     if(pts.isEmpty){_txt(c,'Nada registrado',Offset(s.width/2,s.height/2-10),14,labelColor,TextAlign.center);return;}
     final vals=<double>[];if(previousValue!=null)vals.add(previousValue!);if(nextValue!=null)vals.add(nextValue!);for(final p in data)if(p!=null)vals.add(p.weight);
     final minV=vals.reduce(math.min),maxV=vals.reduce(math.max),raw=math.max(.01,maxV-minV),pad=raw*.12,lo=minV-pad,hi=maxV+pad;
-    double x(int i)=>data.length==1?left+w/2:left+w*i/(data.length-1);double y(double v)=>top+h-(v-lo)/(hi-lo)*h;
+    final innerW=math.max(1.0,w-edgeInset*2).toDouble();
+    double x(int i)=>data.length==1?left+w/2:left+edgeInset+innerW*i/(data.length-1);double y(double v)=>top+h-(v-lo)/(hi-lo)*h;
     final grid=Paint()..color=color.withValues(alpha:.14),ticks=Paint()..color=color.withValues(alpha:.10),axis=Paint()..color=color.withValues(alpha:.35);
     for(var j=0;j<=4;j++){final yy=top+h*j/4;c.drawLine(Offset(left,yy),Offset(s.width-right,yy),grid);_txt(c,'${(hi-(hi-lo)*j/4).toStringAsFixed(1)} kg',Offset(2,yy-7),9,labelColor,TextAlign.left);}
     for(var k=0;k<data.length;k++){final xx=x(k);c.drawLine(Offset(xx,top),Offset(xx,s.height-bottom),ticks);final show=data.length<=7||k==0||k==data.length-1||k%5==0;if(show)_txt(c,DateFormat('dd/MM').format(startDate.add(Duration(days:k))),Offset(xx,s.height-bottom+8),9,labelColor,TextAlign.center);}
-    final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;final path=Path();
-    if(previousValue!=null){path.moveTo(left,y(previousValue!));path.lineTo(x(pts.first.key),y(pts.first.value.weight));}
-    for(var k=1;k<pts.length;k++){path.moveTo(x(pts[k-1].key),y(pts[k-1].value.weight));path.lineTo(x(pts[k].key),y(pts[k].value.weight));}
-    if(nextValue!=null){path.moveTo(x(pts.last.key),y(pts.last.value.weight));path.lineTo(s.width-right,y(nextValue!));}
-    if(previousValue==null&&pts.length==1&&nextValue==null){path.moveTo(x(pts.first.key),y(pts.first.value.weight));}c.drawPath(path,line);
+    final segments=<List<Offset>>[];
+    if(previousValue!=null)segments.add([Offset(left,y(previousValue!)),Offset(x(pts.first.key),y(pts.first.value.value))]);
+    for(var k=1;k<pts.length;k++)segments.add([Offset(x(pts[k-1].key),y(pts[k-1].value.value)),Offset(x(pts[k].key),y(pts[k].value.value))]);
+    if(nextValue!=null)segments.add([Offset(x(pts.last.key),y(pts.last.value.value)),Offset(left+w-edgeInset,y(nextValue!))]);
+    final path=Path();
+    for(final seg in segments){path.moveTo(seg[0].dx,seg[0].dy);path.lineTo(seg[1].dx,seg[1].dy);}
+    if(segments.isNotEmpty)c.drawPath(path,line);
+
     int? selected;
-    if(selectionX!=null&&pts.isNotEmpty){selected=pts.first.key;var best=(x(selected!)-selectionX!).abs();for(final e in pts){final d=(x(e.key)-selectionX!).abs();if(d<best){best=d;selected=e.key;}}}
-    for(var i=0;i<pts.length;i++){
-      final e=pts[i];
-      final xx=x(e.key),yy=y(e.value.weight),big=e.key==selected;
-      c.drawCircle(Offset(xx,yy),big?9:4,Paint()..color=color);
-      final above=yy>top+52||yy>top+34&&i.isEven;
-      final labelTop=(above?math.max(top+2,yy-46):math.min(s.height-bottom-34,yy+12)).toDouble();
-      final labelX=xx+(i.isEven?-8.0:8.0);
-      final label=DateFormat('dd/MM/yyyy').format(DateTime.parse(e.value.date))+'\n'+e.value.weight.toStringAsFixed(e.value.weight.truncateToDouble()==e.value.weight?0:1)+' kg';
-      final tp=TextPainter(text:TextSpan(text:label,style:TextStyle(fontSize:10,color:labelColor,fontWeight:FontWeight.w600)),textDirection:textDirection,textAlign:TextAlign.center)..layout(maxWidth:92);
-      c.drawLine(Offset(xx,yy),Offset(xx,labelTop+(above?tp.height:0)),Paint()..color=labelColor.withValues(alpha:.35)..strokeWidth=1);
-      tp.paint(c,Offset((labelX-tp.width/2).clamp(0.0,math.max(0.0,s.width-tp.width)).toDouble(),labelTop));
+    if(selectionX!=null&&pts.isNotEmpty){
+      selected=0;var best=(x(pts.first.key)-selectionX!).abs();
+      for(var i=0;i<pts.length;i++){final d=(x(pts[i].key)-selectionX!).abs();if(d<best){best=d;selected=i;}}
     }
+    final values=pts.map((e)=>e.value.weight).toList();
+    final minIndex=_indexOfMin(values),maxIndex=_indexOfMax(values);
+    final labelIndices=<int>{minIndex,maxIndex};
+    if(selected!=null)labelIndices.add(selected!);
+    final occupied=<Rect>[];
+    for(final i in labelIndices.toList()..sort()){
+      final e=pts[i];
+      final point=Offset(x(e.key),y(e.value.weight));
+      final value=e.value.weight.toStringAsFixed(e.value.weight.truncateToDouble()==e.value.weight?0:1);
+      final label=DateFormat('dd/MM/yyyy').format(e.value.date)+'\n'+value+' kg';
+      _drawLabel(c,s,point,label,segments,occupied,top,bottom);
+      c.drawCircle(point,i==selected?9:4,Paint()..color=color);
+    }
+    for(var i=0;i<pts.length;i++){
+      if(labelIndices.contains(i))continue;
+      final e=pts[i];
+      c.drawCircle(Offset(x(e.key),y(e.value.weight)),i==selected?9:4,Paint()..color=color);
+    }
+
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
+  }
+
+  int _indexOfMin(List<double> values){var index=0;for(var i=1;i<values.length;i++)if(values[i]<values[index])index=i;return index;}
+  int _indexOfMax(List<double> values){var index=0;for(var i=1;i<values.length;i++)if(values[i]>values[index])index=i;return index;}
+  bool _segmentsIntersect(Offset a,Offset b,Offset c,Offset d){
+    double cross(Offset p,Offset q,Offset r)=>(q.dx-p.dx)*(r.dy-p.dy)-(q.dy-p.dy)*(r.dx-p.dx);
+    bool on(Offset p,Offset q,Offset r)=>q.dx>=math.min(p.dx,r.dx)-.01&&q.dx<=math.max(p.dx,r.dx)+.01&&q.dy>=math.min(p.dy,r.dy)-.01&&q.dy<=math.max(p.dy,r.dy)+.01;
+    final d1=cross(a,b,c),d2=cross(a,b,d),d3=cross(c,d,a),d4=cross(c,d,b);
+    if(d1.abs()<.01&&on(a,c,b))return true;if(d2.abs()<.01&&on(a,d,b))return true;if(d3.abs()<.01&&on(c,a,d))return true;if(d4.abs()<.01&&on(c,b,d))return true;
+    return ((d1>0)!=(d2>0))&&((d3>0)!=(d4>0));
+  }
+  bool _lineHitsRect(List<List<Offset>> segments,Rect rect){
+    for(final seg in segments){
+      if(rect.contains(seg[0])||rect.contains(seg[1]))return true;
+      if(_segmentsIntersect(seg[0],seg[1],rect.topLeft,rect.topRight))return true;
+      if(_segmentsIntersect(seg[0],seg[1],rect.topRight,rect.bottomRight))return true;
+      if(_segmentsIntersect(seg[0],seg[1],rect.bottomRight,rect.bottomLeft))return true;
+      if(_segmentsIntersect(seg[0],seg[1],rect.bottomLeft,rect.topLeft))return true;
+    }
+    return false;
+  }
+  void _drawLabel(Canvas c,Size s,Offset point,String label,List<List<Offset>> segments,List<Rect> occupied,double top,double bottom){
+    final tp=TextPainter(text:TextSpan(text:label,style:TextStyle(fontSize:10,color:labelColor,fontWeight:FontWeight.w600)),textDirection:textDirection,textAlign:TextAlign.center)..layout(maxWidth:92);
+    const gap=7.0,pad=3.0;
+    final candidates=[
+      Offset(point.dx-tp.width/2,point.dy-tp.height-gap),Offset(point.dx-tp.width/2,point.dy+gap),
+      Offset(point.dx-tp.width-gap,point.dy-tp.height/2),Offset(point.dx+gap,point.dy-tp.height/2),
+      Offset(point.dx-tp.width-gap,point.dy-tp.height-gap),Offset(point.dx+gap,point.dy-tp.height-gap),
+      Offset(point.dx-tp.width-gap,point.dy+gap),Offset(point.dx+gap,point.dy+gap),
+    ];
+    final bounds=Rect.fromLTRB(2,2,s.width-2,s.height-bottom-2);
+    Offset? chosen;Rect? chosenRect;
+    for(final pos in candidates){
+      final rect=Rect.fromLTWH(pos.dx-pad,pos.dy-pad,tp.width+pad*2,tp.height+pad*2);
+      if(rect.left<bounds.left||rect.top<bounds.top||rect.right>bounds.right||rect.bottom>bounds.bottom)continue;
+      if(occupied.any((r)=>r.overlaps(rect)))continue;
+      if(_lineHitsRect(segments,rect))continue;
+      chosen=pos;chosenRect=rect;break;
+    }
+    if(chosen==null){
+      final fallbackX=(point.dx-tp.width/2).clamp(bounds.left+pad,bounds.right-tp.width-pad).toDouble();
+      final fallbackY=(point.dy-tp.height-gap).clamp(bounds.top+pad,bounds.bottom-tp.height-pad).toDouble();
+      chosen=Offset(fallbackX,fallbackY);
+      chosenRect=Rect.fromLTWH(chosen.dx-pad,chosen.dy-pad,tp.width+pad*2,tp.height+pad*2);
+    }
+    occupied.add(chosenRect!);
+    final edge=Offset(point.dx.clamp(chosenRect.left,chosenRect.right).toDouble(),point.dy.clamp(chosenRect.top,chosenRect.bottom).toDouble());
+    c.drawLine(point,edge,Paint()..color=labelColor.withValues(alpha:.35)..strokeWidth=1);
+    tp.paint(c,chosen);
   }
   void _txt(Canvas c,String v,Offset p,double size,Color col,TextAlign a){final tp=TextPainter(text:TextSpan(text:v,style:TextStyle(fontSize:size,color:col,fontWeight:FontWeight.w500)),textDirection:textDirection,textAlign:a)..layout(maxWidth:100);tp.paint(c,Offset((a==TextAlign.center?p.dx-tp.width/2:p.dx).clamp(0.0,10000.0).toDouble(),p.dy));}
   @override bool shouldRepaint(covariant _WeightChartPainter o)=>o.data!=data||o.color!=color||o.previousValue!=previousValue||o.nextValue!=nextValue||o.selectionX!=selectionX||o.startDate!=startDate;
