@@ -487,6 +487,7 @@ class _GymChartPainter extends CustomPainter{
     final grid=Paint()..color=color.withValues(alpha:.14),ticks=Paint()..color=color.withValues(alpha:.10),axis=Paint()..color=color.withValues(alpha:.35);
     for(var j=0;j<=4;j++){final yy=top+h*j/4;c.drawLine(Offset(left,yy),Offset(s.width-right,yy),grid);_txt(c,'${(hi-(hi-lo)*j/4).toStringAsFixed(1)} kg',Offset(2,yy-7),9,labelColor,TextAlign.left);}
     for(var k=0;k<data.length;k++){final xx=x(k);c.drawLine(Offset(xx,top),Offset(xx,s.height-bottom),ticks);final show=data.length<=7||k==0||k==data.length-1||k%5==0;if(show)_txt(c,DateFormat('dd/MM').format(startDate.add(Duration(days:k))),Offset(xx,s.height-bottom+8),9,labelColor,TextAlign.center);}
+    final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
     final segments=<List<Offset>>[];
     if(previousValue!=null)segments.add([Offset(left,y(previousValue!)),Offset(x(pts.first.key),y(pts.first.value.value))]);
     for(var k=1;k<pts.length;k++)segments.add([Offset(x(pts[k-1].key),y(pts[k-1].value.value)),Offset(x(pts[k].key),y(pts[k].value.value))]);
