@@ -183,9 +183,9 @@ class _WeightChartPainter extends CustomPainter{
     for(var k=0;k<data.length;k++){final xx=x(k);c.drawLine(Offset(xx,top),Offset(xx,s.height-bottom),ticks);final show=data.length<=7||k==0||k==data.length-1||k%5==0;if(show)_txt(c,DateFormat('dd/MM').format(startDate.add(Duration(days:k))),Offset(xx,s.height-bottom+8),9,labelColor,TextAlign.center);}
     final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
     final segments=<List<Offset>>[];
-    if(previousValue!=null)segments.add([Offset(left,y(previousValue!)),Offset(x(pts.first.key),y(pts.first.value.value))]);
-    for(var k=1;k<pts.length;k++)segments.add([Offset(x(pts[k-1].key),y(pts[k-1].value.value)),Offset(x(pts[k].key),y(pts[k].value.value))]);
-    if(nextValue!=null)segments.add([Offset(x(pts.last.key),y(pts.last.value.value)),Offset(left+w-edgeInset,y(nextValue!))]);
+    if(previousValue!=null)segments.add([Offset(left,y(previousValue!)),Offset(x(pts.first.key),y(pts.first.value.weight))]);
+    for(var k=1;k<pts.length;k++)segments.add([Offset(x(pts[k-1].key),y(pts[k-1].value.weight)),Offset(x(pts[k].key),y(pts[k].value.weight))]);
+    if(nextValue!=null)segments.add([Offset(x(pts.last.key),y(pts.last.value.weight)),Offset(left+w-edgeInset,y(nextValue!))]);
     final path=Path();
     for(final seg in segments){path.moveTo(seg[0].dx,seg[0].dy);path.lineTo(seg[1].dx,seg[1].dy);}
     if(segments.isNotEmpty)c.drawPath(path,line);
