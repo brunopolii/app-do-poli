@@ -280,7 +280,7 @@ class _WeightChartPainter extends CustomPainter{
     // Em situações muito apertadas, procura a posição válida mais distante
     // da linha antes de recorrer a qualquer fallback.
     if(chosen==null){
-      double bestScore=-double.infinity;
+      double bestScore=double.infinity;
       for(final pos in candidates){
         final rect=Rect.fromLTWH(
           pos.dx-pad,pos.dy-pad,tp.width+pad*2,tp.height+pad*2,
