@@ -237,32 +237,89 @@ class _WeightChartPainter extends CustomPainter{
     return false;
   }
   void _drawLabel(Canvas c,Size s,Offset point,String label,List<List<Offset>> segments,List<Rect> occupied,double top,double bottom){
-    final tp=TextPainter(text:TextSpan(text:label,style:TextStyle(fontSize:10,color:labelColor,fontWeight:FontWeight.w600)),textDirection:textDirection,textAlign:TextAlign.center)..layout(maxWidth:92);
-    const gap=7.0,pad=3.0;
-    final candidates=[
-      Offset(point.dx-tp.width/2,point.dy-tp.height-gap),Offset(point.dx-tp.width/2,point.dy+gap),
-      Offset(point.dx-tp.width-gap,point.dy-tp.height/2),Offset(point.dx+gap,point.dy-tp.height/2),
-      Offset(point.dx-tp.width-gap,point.dy-tp.height-gap),Offset(point.dx+gap,point.dy-tp.height-gap),
-      Offset(point.dx-tp.width-gap,point.dy+gap),Offset(point.dx+gap,point.dy+gap),
-    ];
+    final tp=TextPainter(
+      text:TextSpan(text:label,style:TextStyle(fontSize:10,color:labelColor,fontWeight:FontWeight.w600)),
+      textDirection:textDirection,
+      textAlign:TextAlign.center,
+    )..layout(maxWidth:92);
+
+    const pad=3.0;
     final bounds=Rect.fromLTRB(2,2,s.width-2,s.height-bottom-2);
-    Offset? chosen;Rect? chosenRect;
+
+    // Tenta posições cada vez mais afastadas do ponto. Só aceita uma posição
+    // quando o texto não cobre a linha do gráfico nem outro rótulo.
+    final candidates=<Offset>[];
+    for(final distance in <double>[7,14,22,32,44]){
+      candidates.addAll([
+        Offset(point.dx-tp.width/2,point.dy-tp.height-distance),
+        Offset(point.dx-tp.width/2,point.dy+distance),
+        Offset(point.dx-tp.width-distance,point.dy-tp.height/2),
+        Offset(point.dx+distance,point.dy-tp.height/2),
+        Offset(point.dx-tp.width-distance,point.dy-tp.height-distance),
+        Offset(point.dx+distance,point.dy-tp.height-distance),
+        Offset(point.dx-tp.width-distance,point.dy+distance),
+        Offset(point.dx+distance,point.dy+distance),
+      ]);
+    }
+
+    Offset? chosen;
+    Rect? chosenRect;
     for(final pos in candidates){
-      final rect=Rect.fromLTWH(pos.dx-pad,pos.dy-pad,tp.width+pad*2,tp.height+pad*2);
-      if(rect.left<bounds.left||rect.top<bounds.top||rect.right>bounds.right||rect.bottom>bounds.bottom)continue;
+      final rect=Rect.fromLTWH(
+        pos.dx-pad,pos.dy-pad,tp.width+pad*2,tp.height+pad*2,
+      );
+      if(rect.left<bounds.left||rect.top<bounds.top||
+          rect.right>bounds.right||rect.bottom>bounds.bottom)continue;
       if(occupied.any((r)=>r.overlaps(rect)))continue;
       if(_lineHitsRect(segments,rect))continue;
-      chosen=pos;chosenRect=rect;break;
+      chosen=pos;
+      chosenRect=rect;
+      break;
     }
+
+    // Em situações muito apertadas, procura a posição válida mais distante
+    // da linha antes de recorrer a qualquer fallback.
     if(chosen==null){
-      final fallbackX=(point.dx-tp.width/2).clamp(bounds.left+pad,bounds.right-tp.width-pad).toDouble();
-      final fallbackY=(point.dy-tp.height-gap).clamp(bounds.top+pad,bounds.bottom-tp.height-pad).toDouble();
-      chosen=Offset(fallbackX,fallbackY);
-      chosenRect=Rect.fromLTWH(chosen.dx-pad,chosen.dy-pad,tp.width+pad*2,tp.height+pad*2);
+      double bestScore=-double.infinity;
+      for(final pos in candidates){
+        final rect=Rect.fromLTWH(
+          pos.dx-pad,pos.dy-pad,tp.width+pad*2,tp.height+pad*2,
+        );
+        if(rect.left<bounds.left||rect.top<bounds.top||
+            rect.right>bounds.right||rect.bottom>bounds.bottom)continue;
+        if(occupied.any((r)=>r.overlaps(rect)))continue;
+        var score=0.0;
+        for(final seg in segments){
+          final mid=Offset((seg[0].dx+seg[1].dx)/2,(seg[0].dy+seg[1].dy)/2);
+          score+=1/(1+mid.distanceTo(Offset(rect.center.dx,rect.center.dy)));
+        }
+        if(score< -bestScore){chosen=pos;chosenRect=rect;bestScore=-score;}
+      }
     }
+
+    // Último recurso: posição abaixo do ponto, limitada ao gráfico.
+    if(chosen==null){
+      final fallbackX=(point.dx-tp.width/2).clamp(
+        bounds.left+pad,bounds.right-tp.width-pad,
+      ).toDouble();
+      final fallbackY=(point.dy+7).clamp(
+        bounds.top+pad,bounds.bottom-tp.height-pad,
+      ).toDouble();
+      chosen=Offset(fallbackX,fallbackY);
+      chosenRect=Rect.fromLTWH(
+        chosen.dx-pad,chosen.dy-pad,tp.width+pad*2,tp.height+pad*2,
+      );
+    }
+
     occupied.add(chosenRect!);
-    final edge=Offset(point.dx.clamp(chosenRect.left,chosenRect.right).toDouble(),point.dy.clamp(chosenRect.top,chosenRect.bottom).toDouble());
-    c.drawLine(point,edge,Paint()..color=labelColor.withValues(alpha:.35)..strokeWidth=1);
+    final edge=Offset(
+      point.dx.clamp(chosenRect.left,chosenRect.right).toDouble(),
+      point.dy.clamp(chosenRect.top,chosenRect.bottom).toDouble(),
+    );
+    c.drawLine(
+      point,edge,
+      Paint()..color=labelColor.withValues(alpha:.35)..strokeWidth=1,
+    );
     tp.paint(c,chosen);
   }
   void _txt(Canvas c,String v,Offset p,double size,Color col,TextAlign a){final tp=TextPainter(text:TextSpan(text:v,style:TextStyle(fontSize:size,color:col,fontWeight:FontWeight.w500)),textDirection:textDirection,textAlign:a)..layout(maxWidth:100);tp.paint(c,Offset((a==TextAlign.center?p.dx-tp.width/2:p.dx).clamp(0.0,10000.0).toDouble(),p.dy));}
