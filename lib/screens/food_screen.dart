@@ -293,7 +293,7 @@ class _WeightChartPainter extends CustomPainter{
           final mid=Offset((seg[0].dx+seg[1].dx)/2,(seg[0].dy+seg[1].dy)/2);
           score+=1/(1+mid.distanceTo(Offset(rect.center.dx,rect.center.dy)));
         }
-        if(score< -bestScore){chosen=pos;chosenRect=rect;bestScore=-score;}
+        if(score<bestScore){bestScore=score;chosen=pos;chosenRect=rect;}
       }
     }
 
