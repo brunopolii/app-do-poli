@@ -566,15 +566,26 @@ class _FinanceChart extends CustomPainter{
     return false;
   }
   void _drawLabel(Canvas c,Size s,Offset point,String label,List<List<Offset>> segments,List<Rect> occupied,double top,double bottom){
-    final tp=TextPainter(text:TextSpan(text:label,style:TextStyle(fontSize:10,color:color,fontWeight:FontWeight.w600)),textDirection:ui.TextDirection.ltr,textAlign:TextAlign.center)..layout(maxWidth:92);
-    const gap=7.0,pad=3.0;
-    final candidates=[
-      Offset(point.dx-tp.width/2,point.dy-tp.height-gap),Offset(point.dx-tp.width/2,point.dy+gap),
-      Offset(point.dx-tp.width-gap,point.dy-tp.height/2),Offset(point.dx+gap,point.dy-tp.height/2),
-      Offset(point.dx-tp.width-gap,point.dy-tp.height-gap),Offset(point.dx+gap,point.dy-tp.height-gap),
-      Offset(point.dx-tp.width-gap,point.dy+gap),Offset(point.dx+gap,point.dy+gap),
-    ];
+    final tp=TextPainter(
+      text:TextSpan(text:label,style:TextStyle(fontSize:10,color:color,fontWeight:FontWeight.w600)),
+      textDirection:ui.TextDirection.ltr,
+      textAlign:TextAlign.center,
+    )..layout(maxWidth:92);
+    const pad=3.0;
     final bounds=Rect.fromLTRB(2,2,s.width-2,s.height-bottom-2);
+    final candidates=<Offset>[];
+    for(final distance in <double>[7,14,22,32,44]){
+      candidates.addAll([
+        Offset(point.dx-tp.width/2,point.dy-tp.height-distance),
+        Offset(point.dx-tp.width/2,point.dy+distance),
+        Offset(point.dx-tp.width-distance,point.dy-tp.height/2),
+        Offset(point.dx+distance,point.dy-tp.height/2),
+        Offset(point.dx-tp.width-distance,point.dy-tp.height-distance),
+        Offset(point.dx+distance,point.dy-tp.height-distance),
+        Offset(point.dx-tp.width-distance,point.dy+distance),
+        Offset(point.dx+distance,point.dy+distance),
+      ]);
+    }
     Offset? chosen;Rect? chosenRect;
     for(final pos in candidates){
       final rect=Rect.fromLTWH(pos.dx-pad,pos.dy-pad,tp.width+pad*2,tp.height+pad*2);
@@ -584,9 +595,24 @@ class _FinanceChart extends CustomPainter{
       chosen=pos;chosenRect=rect;break;
     }
     if(chosen==null){
+      var bestScore=double.infinity;
+      for(final pos in candidates){
+        final rect=Rect.fromLTWH(pos.dx-pad,pos.dy-pad,tp.width+pad*2,tp.height+pad*2);
+        if(rect.left<bounds.left||rect.top<bounds.top||rect.right>bounds.right||rect.bottom>bounds.bottom)continue;
+        if(occupied.any((r)=>r.overlaps(rect)))continue;
+        var score=0.0;
+        for(final seg in segments){
+          final mid=Offset((seg[0].dx+seg[1].dx)/2,(seg[0].dy+seg[1].dy)/2);
+          score+=1/(1+mid.distanceTo(rect.center));
+        }
+        if(score<bestScore){bestScore=score;chosen=pos;chosenRect=rect;}
+      }
+    }
+    if(chosen==null){
       final fallbackX=(point.dx-tp.width/2).clamp(bounds.left+pad,bounds.right-tp.width-pad).toDouble();
-      final fallbackY=(point.dy-tp.height-gap).clamp(bounds.top+pad,bounds.bottom-tp.height-pad).toDouble();
-      chosen=Offset(fallbackX,fallbackY);chosenRect=Rect.fromLTWH(chosen.dx-pad,chosen.dy-pad,tp.width+pad*2,tp.height+pad*2);
+      final fallbackY=(point.dy+7).clamp(bounds.top+pad,bounds.bottom-tp.height-pad).toDouble();
+      chosen=Offset(fallbackX,fallbackY);
+      chosenRect=Rect.fromLTWH(chosen.dx-pad,chosen.dy-pad,tp.width+pad*2,tp.height+pad*2);
     }
     occupied.add(chosenRect!);
     final edge=Offset(point.dx.clamp(chosenRect.left,chosenRect.right).toDouble(),point.dy.clamp(chosenRect.top,chosenRect.bottom).toDouble());
