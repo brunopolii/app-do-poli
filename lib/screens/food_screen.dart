@@ -291,7 +291,7 @@ class _WeightChartPainter extends CustomPainter{
         var score=0.0;
         for(final seg in segments){
           final mid=Offset((seg[0].dx+seg[1].dx)/2,(seg[0].dy+seg[1].dy)/2);
-          score+=1/(1+mid.distanceTo(Offset(rect.center.dx,rect.center.dy)));
+          score+=1/(1+math.sqrt(math.pow(mid.dx-rect.center.dx,2)+math.pow(mid.dy-rect.center.dy,2)));
         }
         if(score<bestScore){bestScore=score;chosen=pos;chosenRect=rect;}
       }
