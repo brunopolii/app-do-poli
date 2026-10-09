@@ -1,0 +1,37 @@
+name: Validate Poliroutines Update
+
+on:
+  push:
+    branches:
+      - feature/poliroutines-update-2026-10-09
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.2"
+          channel: stable
+          cache: true
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Build release APK
+        run: flutter build apk --release
+      - name: Upload validation APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: poliroutines-validation-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
