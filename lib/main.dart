@@ -140,6 +140,8 @@ class _AppDoPoliState extends State<AppDoPoli> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
   final GlobalKey<GymScreenState> _gymKey = GlobalKey<GymScreenState>();
+  final GlobalKey<FoodScreenState> _foodKey = GlobalKey<FoodScreenState>();
+  final GlobalKey<FinanceScreenState> _financeKey = GlobalKey<FinanceScreenState>();
   late bool activated;
   late ThemeSettings themeSettings;
   late ThemeMode themeMode;
@@ -289,8 +291,8 @@ class _AppDoPoliState extends State<AppDoPoli> {
                 const AgendaScreen(),
                 GymScreen(key: _gymKey),
                 HomeScreen(key: _homeKey, onOpenTheme: _openTheme, onNavigate: (index) => setState(() => selectedIndex = index)),
-                const FoodScreen(),
-                const FinanceScreen(),
+                FoodScreen(key: _foodKey),
+                FinanceScreen(key: _financeKey),
               ],
             ),
             bottomNavigationBar: Builder(
@@ -341,6 +343,8 @@ class _AppDoPoliState extends State<AppDoPoli> {
                       setState(() => selectedIndex = i);
                       if (i == 1) _gymKey.currentState?.refresh();
                       if (i == 2) _homeKey.currentState?.refresh();
+                      if (i == 3) _foodKey.currentState?.refresh();
+                      if (i == 4) _financeKey.currentState?.refresh();
                     },
                     destinations: const [
                       NavigationDestination(

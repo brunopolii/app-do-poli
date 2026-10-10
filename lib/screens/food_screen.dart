@@ -11,8 +11,8 @@ import '../widgets/app_card.dart';
 
 enum _FoodPeriodMode{week,month}
 
-class FoodScreen extends StatefulWidget { const FoodScreen({super.key}); @override State<FoodScreen> createState()=>_FoodScreenState(); }
-class _FoodScreenState extends State<FoodScreen> {
+class FoodScreen extends StatefulWidget { const FoodScreen({super.key}); @override State<FoodScreen> createState()=>FoodScreenState(); }
+class FoodScreenState extends State<FoodScreen> {
   final ai=AiFoodService(); List<Meal> meals=[]; List<WeightEntry> weights=[]; Map<String,double>? goals; bool loading=true; _FoodPeriodMode mode=_FoodPeriodMode.week; late DateTime period; DateTime selectedDay=_day(DateTime.now()); String get todayKey=>DateFormat('yyyy-MM-dd').format(DateTime.now()); String get selectedDayKey=>DateFormat('yyyy-MM-dd').format(selectedDay);
   @override void initState(){super.initState();period=_weekStart(DateTime.now());_load();}
   static DateTime _day(DateTime d)=>DateTime(d.year,d.month,d.day);
@@ -25,6 +25,10 @@ class _FoodScreenState extends State<FoodScreen> {
   String get periodLabel{if(mode==_FoodPeriodMode.week){final end=periodEnd.subtract(const Duration(days:1));return '${DateFormat('dd/MM').format(periodStart)} – ${DateFormat('dd/MM/yyyy').format(end)}';}return formatMonthYearPtBr(periodStart);}
   void _setMode(_FoodPeriodMode next){setState((){mode=next;period=next==_FoodPeriodMode.week?_weekStart(DateTime.now()):_monthStart(DateTime.now());});}
   void _move(int delta){setState((){period=mode==_FoodPeriodMode.week?periodStart.add(Duration(days:7*delta)):DateTime(periodStart.year,periodStart.month+delta,1);});}
+  Future<void> refresh() async {
+    if (mounted) setState(() => loading = true);
+    await _load();
+  }
   Future<void> _load()async{meals=(await StorageService.read('meals')).map(Meal.fromJson).toList();weights=(await StorageService.read('body_weights')).map(WeightEntry.fromJson).toList()..sort((a,b)=>a.date.compareTo(b.date));final p=await SharedPreferences.getInstance();final r=p.getString('nutrition_goals');if(r!=null){final a=r.split('|');if(a.length==4){goals={'calories':double.tryParse(a[0])??0,'protein':double.tryParse(a[1])??0,'carbs':double.tryParse(a[2])??0,'fat':double.tryParse(a[3])??0};}}if(mounted)setState(()=>loading=false);}
   Future<void> _saveMeals()=>StorageService.write('meals',meals.map((e)=>e.toJson()).toList());Future<void> _saveWeights()=>StorageService.write('body_weights',weights.map((e)=>e.toJson()).toList());
   Future<void> _saveWeight(double value,DateTime? date)async{final d=date??selectedDay;weights.add(WeightEntry(date:DateTime(d.year,d.month,d.day,DateTime.now().hour,DateTime.now().minute,DateTime.now().second).toIso8601String(),weight:value));weights.sort((a,b)=>a.date.compareTo(b.date));await _saveWeights();}
@@ -129,7 +133,7 @@ class _FoodScreenState extends State<FoodScreen> {
         Text('${chart.whereType<WeightEntry>().length} dia(s) com registro • ${weights.length} registro(s) total'),
       ])),
       const SizedBox(height:8),
-      Text('Registros do período',style:Theme.of(context).textTheme.titleLarge),
+      Row(children:[Expanded(child:Text('Registros do período',style:Theme.of(context).textTheme.titleLarge)),TextButton.icon(onPressed:_history,icon:const Icon(Icons.history),label:const Text('Ver todos'))]),
       if(records.isEmpty)const AppCard(child:Text('Nenhum registro de peso neste período.')),
       for(final e in records)ListTile(
         contentPadding:const EdgeInsets.symmetric(horizontal:8),

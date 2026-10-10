@@ -174,7 +174,7 @@ class HomeQuickActions {
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: const InputDecoration(
                         labelText: 'Valor',
-                        prefixText: 'R\\$ ',
+                        prefixText: r'R$ ',
                       ),
                       validator: (value) {
                         final amount = double.tryParse(
@@ -271,6 +271,7 @@ class HomeQuickActions {
     final transactions = await StorageService.read('finance');
     transactions.add(transaction.toJson());
     await StorageService.write('finance', transactions);
+    if (!context.mounted) return true;
     _notify(context, income ? 'Entrada adicionada.' : 'Despesa adicionada.');
     return true;
   }
@@ -309,7 +310,7 @@ class HomeQuickActions {
                 ),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text('Data: ' + DateFormat('dd/MM/yyyy').format(date)),
+                  title: Text('Data: ${DateFormat('dd/MM/yyyy').format(date)}'),
                   trailing: const Icon(Icons.calendar_month_outlined),
                   onTap: () async {
                     final result = await showDatePicker(
@@ -360,6 +361,7 @@ class HomeQuickActions {
     final records = await StorageService.read('body_weights');
     records.add(WeightEntry(date: timestamp.toIso8601String(), weight: weight).toJson());
     await StorageService.write('body_weights', records);
+    if (!context.mounted) return true;
     _notify(context, 'Peso registrado.');
     return true;
   }
@@ -505,6 +507,7 @@ class HomeQuickActions {
     final meals = await StorageService.read('meals');
     meals.add(meal.toJson());
     await StorageService.write('meals', meals);
+    if (!context.mounted) return true;
     _notify(context, 'Refeição adicionada.');
     return true;
   }

@@ -240,7 +240,9 @@ class _HistorySectionState extends State<HistorySection>{
   List<_GymDayPoint?> points(){
     if(exercise==null)return[];
     final byDay=<String,_GymDayPoint>{};
-    for(final w in history){
+    final orderByDay=<String,int>{};
+    for(var index=0;index<history.length;index++){
+      final w=history[index];
       final d=DateTime.tryParse(w.date);
       if(d==null||d.isBefore(periodStart)||!d.isBefore(periodEnd))continue;
       double? best;
@@ -252,7 +254,12 @@ class _HistorySectionState extends State<HistorySection>{
       if(best==null)continue;
       final key=DateFormat('yyyy-MM-dd').format(d);
       final previous=byDay[key];
-      if(previous==null||d.isAfter(previous.date))byDay[key]=_GymDayPoint(d,best,w.id);
+      final previousOrder=orderByDay[key]??-1;
+      final isSameInstant=previous!=null&&d.isAtSameMomentAs(previous.date);
+      if(previous==null||d.isAfter(previous.date)||(isSameInstant&&index>previousOrder)){
+        byDay[key]=_GymDayPoint(d,best,w.id);
+        orderByDay[key]=index;
+      }
     }
     final result=< _GymDayPoint?>[];
     final days=mode==_GymPeriodMode.week?7:periodEnd.difference(periodStart).inDays;

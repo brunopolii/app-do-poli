@@ -8,7 +8,7 @@ on:
       - codex/poliroutines-complete-review-2026-10-10
 
 permissions:
-  contents: read
+  contents: write
 
 # Compartilha o bloqueio com o workflow oficial para evitar versionCode duplicado.
 concurrency:
@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -31,6 +33,23 @@ jobs:
 
       - name: Flutter pub get
         run: flutter pub get
+
+      - name: Apply supported Dart fixes and persist source corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          dart fix --apply
+          git add lib
+          if ! git diff --cached --quiet; then
+            if [[ "$GITHUB_REF_NAME" != codex/poliroutines-complete-review-* ]]; then
+              echo "Há correções automáticas, mas a persistência automática só é permitida na branch isolada de revisão."
+              exit 1
+            fi
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "style: aplicar correções sugeridas pelo Dart"
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
 
       - name: Calculate next Android versionCode
         shell: bash

@@ -12,9 +12,9 @@ const expenseCategories=['Alimentação','Transporte','Moradia','Lazer','Educaç
 const incomeCategories=['Salário','Freelance','Investimentos','Outros'];
 enum _FinancePeriodMode{week,month,semester}
 
-class FinanceScreen extends StatefulWidget{const FinanceScreen({super.key});@override State<FinanceScreen> createState()=>_FinanceScreenState();}
+class FinanceScreen extends StatefulWidget{const FinanceScreen({super.key});@override State<FinanceScreen> createState()=>FinanceScreenState();}
 
-class _FinanceScreenState extends State<FinanceScreen>{
+class FinanceScreenState extends State<FinanceScreen>{
   List<MoneyTransaction> items=[];
   DateTime month=DateTime(DateTime.now().year,DateTime.now().month);
   bool loading=true;
@@ -22,6 +22,11 @@ class _FinanceScreenState extends State<FinanceScreen>{
   DateTime chartAnchor=DateTime(DateTime.now().year,DateTime.now().month);
 
   @override void initState(){super.initState();_load();}
+
+  Future<void> refresh() async {
+    if (mounted) setState(() => loading = true);
+    await _load();
+  }
 
   Future<void> _load()async{
     items=(await StorageService.read('finance')).map(MoneyTransaction.fromJson).toList();
@@ -298,7 +303,7 @@ class _FinanceScreenState extends State<FinanceScreen>{
     final outPaid=_sum(cur,paidOnly:true);
     final pendingExpenses=cur.where((x)=>!x.income&&!x.isPaid&&!x.isCancelled).fold(0.0,(a,x)=>a+x.amount);
     final nextExpenses=items.where((x){
-      if(x.income||x.isPaid||x.isCancelled||(!x.isRecurring&&!x.isInstallment))return false;
+      if(x.income||x.isPaid||x.isCancelled)return false;
       final d=_date(x.dueDate);
       return d.isAfter(DateTime(month.year,month.month+1,0));
     }).fold(0.0,(a,x)=>a+x.amount);
