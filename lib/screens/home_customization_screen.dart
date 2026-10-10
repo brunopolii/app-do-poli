@@ -115,7 +115,7 @@ class _HomeCustomizationScreenState extends State<HomeCustomizationScreen> {
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Adicionar cartão'),
           content: DropdownButtonFormField<String>(
-            value: type,
+            initialValue: type,
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Conteúdo'),
             items: homeCardTypes.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),

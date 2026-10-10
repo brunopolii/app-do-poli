@@ -52,8 +52,9 @@ class FoodScreenState extends State<FoodScreen> {
       if(d==null||d.isBefore(periodStart)||!d.isBefore(periodEnd))continue;
       final key=DateFormat('yyyy-MM-dd').format(d);
       final previous=latestByDay[key];
-      if(previous==null)latestByDay[key]=e;
-      else{
+      if(previous==null) {
+        latestByDay[key]=e;
+      } else{
         final previousDate=DateTime.tryParse(previous.date);
         if(previousDate==null||d.isAfter(previousDate))latestByDay[key]=e;
       }
@@ -69,7 +70,7 @@ class FoodScreenState extends State<FoodScreen> {
 
   double? _previousWeight(){
     WeightEntry? best;
-    for(final e in weights){final d=DateTime.tryParse(e.date);if(d==null||!d.isBefore(periodStart))continue;final bd=best==null?null:DateTime.tryParse(best!.date);if(best==null||bd==null||d.isAfter(bd))best=e;}
+    for(final e in weights){final d=DateTime.tryParse(e.date);if(d==null||!d.isBefore(periodStart))continue;final bd=best==null?null:DateTime.tryParse(best.date);if(best==null||bd==null||d.isAfter(bd))best=e;}
     return best?.weight;
   }
 
@@ -78,7 +79,7 @@ class FoodScreenState extends State<FoodScreen> {
     for(final e in weights){
       final d=DateTime.tryParse(e.date);
       if(d==null||!d.isAfter(periodEnd))continue;
-      final bd=best==null?null:DateTime.tryParse(best!.date);
+      final bd=best==null?null:DateTime.tryParse(best.date);
       if(best==null||bd==null||d.isBefore(bd))best=e;
     }
     return best?.weight;
@@ -178,7 +179,9 @@ class _WeightChartPainter extends CustomPainter{
     final w=math.max(1.0,s.width-left-right),h=math.max(1.0,s.height-top-bottom);
     final pts=<MapEntry<int,WeightEntry>>[];for(var k=0;k<data.length;k++){final p=data[k];if(p!=null)pts.add(MapEntry(k,p));}
     if(pts.isEmpty){_txt(c,'Nada registrado',Offset(s.width/2,s.height/2-10),14,labelColor,TextAlign.center);return;}
-    final vals=<double>[];if(previousValue!=null)vals.add(previousValue!);if(nextValue!=null)vals.add(nextValue!);for(final p in data)if(p!=null)vals.add(p.weight);
+    final vals=<double>[];if(previousValue!=null)vals.add(previousValue!);if(nextValue!=null)vals.add(nextValue!);for(final p in data) {
+      if(p!=null)vals.add(p.weight);
+    }
     final minV=vals.reduce(math.min),maxV=vals.reduce(math.max),raw=math.max(.01,maxV-minV),pad=raw*.12,lo=minV-pad,hi=maxV+pad;
     final innerW=math.max(1.0,w-edgeInset*2).toDouble();
     double x(int i)=>data.length==1?left+w/2:left+edgeInset+innerW*i/(data.length-1);double y(double v)=>top+h-(v-lo)/(hi-lo)*h;
@@ -188,7 +191,9 @@ class _WeightChartPainter extends CustomPainter{
     final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
     final segments=<List<Offset>>[];
     if(previousValue!=null)segments.add([Offset(left,y(previousValue!)),Offset(x(pts.first.key),y(pts.first.value.weight))]);
-    for(var k=1;k<pts.length;k++)segments.add([Offset(x(pts[k-1].key),y(pts[k-1].value.weight)),Offset(x(pts[k].key),y(pts[k].value.weight))]);
+    for(var k=1;k<pts.length;k++) {
+      segments.add([Offset(x(pts[k-1].key),y(pts[k-1].value.weight)),Offset(x(pts[k].key),y(pts[k].value.weight))]);
+    }
     if(nextValue!=null)segments.add([Offset(x(pts.last.key),y(pts.last.value.weight)),Offset(left+w-edgeInset,y(nextValue!))]);
     final path=Path();
     for(final seg in segments){path.moveTo(seg[0].dx,seg[0].dy);path.lineTo(seg[1].dx,seg[1].dy);}
@@ -202,13 +207,13 @@ class _WeightChartPainter extends CustomPainter{
     final values=pts.map((e)=>e.value.weight).toList();
     final minIndex=_indexOfMin(values),maxIndex=_indexOfMax(values);
     final labelIndices=<int>{minIndex,maxIndex};
-    if(selected!=null)labelIndices.add(selected!);
+    if(selected!=null)labelIndices.add(selected);
     final occupied=<Rect>[];
     for(final i in labelIndices.toList()..sort()){
       final e=pts[i];
       final point=Offset(x(e.key),y(e.value.weight));
       final value=e.value.weight.toStringAsFixed(e.value.weight.truncateToDouble()==e.value.weight?0:1);
-      final label=DateFormat('dd/MM/yyyy').format(DateTime.parse(e.value.date))+'\n'+value+' kg';
+      final label='${DateFormat('dd/MM/yyyy').format(DateTime.parse(e.value.date))}\n$value kg';
       _drawLabel(c,s,point,label,segments,occupied,top,bottom);
       c.drawCircle(point,i==selected?9:4,Paint()..color=color);
     }
@@ -221,8 +226,12 @@ class _WeightChartPainter extends CustomPainter{
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
 
-  int _indexOfMin(List<double> values){var index=0;for(var i=1;i<values.length;i++)if(values[i]<values[index])index=i;return index;}
-  int _indexOfMax(List<double> values){var index=0;for(var i=1;i<values.length;i++)if(values[i]>values[index])index=i;return index;}
+  int _indexOfMin(List<double> values){var index=0;for(var i=1;i<values.length;i++) {
+    if(values[i]<values[index])index=i;
+  }return index;}
+  int _indexOfMax(List<double> values){var index=0;for(var i=1;i<values.length;i++) {
+    if(values[i]>values[index])index=i;
+  }return index;}
   bool _segmentsIntersect(Offset a,Offset b,Offset c,Offset d){
     double cross(Offset p,Offset q,Offset r)=>(q.dx-p.dx)*(r.dy-p.dy)-(q.dy-p.dy)*(r.dx-p.dx);
     bool on(Offset p,Offset q,Offset r)=>q.dx>=math.min(p.dx,r.dx)-.01&&q.dx<=math.max(p.dx,r.dx)+.01&&q.dy>=math.min(p.dy,r.dy)-.01&&q.dy<=math.max(p.dy,r.dy)+.01;
@@ -273,7 +282,9 @@ class _WeightChartPainter extends CustomPainter{
         pos.dx-pad,pos.dy-pad,tp.width+pad*2,tp.height+pad*2,
       );
       if(rect.left<bounds.left||rect.top<bounds.top||
-          rect.right>bounds.right||rect.bottom>bounds.bottom)continue;
+          rect.right>bounds.right||rect.bottom>bounds.bottom) {
+        continue;
+      }
       if(occupied.any((r)=>r.overlaps(rect)))continue;
       if(_lineHitsRect(segments,rect))continue;
       chosen=pos;
@@ -290,7 +301,9 @@ class _WeightChartPainter extends CustomPainter{
           pos.dx-pad,pos.dy-pad,tp.width+pad*2,tp.height+pad*2,
         );
         if(rect.left<bounds.left||rect.top<bounds.top||
-            rect.right>bounds.right||rect.bottom>bounds.bottom)continue;
+            rect.right>bounds.right||rect.bottom>bounds.bottom) {
+          continue;
+        }
         if(occupied.any((r)=>r.overlaps(rect)))continue;
         var score=0.0;
         for(final seg in segments){

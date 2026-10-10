@@ -37,8 +37,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
     final title = TextEditingController(text: existing?.title ?? '');
     final desc = TextEditingController(text: existing?.description ?? '');
     final now = TimeOfDay.now();
-    TimeOfDay start = existing == null ? now : _parse(existing!.start);
-    TimeOfDay end = existing == null ? TimeOfDay(hour: (now.hour + 1) % 24, minute: now.minute) : _parse(existing!.end);
+    TimeOfDay start = existing == null ? now : _parse(existing.start);
+    TimeOfDay end = existing == null ? TimeOfDay(hour: (now.hour + 1) % 24, minute: now.minute) : _parse(existing.end);
     bool notify = existing?.notify ?? false;
     final result = await showDialog<bool>(context: context, builder: (c) => StatefulBuilder(builder: (c, ss) => AlertDialog(
       title: Text(existing == null ? 'Novo compromisso' : 'Editar compromisso'),

@@ -98,10 +98,12 @@ class _ExerciseThumb extends StatelessWidget{
   const _ExerciseThumb({required this.path});
   @override Widget build(BuildContext context){
     if(path.isEmpty)return const CircleAvatar(radius:26,child:Icon(Icons.fitness_center));
-    if(path.startsWith('assets/'))return ClipRRect(
+    if(path.startsWith('assets/')) {
+      return ClipRRect(
       borderRadius:BorderRadius.circular(10),
       child:SvgPicture.asset(path,width:52,height:52,fit:BoxFit.cover,placeholderBuilder:(_)=>const CircleAvatar(radius:26,child:Icon(Icons.fitness_center))),
     );
+    }
     return ClipRRect(
       borderRadius:BorderRadius.circular(10),
       child:Image.file(File(path),width:52,height:52,fit:BoxFit.cover,cacheWidth:160,cacheHeight:160,filterQuality:FilterQuality.low,gaplessPlayback:true,errorBuilder:(_,__,___)=>const CircleAvatar(radius:26,child:Icon(Icons.fitness_center))),
@@ -277,7 +279,7 @@ class _HistorySectionState extends State<HistorySection>{
       final d=DateTime.tryParse(w.date);if(d==null||!d.isBefore(periodStart))continue;
       double? value;
       for(final e in w.exercises.where((e)=>e.name==exercise)){for(final v in e.weights){if(v.isFinite&&v>0&&(value==null||v>value))value=v;}}
-      if(value!=null&&(bestDate==null||d.isAfter(bestDate!))){bestDate=d;bestValue=value;}
+      if(value!=null&&(bestDate==null||d.isAfter(bestDate))){bestDate=d;bestValue=value;}
     }
     return bestValue;
   }
@@ -289,7 +291,7 @@ class _HistorySectionState extends State<HistorySection>{
       final d=DateTime.tryParse(w.date);if(d==null||!d.isAfter(periodEnd))continue;
       double? value;
       for(final e in w.exercises.where((e)=>e.name==exercise)){for(final v in e.weights){if(v.isFinite&&v>0&&(value==null||v>value))value=v;}}
-      if(value!=null&&(bestDate==null||d.isBefore(bestDate!))){bestDate=d;bestValue=value;}
+      if(value!=null&&(bestDate==null||d.isBefore(bestDate))){bestDate=d;bestValue=value;}
     }
     return bestValue;
   }
@@ -323,13 +325,17 @@ class _HistorySectionState extends State<HistorySection>{
     ));
     if(ok==true){
       final values=controllers.map((c)=>double.tryParse(c.text.replaceAll(',','.').trim())??0).toList();
-      for(final c in controllers)c.dispose();
+      for(final c in controllers) {
+        c.dispose();
+      }
       if(values.any((v)=>v<0||!v.isFinite))return;
       target.weights=values;
       await StorageService.write('workout_history',history.map((e)=>e.toJson()).toList());
       if(mounted)setState((){});
     }else{
-      for(final c in controllers)c.dispose();
+      for(final c in controllers) {
+        c.dispose();
+      }
     }
   }
 
@@ -338,7 +344,7 @@ class _HistorySectionState extends State<HistorySection>{
     if(workout==null||exercise==null)return;
     final ok=await showDialog<bool>(context:context,builder:(d)=>AlertDialog(
       title:const Text('Excluir registro?'),
-      content:Text('Excluir o registro de ${exercise} em ${DateFormat('dd/MM/yyyy').format(record.date)}?'),
+      content:Text('Excluir o registro de $exercise em ${DateFormat('dd/MM/yyyy').format(record.date)}?'),
       actions:[
         TextButton(onPressed:()=>Navigator.pop(d,false),child:const Text('Cancelar')),
         FilledButton(onPressed:()=>Navigator.pop(d,true),child:const Text('Excluir')),
@@ -353,11 +359,13 @@ class _HistorySectionState extends State<HistorySection>{
 
   @override
   Widget build(BuildContext context){
-    if(history.isEmpty)return AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+    if(history.isEmpty) {
+      return AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       Text('Evolução de carga',style:Theme.of(context).textTheme.titleLarge),
       const SizedBox(height:8),
       const Text('Conclua um treino com cargas registradas para começar a acompanhar sua evolução.')
     ]));
+    }
     final names=history.expand((w)=>w.exercises.map((e)=>e.name)).where((n)=>n.trim().isNotEmpty).toSet().toList()..sort((a,b){
       final ae=history.expand((w)=>w.exercises).firstWhere((e)=>e.name==a);
       final be=history.expand((w)=>w.exercises).firstWhere((e)=>e.name==b);
@@ -399,7 +407,7 @@ class _HistorySectionState extends State<HistorySection>{
       const SizedBox(height:6),
       if(chartData.isNotEmpty)_GymChart(data:chartData,color:Theme.of(context).colorScheme.primary,startDate:periodStart,previousValue:previousValue(),nextValue:nextValue())
       else const Padding(padding:EdgeInsets.symmetric(vertical:24),child:Text('Nenhum registro de carga neste período.')),
-      if(registered>0)Text('${registered} dia(s) com registro • maior carga do treino selecionado'),
+      if(registered>0)Text('$registered dia(s) com registro • maior carga do treino selecionado'),
       const SizedBox(height:8),
       Text('Registros do período',style:Theme.of(context).textTheme.titleMedium),
       if(recordList.isEmpty)const Padding(padding:EdgeInsets.symmetric(vertical:8),child:Text('Nenhum registro neste período.')),
@@ -487,7 +495,9 @@ class _GymChartPainter extends CustomPainter{
     final w=math.max(1.0,s.width-left-right),h=math.max(1.0,s.height-top-bottom);
     final pts=<MapEntry<int,_GymDayPoint>>[];for(var k=0;k<data.length;k++){final p=data[k];if(p!=null)pts.add(MapEntry(k,p));}
     if(pts.isEmpty){_txt(c,'Nada registrado',Offset(s.width/2,s.height/2-10),14,labelColor,TextAlign.center);return;}
-    final vals=<double>[];if(previousValue!=null)vals.add(previousValue!);if(nextValue!=null)vals.add(nextValue!);for(final p in data)if(p!=null)vals.add(p.value);
+    final vals=<double>[];if(previousValue!=null)vals.add(previousValue!);if(nextValue!=null)vals.add(nextValue!);for(final p in data) {
+      if(p!=null)vals.add(p.value);
+    }
     final minV=vals.reduce(math.min),maxV=vals.reduce(math.max),raw=math.max(.01,maxV-minV),pad=raw*.12,lo=minV-pad,hi=maxV+pad;
     final innerW=math.max(1.0,w-edgeInset*2).toDouble();
     double x(int i)=>data.length==1?left+w/2:left+edgeInset+innerW*i/(data.length-1);double y(double v)=>top+h-(v-lo)/(hi-lo)*h;
@@ -497,7 +507,9 @@ class _GymChartPainter extends CustomPainter{
     final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
     final segments=<List<Offset>>[];
     if(previousValue!=null)segments.add([Offset(left,y(previousValue!)),Offset(x(pts.first.key),y(pts.first.value.value))]);
-    for(var k=1;k<pts.length;k++)segments.add([Offset(x(pts[k-1].key),y(pts[k-1].value.value)),Offset(x(pts[k].key),y(pts[k].value.value))]);
+    for(var k=1;k<pts.length;k++) {
+      segments.add([Offset(x(pts[k-1].key),y(pts[k-1].value.value)),Offset(x(pts[k].key),y(pts[k].value.value))]);
+    }
     if(nextValue!=null)segments.add([Offset(x(pts.last.key),y(pts.last.value.value)),Offset(left+w-edgeInset,y(nextValue!))]);
     final path=Path();
     for(final seg in segments){path.moveTo(seg[0].dx,seg[0].dy);path.lineTo(seg[1].dx,seg[1].dy);}
@@ -511,13 +523,13 @@ class _GymChartPainter extends CustomPainter{
     final values=pts.map((e)=>e.value.value).toList();
     final minIndex=_indexOfMin(values),maxIndex=_indexOfMax(values);
     final labelIndices=<int>{minIndex,maxIndex};
-    if(selected!=null)labelIndices.add(selected!);
+    if(selected!=null)labelIndices.add(selected);
     final occupied=<Rect>[];
     for(final i in labelIndices.toList()..sort()){
       final e=pts[i];
       final point=Offset(x(e.key),y(e.value.value));
       final value=e.value.value.toStringAsFixed(e.value.value.truncateToDouble()==e.value.value?0:1);
-      final label=DateFormat('dd/MM/yyyy').format(e.value.date)+'\n'+value+' kg';
+      final label='${DateFormat('dd/MM/yyyy').format(e.value.date)}\n$value kg';
       _drawLabel(c,s,point,label,segments,occupied,top,bottom);
       c.drawCircle(point,i==selected?9:4,Paint()..color=color);
     }
@@ -530,8 +542,12 @@ class _GymChartPainter extends CustomPainter{
     c.drawLine(Offset(left,top),Offset(left,s.height-bottom),axis);c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
 
-  int _indexOfMin(List<double> values){var index=0;for(var i=1;i<values.length;i++)if(values[i]<values[index])index=i;return index;}
-  int _indexOfMax(List<double> values){var index=0;for(var i=1;i<values.length;i++)if(values[i]>values[index])index=i;return index;}
+  int _indexOfMin(List<double> values){var index=0;for(var i=1;i<values.length;i++) {
+    if(values[i]<values[index])index=i;
+  }return index;}
+  int _indexOfMax(List<double> values){var index=0;for(var i=1;i<values.length;i++) {
+    if(values[i]>values[index])index=i;
+  }return index;}
   bool _segmentsIntersect(Offset a,Offset b,Offset c,Offset d){
     double cross(Offset p,Offset q,Offset r)=>(q.dx-p.dx)*(r.dy-p.dy)-(q.dy-p.dy)*(r.dx-p.dx);
     bool on(Offset p,Offset q,Offset r)=>q.dx>=math.min(p.dx,r.dx)-.01&&q.dx<=math.max(p.dx,r.dx)+.01&&q.dy>=math.min(p.dy,r.dy)-.01&&q.dy<=math.max(p.dy,r.dy)+.01;
@@ -582,7 +598,9 @@ class _GymChartPainter extends CustomPainter{
         pos.dx-pad,pos.dy-pad,tp.width+pad*2,tp.height+pad*2,
       );
       if(rect.left<bounds.left||rect.top<bounds.top||
-          rect.right>bounds.right||rect.bottom>bounds.bottom)continue;
+          rect.right>bounds.right||rect.bottom>bounds.bottom) {
+        continue;
+      }
       if(occupied.any((r)=>r.overlaps(rect)))continue;
       if(_lineHitsRect(segments,rect))continue;
       chosen=pos;
@@ -599,7 +617,9 @@ class _GymChartPainter extends CustomPainter{
           pos.dx-pad,pos.dy-pad,tp.width+pad*2,tp.height+pad*2,
         );
         if(rect.left<bounds.left||rect.top<bounds.top||
-            rect.right>bounds.right||rect.bottom>bounds.bottom)continue;
+            rect.right>bounds.right||rect.bottom>bounds.bottom) {
+          continue;
+        }
         if(occupied.any((r)=>r.overlaps(rect)))continue;
         var score=0.0;
         for(final seg in segments){

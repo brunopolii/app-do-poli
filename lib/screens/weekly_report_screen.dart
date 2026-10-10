@@ -52,7 +52,7 @@ class _WeeklyReportScreenState extends State<WeeklyReportScreen> {
     final diff = current - previous;
     final sign = diff > 0 ? '+' : '';
     final percentage = previous == 0 ? (current == 0 ? '0%' : 'novo') : '${(diff / previous * 100).toStringAsFixed(0)}%';
-    return '${sign}${diff.toStringAsFixed(0)} ($percentage)';
+    return '$sign${diff.toStringAsFixed(0)} ($percentage)';
   }
 
   Widget _metric(String title, String current, String previous, String delta, {bool reverse = false}) {

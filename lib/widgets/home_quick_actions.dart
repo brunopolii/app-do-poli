@@ -438,7 +438,7 @@ class HomeQuickActions {
                     ),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text('Data: ' + DateFormat('dd/MM/yyyy').format(date)),
+                      title: Text('Data: ${DateFormat('dd/MM/yyyy').format(date)}'),
                       trailing: const Icon(Icons.calendar_month_outlined),
                       onTap: () async {
                         final result = await showDatePicker(

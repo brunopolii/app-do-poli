@@ -91,7 +91,7 @@ class LicenseService {
       final installationId = await _installationId();
       final response = await http
           .post(
-            Uri.parse(endpoint + '/validate'),
+            Uri.parse('$endpoint/validate'),
             headers: const {'content-type': 'application/json'},
             body: jsonEncode({
               'license_key': key,
@@ -141,7 +141,7 @@ class LicenseService {
       final installationId = await _installationId();
       final response = await http
           .post(
-            Uri.parse(endpoint + '/activate'),
+            Uri.parse('$endpoint/activate'),
             headers: const {'content-type': 'application/json'},
             body: jsonEncode({
               'license_key': key,

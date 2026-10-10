@@ -43,8 +43,11 @@ class FinanceScreenState extends State<FinanceScreen>{
     for(final x in items){
       if(x.isCancelled||x.isPaid)continue;
       final d=DateTime.tryParse(x.dueDate);
-      if(d!=null&&d.isBefore(d0))x.paymentStatus='overdue';
-      else x.paymentStatus='pending';
+      if(d!=null&&d.isBefore(d0)) {
+        x.paymentStatus='overdue';
+      } else {
+        x.paymentStatus='pending';
+      }
     }
   }
 
@@ -234,8 +237,9 @@ class FinanceScreenState extends State<FinanceScreen>{
   }
 
   Future<void> _edit(MoneyTransaction x)async{
-    if(x.isInstallment)await _installment(editing:x);
-    else if(x.isRecurring&&x.income)await _salary(editing:x);
+    if(x.isInstallment) {
+      await _installment(editing:x);
+    } else if(x.isRecurring&&x.income)await _salary(editing:x);
     else if(x.isRecurring)await _recurring(editing:x);
     else await _single(x.income,editing:x);
   }
@@ -258,7 +262,9 @@ class FinanceScreenState extends State<FinanceScreen>{
       ListTile(title:const Text('Compra parcelada'),onTap:()=>Navigator.pop(c,'inst')),
       ListTile(title:const Text('Despesa recorrente'),onTap:()=>Navigator.pop(c,'rec')),ListTile(title:const Text('Salário mensal'),onTap:()=>Navigator.pop(c,'salary')),
     ])));
-    if(choice=='in')await _single(true);else if(choice=='out')await _single(false);else if(choice=='inst')await _installment();else if(choice=='rec')await _recurring();else if(choice=='salary')await _salary();
+    if(choice=='in') {
+      await _single(true);
+    } else if(choice=='out')await _single(false);else if(choice=='inst')await _installment();else if(choice=='rec')await _recurring();else if(choice=='salary')await _salary();
   }
 
   DateTime get _chartCurrentMonth=>DateTime(DateTime.now().year,DateTime.now().month);
@@ -291,8 +297,9 @@ class FinanceScreenState extends State<FinanceScreen>{
   }
   void _setChartMode(_FinancePeriodMode next){setState((){chartMode=next;chartAnchor=next==_FinancePeriodMode.week?_weekStart(DateTime.now()):_chartCurrentMonth;});}
   void _moveChart(int delta){setState((){
-    if(chartMode==_FinancePeriodMode.week)chartAnchor=_chartStart.add(Duration(days:7*delta));
-    else if(chartMode==_FinancePeriodMode.month)chartAnchor=DateTime(chartAnchor.year,chartAnchor.month+delta,1);
+    if(chartMode==_FinancePeriodMode.week) {
+      chartAnchor=_chartStart.add(Duration(days:7*delta));
+    } else if(chartMode==_FinancePeriodMode.month)chartAnchor=DateTime(chartAnchor.year,chartAnchor.month+delta,1);
     else chartAnchor=DateTime(chartAnchor.year,chartAnchor.month+(delta*6),1);
   });}
 
@@ -346,9 +353,9 @@ class FinanceScreenState extends State<FinanceScreen>{
       AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text('Próximas despesas',style:Theme.of(context).textTheme.titleLarge),
         const SizedBox(height:6),
-        Text(nextExpenses==0?'Nenhuma próxima despesa registrada.':'Total previsto: '+money(nextExpenses)),
+        Text(nextExpenses==0?'Nenhuma próxima despesa registrada.':'Total previsto: ${money(nextExpenses)}'),
         const SizedBox(height:4),
-        Text('Saldo previsto: '+money(projectedBalance),style:Theme.of(context).textTheme.bodySmall),
+        Text('Saldo previsto: ${money(projectedBalance)}',style:Theme.of(context).textTheme.bodySmall),
       ])),
       AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text('Evolução financeira',style:Theme.of(context).textTheme.titleLarge),
@@ -476,14 +483,14 @@ class _FinanceChart extends CustomPainter{
       nextBalance=futureOpening+delta;
     }
 
-    final scaleValues=<double>[opening,...points.map((p)=>p.balance),if(nextBalance!=null)nextBalance!];
+    final scaleValues=<double>[opening,...points.map((p)=>p.balance),if(nextBalance!=null)nextBalance];
     var minV=scaleValues.reduce((a,b)=>math.min(a,b).toDouble());
     var maxV=scaleValues.reduce((a,b)=>math.max(a,b).toDouble());
     if((maxV-minV).abs()<.01){minV-=1;maxV+=1;}
     final range=maxV-minV;
     final grid=Paint()..color=color.withValues(alpha:.14)..strokeWidth=1;
     final vertical=Paint()..color=color.withValues(alpha:.08)..strokeWidth=1;
-    final axis=Paint()..color=this.color.withValues(alpha:.35)..strokeWidth=1;
+    final axis=Paint()..color=color.withValues(alpha:.35)..strokeWidth=1;
     final line=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
     final totalDays=math.max(1,visibleEnd.difference(start).inDays).toDouble();
     double xFor(DateTime d){
@@ -518,8 +525,10 @@ class _FinanceChart extends CustomPainter{
     final segments=<List<Offset>>[];
     if(points.isNotEmpty){
       segments.add([Offset(left,yFor(opening)),Offset(xFor(points.first.date),yFor(points.first.balance))]);
-      for(var i=1;i<points.length;i++)segments.add([Offset(xFor(points[i-1].date),yFor(points[i-1].balance)),Offset(xFor(points[i].date),yFor(points[i].balance))]);
-      if(nextBalance!=null)segments.add([Offset(xFor(points.last.date),yFor(points.last.balance)),Offset(left+w-edgeInset,yFor(nextBalance!))]);
+      for(var i=1;i<points.length;i++) {
+        segments.add([Offset(xFor(points[i-1].date),yFor(points[i-1].balance)),Offset(xFor(points[i].date),yFor(points[i].balance))]);
+      }
+      if(nextBalance!=null)segments.add([Offset(xFor(points.last.date),yFor(points.last.balance)),Offset(left+w-edgeInset,yFor(nextBalance))]);
       final path=Path();
       for(final seg in segments){path.moveTo(seg[0].dx,seg[0].dy);path.lineTo(seg[1].dx,seg[1].dy);}
       c.drawPath(path,line);
@@ -531,12 +540,12 @@ class _FinanceChart extends CustomPainter{
       final values=points.map((p)=>p.balance).toList();
       final minIndex=_indexOfMin(values),maxIndex=_indexOfMax(values);
       final labelIndices=<int>{minIndex,maxIndex};
-      if(selected!=null)labelIndices.add(selected!);
+      if(selected!=null)labelIndices.add(selected);
       final occupied=<Rect>[];
       for(final i in labelIndices.toList()..sort()){
         final p=points[i];
         final point=Offset(xFor(p.date),yFor(p.balance));
-        final label=DateFormat('dd/MM/yyyy').format(p.date)+'\n'+moneyPoint(p.balance);
+        final label='${DateFormat('dd/MM/yyyy').format(p.date)}\n${moneyPoint(p.balance)}';
         _drawLabel(c,s,point,label,segments,occupied,top,bottom);
         c.drawCircle(point,i==selected?9:4,Paint()..color=color);
       }
@@ -551,8 +560,12 @@ class _FinanceChart extends CustomPainter{
     c.drawLine(Offset(left,s.height-bottom),Offset(s.width-right,s.height-bottom),axis);
   }
 
-  int _indexOfMin(List<double> values){var index=0;for(var i=1;i<values.length;i++)if(values[i]<values[index])index=i;return index;}
-  int _indexOfMax(List<double> values){var index=0;for(var i=1;i<values.length;i++)if(values[i]>values[index])index=i;return index;}
+  int _indexOfMin(List<double> values){var index=0;for(var i=1;i<values.length;i++) {
+    if(values[i]<values[index])index=i;
+  }return index;}
+  int _indexOfMax(List<double> values){var index=0;for(var i=1;i<values.length;i++) {
+    if(values[i]>values[index])index=i;
+  }return index;}
   bool _segmentsIntersect(Offset a,Offset b,Offset c,Offset d){
     double cross(Offset p,Offset q,Offset r)=>(q.dx-p.dx)*(r.dy-p.dy)-(q.dy-p.dy)*(r.dx-p.dx);
     bool on(Offset p,Offset q,Offset r)=>q.dx>=math.min(p.dx,r.dx)-.01&&q.dx<=math.max(p.dx,r.dx)+.01&&q.dy>=math.min(p.dy,r.dy)-.01&&q.dy<=math.max(p.dy,r.dy)+.01;
@@ -626,14 +639,14 @@ class _FinanceChart extends CustomPainter{
   }
   String deltaLabel(double value){
     final sign=value>=0?'+':'-';
-    return 'R\$'+sign+value.abs().toStringAsFixed(2).replaceAll('.',',');
+    return 'R\$$sign${value.abs().toStringAsFixed(2).replaceAll('.',',')}';
   }
-  String moneyPoint(double value)=>'R\$'+value.toStringAsFixed(value.truncateToDouble()==value?0:2).replaceAll('.',',');
+  String moneyPoint(double value)=>'R\$${value.toStringAsFixed(value.truncateToDouble()==value?0:2).replaceAll('.',',')}';
   String moneyLabel(double value){
     final sign=value<0?'-':'';
     final abs=value.abs();
-    if(abs>=1000)return 'R\$'+sign+(abs/1000).toStringAsFixed(abs%1000==0?0:1)+'k';
-    return 'R\$'+sign+abs.toStringAsFixed(abs.truncateToDouble()==abs?0:2).replaceAll('.',',');
+    if(abs>=1000)return 'R\$$sign${(abs/1000).toStringAsFixed(abs%1000==0?0:1)}k';
+    return 'R\$$sign${abs.toStringAsFixed(abs.truncateToDouble()==abs?0:2).replaceAll('.',',')}';
   }
   void _text(Canvas c,String text,Offset position,double size,Color textColor){
     final tp=TextPainter(text:TextSpan(text:text,style:TextStyle(fontSize:size,color:textColor,fontWeight:FontWeight.w500)),textDirection:ui.TextDirection.ltr)..layout(maxWidth:88);
