@@ -68,7 +68,7 @@ jobs:
               -o "$LATEST_APK"; then
             AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1 || true)"
             if [ -n "$AAPT" ]; then
-              LATEST_CODE="$("$AAPT" dump badging "$LATEST_APK" | sed -n "s/.*versionCode='\\([0-9][0-9]*\\)'.*/\\1/p" | head -n 1)"
+              LATEST_CODE="$("$AAPT" dump badging "$LATEST_APK" | sed -n "s/.*versionCode='\([0-9][0-9]*\)'.*/\1/p" | head -n 1)"
             fi
           fi
 
