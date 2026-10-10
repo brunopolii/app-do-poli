@@ -43,7 +43,7 @@ class _WeeklyReportScreenState extends State<WeeklyReportScreen> {
   }
 
   double _sumMoney(List<MoneyTransaction> source, DateTime start, DateTime end, bool income) {
-    return source.where((m) => m.income == income && m.isPaid && !m.isCancelled && _inRange(m.paidDate.isNotEmpty ? m.paidDate : m.date, start, end))
+    return source.where((m) => m.income == income && m.isPaid && !m.isCancelled && _inRange(m.paidDate?.isNotEmpty == true ? m.paidDate! : m.date, start, end))
       .fold(0.0, (sum, m) => sum + m.amount);
   }
 
@@ -52,8 +52,6 @@ class _WeeklyReportScreenState extends State<WeeklyReportScreen> {
     final diff = current - previous;
     final sign = diff > 0 ? '+' : '';
     final percentage = previous == 0 ? (current == 0 ? '0%' : 'novo') : '${(diff / previous * 100).toStringAsFixed(0)}%';
-    final upIsGood = reverse ? diff < 0 : diff > 0;
-    final color = diff == 0 ? Theme.of(context).colorScheme.onSurfaceVariant : (upIsGood ? Colors.green : Colors.red);
     return '${sign}${diff.toStringAsFixed(0)} ($percentage)';
   }
 
