@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feature/poliroutines-update-2026-10-09
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
