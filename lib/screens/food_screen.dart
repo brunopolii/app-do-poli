@@ -78,7 +78,7 @@ class FoodScreenState extends State<FoodScreen> {
     WeightEntry? best;
     for(final e in weights){
       final d=DateTime.tryParse(e.date);
-      if(d==null||!d.isAfter(periodEnd))continue;
+      if(d==null||d.isBefore(periodEnd))continue;
       final bd=best==null?null:DateTime.tryParse(best.date);
       if(best==null||bd==null||d.isBefore(bd))best=e;
     }
