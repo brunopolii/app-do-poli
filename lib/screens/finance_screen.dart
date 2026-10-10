@@ -349,13 +349,48 @@ class FinanceScreenState extends State<FinanceScreen>{
         .toList();
     final incPaid = _sum(paidCur, income: true, paidOnly: true);
     final outPaid = _sum(paidCur, paidOnly: true);
-    final pendingExpenses=cur.where((x)=>!x.income&&!x.isPaid&&!x.isCancelled).fold(0.0,(a,x)=>a+x.amount);
-    final nextExpenses=items.where((x){
-      if(x.income||x.isPaid||x.isCancelled)return false;
-      final d=_date(x.dueDate);
-      return d.isAfter(DateTime(month.year,month.month+1,0));
-    }).fold(0.0,(a,x)=>a+x.amount);
-    final projectedBalance=_balance()-pendingExpenses-nextExpenses;
+    final pendingExpenses = cur
+        .where((x) => !x.income && !x.isPaid && !x.isCancelled)
+        .fold(0.0, (sum, x) => sum + x.amount);
+    final selectedMonthPendingIncome = cur
+        .where((x) => x.income && !x.isPaid && !x.isCancelled)
+        .fold(0.0, (sum, x) => sum + x.amount);
+    final selectedMonthStart = DateTime(month.year, month.month, 1);
+    final nextMonthStart = DateTime(month.year, month.month + 1, 1);
+    final followingMonthStart = DateTime(month.year, month.month + 2, 1);
+    final nextMonthPending = items.where((x) {
+      if (x.isPaid || x.isCancelled) return false;
+      final due = _date(x.dueDate);
+      return !due.isBefore(nextMonthStart) && due.isBefore(followingMonthStart);
+    }).toList();
+    final nextExpenses = nextMonthPending
+        .where((x) => !x.income)
+        .fold(0.0, (sum, x) => sum + x.amount);
+    final nextIncome = nextMonthPending
+        .where((x) => x.income)
+        .fold(0.0, (sum, x) => sum + x.amount);
+    final openingBalance = items
+        .where((x) =>
+            x.isPaid &&
+            !x.isCancelled &&
+            _cashMovementDate(x).isBefore(selectedMonthStart))
+        .fold(0.0, (sum, x) => sum + (x.income ? x.amount : -x.amount));
+    final paidNextMonth = items
+        .where((x) {
+          if (!x.isPaid || x.isCancelled) return false;
+          final paidDate = _cashMovementDate(x);
+          return !paidDate.isBefore(nextMonthStart) &&
+              paidDate.isBefore(followingMonthStart);
+        })
+        .fold(0.0, (sum, x) => sum + (x.income ? x.amount : -x.amount));
+    final projectedBalance = openingBalance +
+        incPaid -
+        outPaid +
+        selectedMonthPendingIncome -
+        pendingExpenses +
+        paidNextMonth +
+        nextIncome -
+        nextExpenses;
     final cats=<String,double>{};
     for(final x in cur.where((x)=>!x.income)){cats[x.category]=(cats[x.category]??0)+x.amount;}
     return SafeArea(child:ListView(padding:const EdgeInsets.all(16),children:[
