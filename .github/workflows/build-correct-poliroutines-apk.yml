@@ -1,0 +1,85 @@
+name: Build Correct Poliroutines APK
+on:
+  push:
+    branches:
+      - feature/poliroutines-update-2026-10-09
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: poliroutines-correct-apk
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.2"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Calculate next versionCode from latest published APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURRENT_CODE="$(sed -n 's/^version: .*+\([0-9][0-9]*\)$/\1/p' pubspec.yaml | head -n 1)"
+          test -n "$CURRENT_CODE"
+          LATEST_APK="/tmp/Poliroutines-latest.apk"
+          NEXT_CODE=""
+          if curl -fL --retry 3 --retry-delay 2 "https://github.com/brunopolii/app-do-poli/releases/latest/download/Poliroutines.apk" -o "$LATEST_APK"; then
+            AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1 || true)"
+            if [ -n "$AAPT" ]; then
+              NEXT_CODE="$("$AAPT" dump badging "$LATEST_APK" | sed -n "s/.*versionCode='\\([0-9][0-9]*\\)'.*/\\1/p" | head -n 1)"
+            fi
+          fi
+          if [ -z "$NEXT_CODE" ]; then
+            NEXT_CODE="$((CURRENT_CODE + 1))"
+          else
+            NEXT_CODE="$((NEXT_CODE + 1))"
+            if [ "$NEXT_CODE" -le "$CURRENT_CODE" ]; then NEXT_CODE="$((CURRENT_CODE + 1))"; fi
+          fi
+          echo "NEXT_VERSION_CODE=$NEXT_CODE" >> "$GITHUB_ENV"
+          echo "Resolved Android versionName from pubspec: $(sed -n 's/^version: \([^+]*\)+.*/\1/p' pubspec.yaml)"
+          echo "Resolved Android versionCode for this APK: $NEXT_CODE"
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Configure release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/poliroutines-release.keystore
+          cat > android/key.properties <<EOF
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          storeFile=poliroutines-release.keystore
+          EOF
+      - name: Build release APK
+        run: flutter build apk --release --build-number "$NEXT_VERSION_CODE"
+      - name: Verify APK metadata and signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          "$AAPT" dump badging "$APK" | grep -E "^package:|^application-label:"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          sha256sum "$APK"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: poliroutines-correct-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
