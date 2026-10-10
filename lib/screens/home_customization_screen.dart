@@ -47,6 +47,17 @@ const homeCardTypes = <String, String>{
   'weekly': 'Relatório semanal',
 };
 
+const homeCardMetricOptions = <String, Map<String, String>>{
+  'overview': {'agenda': 'Compromissos', 'gym': 'Treinos', 'food': 'Refeições'},
+  'quick': {'agenda': 'Compromisso', 'gym': 'Treino', 'food': 'Refeição', 'finance': 'Finanças'},
+  'agenda': {'next': 'Próximos compromissos'},
+  'gym': {'workouts': 'Treinos na semana', 'last': 'Último treino'},
+  'food': {'calories': 'Calorias', 'protein': 'Proteína', 'carbs': 'Carboidratos', 'fat': 'Gorduras'},
+  'finance': {'income': 'Entradas', 'expense': 'Despesas', 'balance': 'Resultado'},
+  'alerts': {'appointments': 'Compromissos de hoje', 'bills': 'Despesas pendentes'},
+  'weekly': {'workouts': 'Academia', 'meals': 'Alimentação', 'finance': 'Financeiro'},
+};
+
 class HomeCustomizationScreen extends StatefulWidget {
   final List<Map<String, dynamic>> initialCards;
   const HomeCustomizationScreen({super.key, required this.initialCards});
@@ -191,6 +202,33 @@ class _HomeCustomizationScreenState extends State<HomeCustomizationScreen> {
                         decoration: const InputDecoration(labelText: 'Título do cartão', isDense: true),
                         onChanged: (value) => card['title'] = value,
                       ),
+                      if (homeCardMetricOptions[type] != null) ...[
+                        const SizedBox(height: 10),
+                        const Align(alignment: Alignment.centerLeft, child: Text('Detalhes exibidos')),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 0,
+                            children: homeCardMetricOptions[type]!.entries.map((entry) {
+                              final selected = ((card['metrics'] as List?) ?? const []).contains(entry.key);
+                              return FilterChip(
+                                label: Text(entry.value),
+                                selected: selected,
+                                onSelected: (value) => setState(() {
+                                  final metrics = List<String>.from((card['metrics'] as List?) ?? const []);
+                                  if (value && !metrics.contains(entry.key)) {
+                                    metrics.add(entry.key);
+                                  } else if (!value) {
+                                    metrics.remove(entry.key);
+                                  }
+                                  card['metrics'] = metrics;
+                                }),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
