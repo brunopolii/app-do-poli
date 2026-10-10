@@ -12,6 +12,17 @@ const expenseCategories=['Alimentação','Transporte','Moradia','Lazer','Educaç
 const incomeCategories=['Salário','Freelance','Investimentos','Outros'];
 enum FinancePeriodMode{week,month,semester}
 
+DateTime _cashMovementDate(MoneyTransaction transaction) {
+  final paidDate = transaction.paidDate;
+  final effectiveDate =
+      transaction.isPaid && paidDate != null && paidDate.isNotEmpty
+          ? paidDate
+          : transaction.date;
+  return DateTime.tryParse(effectiveDate) ??
+      DateTime.tryParse(transaction.date) ??
+      DateTime(1900);
+}
+
 class FinanceScreen extends StatefulWidget{const FinanceScreen({super.key});@override State<FinanceScreen> createState()=>FinanceScreenState();}
 
 class FinanceScreenState extends State<FinanceScreen>{
@@ -330,8 +341,14 @@ class FinanceScreenState extends State<FinanceScreen>{
   @override Widget build(BuildContext context){
     if(loading)return const Center(child:CircularProgressIndicator());
     final cur=_month(month);
-    final incPaid=_sum(cur,income:true,paidOnly:true);
-    final outPaid=_sum(cur,paidOnly:true);
+    final paidCur = items
+        .where((x) =>
+            !x.isCancelled &&
+            x.isPaid &&
+            _ym(_cashMovementDate(x)) == _ym(month))
+        .toList();
+    final incPaid = _sum(paidCur, income: true, paidOnly: true);
+    final outPaid = _sum(paidCur, paidOnly: true);
     final pendingExpenses=cur.where((x)=>!x.income&&!x.isPaid&&!x.isCancelled).fold(0.0,(a,x)=>a+x.amount);
     final nextExpenses=items.where((x){
       if(x.income||x.isPaid||x.isCancelled)return false;
@@ -448,7 +465,7 @@ class _FinanceInteractiveChartState extends State<_FinanceInteractiveChart>{
 class _FinanceChart extends CustomPainter{
   final DateTime start;final DateTime end;final FinancePeriodMode mode;final List<MoneyTransaction> items;final Color color;final double? selectedX;
   _FinanceChart({required this.start,required this.end,required this.mode,required this.items,required this.color,required this.selectedX});
-  DateTime _movementDate(MoneyTransaction x)=>DateTime.tryParse(x.date)??DateTime(1900);
+  DateTime _movementDate(MoneyTransaction x) => _cashMovementDate(x);
   double _delta(MoneyTransaction x)=>x.income?x.amount:-x.amount;
 
   @override void paint(Canvas c,Size s){
@@ -569,7 +586,7 @@ class _FinanceChart extends CustomPainter{
       for(final i in labelIndices.toList()..sort()){
         final p=points[i];
         final point=Offset(xFor(p.date),yFor(p.balance));
-        final label='${DateFormat('dd/MM/yyyy').format(p.date)}\n${moneyPoint(p.balance)}';
+        final label = '${DateFormat('dd/MM/yyyy').format(p.date)}\n${moneyPoint(p.balance)}\n${deltaLabel(p.delta)}';
         _drawLabel(c,s,point,label,segments,occupied,top,bottom);
         c.drawCircle(point,i==selected?9:4,Paint()..color=color);
       }

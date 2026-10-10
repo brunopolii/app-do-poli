@@ -72,7 +72,7 @@ jobs:
           echo "NEXT_VERSION_CODE=$NEXT_CODE" >> "$GITHUB_ENV"
 
       - name: Analyze
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        run: flutter analyze --fatal-infos --fatal-warnings
 
       - name: Configure release signing
         env:
