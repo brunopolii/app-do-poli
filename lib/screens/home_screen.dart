@@ -245,7 +245,17 @@ class HomeScreenState extends State<HomeScreen> {
       return d != null && !DateTime(d.year, d.month, d.day).isBefore(DateTime(now.year, now.month, now.day));
     }).toList()..sort((a, b) => '${a.date} ${a.start}'.compareTo('${b.date} ${b.start}'));
     final todayMeals = meals.where((e) => e.date == today).toList();
-    final currentMonth = money.where((x) => x.date.startsWith(DateFormat('yyyy-MM').format(now)));
+    final monthKey = DateFormat('yyyy-MM').format(now);
+    final currentMonth = money.where((transaction) {
+      if (transaction.isCancelled) return false;
+      final paidDate = transaction.paidDate;
+      final effectiveDate = transaction.isPaid &&
+              paidDate != null &&
+              paidDate.isNotEmpty
+          ? paidDate
+          : transaction.date;
+      return effectiveDate.startsWith(monthKey);
+    });
     final income = _cash(currentMonth, true, paid: true);
     final expense = _cash(currentMonth, false, paid: true);
     final balance = _cash(money, true, paid: true) - _cash(money, false, paid: true);
