@@ -271,44 +271,65 @@ class _HistorySectionState extends State<HistorySection>{
     return result;
   }
 
-  double? previousValue(){
-    if(exercise==null)return null;
-    DateTime? bestDate;double? bestValue;
-    for(final w in history){
-      final d=DateTime.tryParse(w.date);if(d==null||!d.isBefore(periodStart))continue;
+  double? previousValue() {
+    if (exercise == null) return null;
+    DateTime? bestDate;
+    double? bestValue;
+    var bestIndex = -1;
+    for (var index = 0; index < history.length; index++) {
+      final workout = history[index];
+      final date = DateTime.tryParse(workout.date);
+      if (date == null || !date.isBefore(periodStart)) continue;
       double? value;
-      for(final e in w.exercises.where((e)=>e.name==exercise)){for(final v in e.weights){if(v.isFinite&&v>0&&(value==null||v>value))value=v;}}
-      final sameDay = bestDate != null &&
-          DateUtils.isSameDay(d, bestDate);
+      for (final entry in workout.exercises.where((e) => e.name == exercise)) {
+        for (final weight in entry.weights) {
+          if (weight.isFinite && weight > 0 && (value == null || weight > value)) {
+            value = weight;
+          }
+        }
+      }
+      final sameInstant = bestDate != null && date.isAtSameMomentAs(bestDate);
       if (value != null &&
           (bestDate == null ||
-              d.isAfter(bestDate) ||
-              (sameDay && d.isAtSameMomentAs(bestDate)))) {
-        bestDate = d;
+              date.isAfter(bestDate) ||
+              (sameInstant && index > bestIndex))) {
+        bestDate = date;
         bestValue = value;
+        bestIndex = index;
       }
     }
     return bestValue;
   }
 
-  double? nextValue(){
-    if(exercise==null)return null;
-    DateTime? bestDate;double? bestValue;
-    for(final w in history){
-      final d=DateTime.tryParse(w.date);if(d==null||!d.isAfter(periodEnd))continue;
+  double? nextValue() {
+    if (exercise == null) return null;
+    DateTime? bestDate;
+    double? bestValue;
+    var bestIndex = -1;
+    for (var index = 0; index < history.length; index++) {
+      final workout = history[index];
+      final date = DateTime.tryParse(workout.date);
+      if (date == null || !date.isAfter(periodEnd)) continue;
       double? value;
-      for(final e in w.exercises.where((e)=>e.name==exercise)){for(final v in e.weights){if(v.isFinite&&v>0&&(value==null||v>value))value=v;}}
-      final sameDay = bestDate != null &&
-          DateUtils.isSameDay(d, bestDate);
-      final isEarlierDay = bestDate == null ||
-          DateTime(d.year, d.month, d.day).isBefore(
+      for (final entry in workout.exercises.where((e) => e.name == exercise)) {
+        for (final weight in entry.weights) {
+          if (weight.isFinite && weight > 0 && (value == null || weight > value)) {
+            value = weight;
+          }
+        }
+      }
+      final sameDay = bestDate != null && DateUtils.isSameDay(date, bestDate);
+      final earlierDay = bestDate == null ||
+          DateTime(date.year, date.month, date.day).isBefore(
             DateTime(bestDate.year, bestDate.month, bestDate.day),
           );
+      final sameInstant = bestDate != null && date.isAtSameMomentAs(bestDate);
       final laterOnSameDay = sameDay &&
-          (d.isAfter(bestDate) || d.isAtSameMomentAs(bestDate));
-      if (value != null && (isEarlierDay || laterOnSameDay)) {
-        bestDate = d;
+          (date.isAfter(bestDate) || (sameInstant && index > bestIndex));
+      if (value != null && (earlierDay || laterOnSameDay)) {
+        bestDate = date;
         bestValue = value;
+        bestIndex = index;
       }
     }
     return bestValue;
