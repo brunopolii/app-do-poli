@@ -105,17 +105,19 @@ class HomeScreenState extends State<HomeScreen> {
     final type = (config['type'] ?? 'overview').toString();
     switch (type) {
       case 'overview':
+        final metrics = (config['metrics'] as List? ?? []).cast<String>();
         return _card(config, Row(children: [
-          _counter(Icons.event_outlined, 'Compromissos', events.where((e) => e.date == today).length),
-          _counter(Icons.fitness_center, 'Treinos', workouts.where((w) => w.date == today).length),
-          _counter(Icons.restaurant_outlined, 'Refeições', todayMeals.length),
+          if (metrics.contains('agenda')) _counter(Icons.event_outlined, 'Compromissos', events.where((e) => e.date == today).length),
+          if (metrics.contains('gym')) _counter(Icons.fitness_center, 'Treinos', workouts.where((w) => w.date == today).length),
+          if (metrics.contains('food')) _counter(Icons.restaurant_outlined, 'Refeições', todayMeals.length),
         ]));
       case 'quick':
+        final metrics = (config['metrics'] as List? ?? []).cast<String>();
         return _card(config, Wrap(spacing: 8, runSpacing: 8, children: [
-          _quickAction(Icons.event_outlined, 'Compromisso', () => _go(0)),
-          _quickAction(Icons.fitness_center, 'Treino', () => _go(1)),
-          _quickAction(Icons.restaurant_outlined, 'Refeição', () => _go(3)),
-          _quickAction(Icons.account_balance_wallet_outlined, 'Finanças', () => _go(4)),
+          if (metrics.contains('agenda')) _quickAction(Icons.event_outlined, 'Compromisso', () => _go(0)),
+          if (metrics.contains('gym')) _quickAction(Icons.fitness_center, 'Treino', () => _go(1)),
+          if (metrics.contains('food')) _quickAction(Icons.restaurant_outlined, 'Refeição', () => _go(3)),
+          if (metrics.contains('finance')) _quickAction(Icons.account_balance_wallet_outlined, 'Finanças', () => _go(4)),
         ]));
       case 'agenda':
         return _card(config, upcoming.isEmpty
@@ -135,9 +137,10 @@ class HomeScreenState extends State<HomeScreen> {
           return d != null && !DateTime(d.year, d.month, d.day).isBefore(weekStart);
         }).length;
         final recent = workouts.toList()..sort((a, b) => b.date.compareTo(a.date));
+        final metrics = (config['metrics'] as List? ?? []).cast<String>();
         return _card(config, Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [_stat('$weekWorkouts', 'treinos nesta semana'), _stat('${workouts.length}', 'registros totais')]),
-          if (config['size'] != 'compact' && recent.isNotEmpty) ...[
+          if (metrics.contains('workouts')) Text('$weekWorkouts treino(s) nesta semana', style: Theme.of(context).textTheme.titleMedium),
+          if (metrics.contains('last') && recent.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text('Último treino: ${recent.first.name} • ${recent.first.date}'),
           ],
@@ -172,16 +175,23 @@ class HomeScreenState extends State<HomeScreen> {
           return d != null && !d.isBefore(todayDate) && !d.isAfter(todayDate.add(const Duration(days: 7)));
         }).toList()..sort((a, b) => a.dueDate.compareTo(b.dueDate));
         final todayEvents = events.where((e) => e.date == today).length;
+        final metrics = (config['metrics'] as List? ?? []).cast<String>();
         return _card(config, Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.event_available_outlined), title: Text('$todayEvents compromisso(s) hoje'), onTap: () => _go(0)),
-          ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.payments_outlined), title: Text('${urgent.length} despesa(s) pendente(s) nos próximos 7 dias'), onTap: () => _go(4)),
-          if (urgent.isNotEmpty) Text('Próxima: ${urgent.first.description} • ${urgent.first.dueDate}'),
+          if (metrics.contains('appointments')) ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.event_available_outlined), title: Text('$todayEvents compromisso(s) hoje'), onTap: () => _go(0)),
+          if (metrics.contains('bills')) ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.payments_outlined), title: Text('${urgent.length} despesa(s) pendente(s) nos próximos 7 dias'), onTap: () => _go(4)),
+          if (metrics.contains('bills') && urgent.isNotEmpty) Text('Próxima: ${urgent.first.description} • ${urgent.first.dueDate}'),
         ]));
       case 'weekly':
+        final metrics = (config['metrics'] as List? ?? []).cast<String>();
+        final labels = <String>[
+          if (metrics.contains('workouts')) 'Academia',
+          if (metrics.contains('meals')) 'Alimentação',
+          if (metrics.contains('finance')) 'Financeiro',
+        ];
         return _card(config, Row(children: [
           const Icon(Icons.insights_outlined, size: 32),
           const SizedBox(width: 12),
-          const Expanded(child: Text('Compare seus treinos, alimentação e finanças com a semana anterior.')),
+          Expanded(child: Text(labels.isEmpty ? 'Relatório sem módulos selecionados.' : 'Comparação semanal: ${labels.join(' • ')}')),
           const Icon(Icons.chevron_right),
         ]), onTap: _openWeeklyReport);
       default:
