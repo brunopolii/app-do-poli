@@ -309,7 +309,7 @@ class _HistorySectionState extends State<HistorySection>{
     for (var index = 0; index < history.length; index++) {
       final workout = history[index];
       final date = DateTime.tryParse(workout.date);
-      if (date == null || !date.isAfter(periodEnd)) continue;
+      if (date == null || date.isBefore(periodEnd)) continue;
       double? value;
       for (final entry in workout.exercises.where((e) => e.name == exercise)) {
         for (final weight in entry.weights) {
