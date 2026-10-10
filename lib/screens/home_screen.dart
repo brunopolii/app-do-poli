@@ -4,6 +4,7 @@ import '../utils/date_formatters.dart';
 import '../models/models.dart';
 import '../services/storage_service.dart';
 import '../widgets/app_card.dart';
+import '../widgets/home_quick_actions.dart';
 import 'home_customization_screen.dart';
 import 'weekly_report_screen.dart';
 
@@ -61,6 +62,14 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _go(int index) => widget.onNavigate?.call(index);
+
+  Future<void> _openQuickAdd(List<String> enabledActions) async {
+    final saved = await HomeQuickActions.show(
+      context,
+      enabledActions: enabledActions,
+    );
+    if (saved) await refresh();
+  }
   Future<void> _openWeeklyReport() async {
     await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => const WeeklyReportScreen()));
   }
@@ -112,13 +121,20 @@ class HomeScreenState extends State<HomeScreen> {
           if (metrics.contains('food')) _counter(Icons.restaurant_outlined, 'Refeições', todayMeals.length),
         ]));
       case 'quick':
-        final metrics = (config['metrics'] as List? ?? []).cast<String>();
-        return _card(config, Wrap(spacing: 8, runSpacing: 8, children: [
-          if (metrics.contains('agenda')) _quickAction(Icons.event_outlined, 'Compromisso', () => _go(0)),
-          if (metrics.contains('gym')) _quickAction(Icons.fitness_center, 'Treino', () => _go(1)),
-          if (metrics.contains('food')) _quickAction(Icons.restaurant_outlined, 'Refeição', () => _go(3)),
-          if (metrics.contains('finance')) _quickAction(Icons.account_balance_wallet_outlined, 'Finanças', () => _go(4)),
-        ]));
+        final metrics = (config['metrics'] as List? ?? const [])
+            .map((value) => value.toString())
+            .toList();
+        return _card(
+          config,
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => _openQuickAdd(metrics),
+              icon: const Icon(Icons.add_circle_outline),
+              label: const Text('O que deseja adicionar?'),
+            ),
+          ),
+        );
       case 'agenda':
         return _card(config, upcoming.isEmpty
           ? const Text('Nada agendado para os próximos dias.')
@@ -131,10 +147,14 @@ class HomeScreenState extends State<HomeScreen> {
               onTap: () => _go(0),
             )).toList()), onTap: () => _go(0));
       case 'gym':
-        final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+        final weekStart = DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: now.weekday % 7));
+        final weekEnd = weekStart.add(const Duration(days: 7));
         final weekWorkouts = workouts.where((w) {
           final d = DateTime.tryParse(w.date);
-          return d != null && !DateTime(d.year, d.month, d.day).isBefore(weekStart);
+          if (d == null) return false;
+          final day = DateTime(d.year, d.month, d.day);
+          return !day.isBefore(weekStart) && day.isBefore(weekEnd);
         }).length;
         final recent = workouts.toList()..sort((a, b) => b.date.compareTo(a.date));
         final metrics = (config['metrics'] as List? ?? []).cast<String>();
@@ -199,8 +219,6 @@ class HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Widget _quickAction(IconData icon, String label, VoidCallback onTap) => ActionChip(
-    avatar: Icon(icon, size: 18), label: Text(label), onPressed: onTap);
 
   Widget _smallMetric(String value, String label) => SizedBox(width: 130,
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

@@ -7,7 +7,7 @@ class HomeCardSettings {
 
   static List<Map<String, dynamic>> defaults() => [
     {'id': 'overview', 'type': 'overview', 'title': 'Resumo de hoje', 'visible': true, 'size': 'normal', 'metrics': ['agenda', 'gym', 'food']},
-    {'id': 'quick', 'type': 'quick', 'title': 'Ações rápidas', 'visible': true, 'size': 'compact', 'metrics': ['agenda', 'gym', 'food', 'finance']},
+    {'id': 'quick', 'type': 'quick', 'title': 'Ações rápidas', 'visible': true, 'size': 'compact', 'metrics': ['expense', 'income', 'weight', 'food']},
     {'id': 'agenda', 'type': 'agenda', 'title': 'Próximos compromissos', 'visible': true, 'size': 'normal', 'metrics': ['next']},
     {'id': 'gym', 'type': 'gym', 'title': 'Academia', 'visible': true, 'size': 'normal', 'metrics': ['workouts', 'last']},
     {'id': 'food', 'type': 'food', 'title': 'Alimentação de hoje', 'visible': true, 'size': 'normal', 'metrics': ['calories', 'protein', 'carbs', 'fat']},
@@ -24,6 +24,27 @@ class HomeCardSettings {
       final decoded = jsonDecode(raw) as List;
       final cards = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       if (cards.isEmpty) return defaults();
+
+      // Migra ações rápidas antigas para opções de cadastro, sem perder os demais cartões.
+      var migrated = false;
+      const allowedQuickActions = ['expense', 'income', 'weight', 'food'];
+      for (final card in cards.where((item) => item['type'] == 'quick')) {
+        final existing = (card['metrics'] as List? ?? const [])
+            .map((value) => value.toString())
+            .toList();
+        final hasLegacyAction =
+            existing.any((value) => !allowedQuickActions.contains(value));
+        final normalized = hasLegacyAction || existing.isEmpty
+            ? List<String>.from(allowedQuickActions)
+            : existing.toSet().toList();
+        if (existing.join('|') != normalized.join('|')) {
+          card['metrics'] = normalized;
+          migrated = true;
+        }
+      }
+      if (migrated) {
+        await prefs.setString(storageKey, jsonEncode(cards));
+      }
       return cards;
     } catch (_) {
       return defaults();
@@ -49,7 +70,7 @@ const homeCardTypes = <String, String>{
 
 const homeCardMetricOptions = <String, Map<String, String>>{
   'overview': {'agenda': 'Compromissos', 'gym': 'Treinos', 'food': 'Refeições'},
-  'quick': {'agenda': 'Compromisso', 'gym': 'Treino', 'food': 'Refeição', 'finance': 'Finanças'},
+  'quick': {'expense': 'Despesa', 'income': 'Entrada', 'weight': 'Peso corporal', 'food': 'Comida'},
   'agenda': {'next': 'Próximos compromissos'},
   'gym': {'workouts': 'Treinos na semana', 'last': 'Último treino'},
   'food': {'calories': 'Calorias', 'protein': 'Proteína', 'carbs': 'Carboidratos', 'fat': 'Gorduras'},

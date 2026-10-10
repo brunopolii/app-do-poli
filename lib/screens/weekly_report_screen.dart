@@ -77,21 +77,22 @@ class _WeeklyReportScreenState extends State<WeeklyReportScreen> {
   Widget build(BuildContext context) {
     if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     final today = _day(DateTime.now());
-    final start = today.subtract(const Duration(days: 6));
+    final start = today.subtract(Duration(days: today.weekday % 7));
+    final end = start.add(const Duration(days: 6));
     final previousStart = start.subtract(const Duration(days: 7));
     final previousEnd = start.subtract(const Duration(days: 1));
-    final currentWorkouts = workouts.where((w) => _inRange(w.date, start, today)).length.toDouble();
+    final currentWorkouts = workouts.where((w) => _inRange(w.date, start, end)).length.toDouble();
     final previousWorkouts = workouts.where((w) => _inRange(w.date, previousStart, previousEnd)).length.toDouble();
-    final currentMeals = meals.where((m) => _inRange(m.date, start, today)).length.toDouble();
+    final currentMeals = meals.where((m) => _inRange(m.date, start, end)).length.toDouble();
     final previousMeals = meals.where((m) => _inRange(m.date, previousStart, previousEnd)).length.toDouble();
-    final currentCalories = _sumMeals(meals, start, today, 0);
+    final currentCalories = _sumMeals(meals, start, end, 0);
     final previousCalories = _sumMeals(meals, previousStart, previousEnd, 0);
-    final currentIncome = _sumMoney(money, start, today, true);
+    final currentIncome = _sumMoney(money, start, end, true);
     final previousIncome = _sumMoney(money, previousStart, previousEnd, true);
-    final currentExpense = _sumMoney(money, start, today, false);
+    final currentExpense = _sumMoney(money, start, end, false);
     final previousExpense = _sumMoney(money, previousStart, previousEnd, false);
     final fmt = DateFormat('dd/MM');
-    final period = '${fmt.format(start)} – ${fmt.format(today)}';
+    final period = '${fmt.format(start)} – ${fmt.format(end)}';
     final previousPeriod = '${fmt.format(previousStart)} – ${fmt.format(previousEnd)}';
 
     return Scaffold(
