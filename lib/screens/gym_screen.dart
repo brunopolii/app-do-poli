@@ -209,7 +209,6 @@ class _HistorySectionState extends State<HistorySection>{
 
   Future<void> load()async{
     history=(await StorageService.read('workout_history')).map(Workout.fromJson).toList();
-    history.sort((a,b)=>a.date.compareTo(b.date));
     if(mounted)setState((){});
   }
 
@@ -279,7 +278,15 @@ class _HistorySectionState extends State<HistorySection>{
       final d=DateTime.tryParse(w.date);if(d==null||!d.isBefore(periodStart))continue;
       double? value;
       for(final e in w.exercises.where((e)=>e.name==exercise)){for(final v in e.weights){if(v.isFinite&&v>0&&(value==null||v>value))value=v;}}
-      if(value!=null&&(bestDate==null||d.isAfter(bestDate))){bestDate=d;bestValue=value;}
+      final sameDay = bestDate != null &&
+          DateUtils.isSameDay(d, bestDate);
+      if (value != null &&
+          (bestDate == null ||
+              d.isAfter(bestDate) ||
+              (sameDay && d.isAtSameMomentAs(bestDate)))) {
+        bestDate = d;
+        bestValue = value;
+      }
     }
     return bestValue;
   }
@@ -291,7 +298,18 @@ class _HistorySectionState extends State<HistorySection>{
       final d=DateTime.tryParse(w.date);if(d==null||!d.isAfter(periodEnd))continue;
       double? value;
       for(final e in w.exercises.where((e)=>e.name==exercise)){for(final v in e.weights){if(v.isFinite&&v>0&&(value==null||v>value))value=v;}}
-      if(value!=null&&(bestDate==null||d.isBefore(bestDate))){bestDate=d;bestValue=value;}
+      final sameDay = bestDate != null &&
+          DateUtils.isSameDay(d, bestDate);
+      final isEarlierDay = bestDate == null ||
+          DateTime(d.year, d.month, d.day).isBefore(
+            DateTime(bestDate.year, bestDate.month, bestDate.day),
+          );
+      final laterOnSameDay = sameDay &&
+          (d.isAfter(bestDate) || d.isAtSameMomentAs(bestDate));
+      if (value != null && (isEarlierDay || laterOnSameDay)) {
+        bestDate = d;
+        bestValue = value;
+      }
     }
     return bestValue;
   }

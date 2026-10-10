@@ -146,7 +146,7 @@ class _HomeCustomizationScreenState extends State<HomeCustomizationScreen> {
 
   List<String> _defaultMetrics(String type) => switch (type) {
     'overview' => ['agenda', 'gym', 'food'],
-    'quick' => ['agenda', 'gym', 'food', 'finance'],
+    'quick' => ['expense', 'income', 'weight', 'food'],
     'agenda' => ['next'],
     'gym' => ['workouts', 'last'],
     'food' => ['calories', 'protein', 'carbs', 'fat'],
@@ -168,9 +168,8 @@ class _HomeCustomizationScreenState extends State<HomeCustomizationScreen> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: cards.length,
-            onReorder: (oldIndex, newIndex) {
+            onReorderItem: (oldIndex, newIndex) {
               setState(() {
-                if (newIndex > oldIndex) newIndex--;
                 final item = cards.removeAt(oldIndex);
                 cards.insert(newIndex, item);
               });

@@ -9,22 +9,22 @@ import '../services/ai_food_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/app_card.dart';
 
-enum _FoodPeriodMode{week,month}
+enum FoodPeriodMode{week,month}
 
 class FoodScreen extends StatefulWidget { const FoodScreen({super.key}); @override State<FoodScreen> createState()=>FoodScreenState(); }
 class FoodScreenState extends State<FoodScreen> {
-  final ai=AiFoodService(); List<Meal> meals=[]; List<WeightEntry> weights=[]; Map<String,double>? goals; bool loading=true; _FoodPeriodMode mode=_FoodPeriodMode.week; late DateTime period; DateTime selectedDay=_day(DateTime.now()); String get todayKey=>DateFormat('yyyy-MM-dd').format(DateTime.now()); String get selectedDayKey=>DateFormat('yyyy-MM-dd').format(selectedDay);
+  final ai=AiFoodService(); List<Meal> meals=[]; List<WeightEntry> weights=[]; Map<String,double>? goals; bool loading=true; FoodPeriodMode mode=FoodPeriodMode.week; late DateTime period; DateTime selectedDay=_day(DateTime.now()); String get todayKey=>DateFormat('yyyy-MM-dd').format(DateTime.now()); String get selectedDayKey=>DateFormat('yyyy-MM-dd').format(selectedDay);
   @override void initState(){super.initState();period=_weekStart(DateTime.now());_load();}
   static DateTime _day(DateTime d)=>DateTime(d.year,d.month,d.day);
   static DateTime _weekStart(DateTime d)=>_day(d).subtract(Duration(days:d.weekday%7));
   static DateTime _monthStart(DateTime d)=>DateTime(d.year,d.month,1);
-  DateTime get periodStart=>mode==_FoodPeriodMode.week?_weekStart(period):_monthStart(period);
-  DateTime get periodEnd=>mode==_FoodPeriodMode.week?periodStart.add(const Duration(days:7)):DateTime(periodStart.year,periodStart.month+1,1);
-  DateTime get currentStart{final now=DateTime.now();return mode==_FoodPeriodMode.week?_weekStart(now):_monthStart(now);}
+  DateTime get periodStart=>mode==FoodPeriodMode.week?_weekStart(period):_monthStart(period);
+  DateTime get periodEnd=>mode==FoodPeriodMode.week?periodStart.add(const Duration(days:7)):DateTime(periodStart.year,periodStart.month+1,1);
+  DateTime get currentStart{final now=DateTime.now();return mode==FoodPeriodMode.week?_weekStart(now):_monthStart(now);}
   bool get canGoNext=>periodStart.isBefore(currentStart);
-  String get periodLabel{if(mode==_FoodPeriodMode.week){final end=periodEnd.subtract(const Duration(days:1));return '${DateFormat('dd/MM').format(periodStart)} – ${DateFormat('dd/MM/yyyy').format(end)}';}return formatMonthYearPtBr(periodStart);}
-  void _setMode(_FoodPeriodMode next){setState((){mode=next;period=next==_FoodPeriodMode.week?_weekStart(DateTime.now()):_monthStart(DateTime.now());});}
-  void _move(int delta){setState((){period=mode==_FoodPeriodMode.week?periodStart.add(Duration(days:7*delta)):DateTime(periodStart.year,periodStart.month+delta,1);});}
+  String get periodLabel{if(mode==FoodPeriodMode.week){final end=periodEnd.subtract(const Duration(days:1));return '${DateFormat('dd/MM').format(periodStart)} – ${DateFormat('dd/MM/yyyy').format(end)}';}return formatMonthYearPtBr(periodStart);}
+  void _setMode(FoodPeriodMode next){setState((){mode=next;period=next==FoodPeriodMode.week?_weekStart(DateTime.now()):_monthStart(DateTime.now());});}
+  void _move(int delta){setState((){period=mode==FoodPeriodMode.week?periodStart.add(Duration(days:7*delta)):DateTime(periodStart.year,periodStart.month+delta,1);});}
   Future<void> refresh() async {
     if (mounted) setState(() => loading = true);
     await _load();
@@ -60,7 +60,7 @@ class FoodScreenState extends State<FoodScreen> {
       }
     }
     final out=<WeightEntry?>[];
-    final days=mode==_FoodPeriodMode.week?7:periodEnd.difference(periodStart).inDays;
+    final days=mode==FoodPeriodMode.week?7:periodEnd.difference(periodStart).inDays;
     for(var i=0;i<days;i++){
       final d=periodStart.add(Duration(days:i));
       out.add(latestByDay[DateFormat('yyyy-MM-dd').format(d)]);
@@ -114,10 +114,10 @@ class FoodScreenState extends State<FoodScreen> {
       AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text('Evolução do peso',style:Theme.of(context).textTheme.titleLarge),
         const SizedBox(height:8),
-        SegmentedButton<_FoodPeriodMode>(
+        SegmentedButton<FoodPeriodMode>(
           segments:const[
-            ButtonSegment(value:_FoodPeriodMode.week,label:Text('Semanal')),
-            ButtonSegment(value:_FoodPeriodMode.month,label:Text('Mensal')),
+            ButtonSegment(value:FoodPeriodMode.week,label:Text('Semanal')),
+            ButtonSegment(value:FoodPeriodMode.month,label:Text('Mensal')),
           ],
           selected:{mode},
           onSelectionChanged:(v){if(v.isNotEmpty)_setMode(v.first);},
@@ -128,7 +128,7 @@ class FoodScreenState extends State<FoodScreen> {
           Expanded(child:Text(periodLabel,textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.w600))),
           if(canGoNext)IconButton(onPressed:()=>_move(1),icon:const Icon(Icons.chevron_right))else const SizedBox(width:48),
         ]),
-        Text(mode==_FoodPeriodMode.week?'Uma pesagem por dia • última pesagem do dia':'Uma pesagem por dia • última pesagem de cada dia',style:Theme.of(context).textTheme.bodySmall),
+        Text(mode==FoodPeriodMode.week?'Uma pesagem por dia • última pesagem do dia':'Uma pesagem por dia • última pesagem de cada dia',style:Theme.of(context).textTheme.bodySmall),
         const SizedBox(height:4),
         _WeightChart(data:chart,color:Theme.of(context).colorScheme.primary,startDate:periodStart,previousValue:_previousWeight(),nextValue:_nextWeight()),
         Text('${chart.whereType<WeightEntry>().length} dia(s) com registro • ${weights.length} registro(s) total'),

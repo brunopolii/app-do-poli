@@ -117,7 +117,16 @@ class HomeScreenState extends State<HomeScreen> {
         final metrics = (config['metrics'] as List? ?? []).cast<String>();
         return _card(config, Row(children: [
           if (metrics.contains('agenda')) _counter(Icons.event_outlined, 'Compromissos', events.where((e) => e.date == today).length),
-          if (metrics.contains('gym')) _counter(Icons.fitness_center, 'Treinos', workouts.where((w) => w.date == today).length),
+          if (metrics.contains('gym'))
+            _counter(
+              Icons.fitness_center,
+              'Treinos',
+              workouts.where((workout) {
+                final date = DateTime.tryParse(workout.date);
+                return date != null &&
+                    DateFormat('yyyy-MM-dd').format(date) == today;
+              }).length,
+            ),
           if (metrics.contains('food')) _counter(Icons.restaurant_outlined, 'Refeições', todayMeals.length),
         ]));
       case 'quick':

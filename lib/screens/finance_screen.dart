@@ -10,7 +10,7 @@ import '../widgets/app_card.dart';
 
 const expenseCategories=['Alimentação','Transporte','Moradia','Lazer','Educação','Saúde','Compras','Outros'];
 const incomeCategories=['Salário','Freelance','Investimentos','Outros'];
-enum _FinancePeriodMode{week,month,semester}
+enum FinancePeriodMode{week,month,semester}
 
 class FinanceScreen extends StatefulWidget{const FinanceScreen({super.key});@override State<FinanceScreen> createState()=>FinanceScreenState();}
 
@@ -18,7 +18,7 @@ class FinanceScreenState extends State<FinanceScreen>{
   List<MoneyTransaction> items=[];
   DateTime month=DateTime(DateTime.now().year,DateTime.now().month);
   bool loading=true;
-  _FinancePeriodMode chartMode=_FinancePeriodMode.month;
+  FinancePeriodMode chartMode=FinancePeriodMode.month;
   DateTime chartAnchor=DateTime(DateTime.now().year,DateTime.now().month);
 
   @override void initState(){super.initState();_load();}
@@ -236,12 +236,16 @@ class FinanceScreenState extends State<FinanceScreen>{
     await _save();if(mounted)setState((){});
   }
 
-  Future<void> _edit(MoneyTransaction x)async{
-    if(x.isInstallment) {
-      await _installment(editing:x);
-    } else if(x.isRecurring&&x.income)await _salary(editing:x);
-    else if(x.isRecurring)await _recurring(editing:x);
-    else await _single(x.income,editing:x);
+  Future<void> _edit(MoneyTransaction x) async {
+    if (x.isInstallment) {
+      await _installment(editing: x);
+    } else if (x.isRecurring && x.income) {
+      await _salary(editing: x);
+    } else if (x.isRecurring) {
+      await _recurring(editing: x);
+    } else {
+      await _single(x.income, editing: x);
+    }
   }
 
   Future<void> _remove(MoneyTransaction x)async{
@@ -255,27 +259,44 @@ class FinanceScreenState extends State<FinanceScreen>{
     await _save();if(mounted)setState((){});
   }
 
-  Future<void> _menu()async{
-    final choice=await showModalBottomSheet<String>(context:context,builder:(c)=>SafeArea(child:Column(mainAxisSize:MainAxisSize.min,children:[
-      ListTile(title:const Text('Nova entrada'),onTap:()=>Navigator.pop(c,'in')),
-      ListTile(title:const Text('Nova despesa'),onTap:()=>Navigator.pop(c,'out')),
-      ListTile(title:const Text('Compra parcelada'),onTap:()=>Navigator.pop(c,'inst')),
-      ListTile(title:const Text('Despesa recorrente'),onTap:()=>Navigator.pop(c,'rec')),ListTile(title:const Text('Salário mensal'),onTap:()=>Navigator.pop(c,'salary')),
-    ])));
-    if(choice=='in') {
+  Future<void> _menu() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (c) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(title: const Text('Nova entrada'), onTap: () => Navigator.pop(c, 'in')),
+            ListTile(title: const Text('Nova despesa'), onTap: () => Navigator.pop(c, 'out')),
+            ListTile(title: const Text('Compra parcelada'), onTap: () => Navigator.pop(c, 'inst')),
+            ListTile(title: const Text('Despesa recorrente'), onTap: () => Navigator.pop(c, 'rec')),
+            ListTile(title: const Text('Salário mensal'), onTap: () => Navigator.pop(c, 'salary')),
+          ],
+        ),
+      ),
+    );
+    if (choice == 'in') {
       await _single(true);
-    } else if(choice=='out')await _single(false);else if(choice=='inst')await _installment();else if(choice=='rec')await _recurring();else if(choice=='salary')await _salary();
+    } else if (choice == 'out') {
+      await _single(false);
+    } else if (choice == 'inst') {
+      await _installment();
+    } else if (choice == 'rec') {
+      await _recurring();
+    } else if (choice == 'salary') {
+      await _salary();
+    }
   }
 
   DateTime get _chartCurrentMonth=>DateTime(DateTime.now().year,DateTime.now().month);
   DateTime _weekStart(DateTime d)=>DateTime(d.year,d.month,d.day).subtract(Duration(days:d.weekday%7));
   DateTime get _chartStart{
-    if(chartMode==_FinancePeriodMode.week)return _weekStart(DateTime(chartAnchor.year,chartAnchor.month,chartAnchor.day));
-    if(chartMode==_FinancePeriodMode.month)return DateTime(chartAnchor.year,chartAnchor.month,1);
+    if(chartMode==FinancePeriodMode.week)return _weekStart(DateTime(chartAnchor.year,chartAnchor.month,chartAnchor.day));
+    if(chartMode==FinancePeriodMode.month)return DateTime(chartAnchor.year,chartAnchor.month,1);
     return DateTime(chartAnchor.year,chartAnchor.month-5,1);
   }
   DateTime get _chartFullEnd{
-    if(chartMode==_FinancePeriodMode.week)return _chartStart.add(const Duration(days:7));
+    if(chartMode==FinancePeriodMode.week)return _chartStart.add(const Duration(days:7));
     return DateTime(chartAnchor.year,chartAnchor.month+1,1);
   }
   DateTime get _chartEnd{
@@ -283,24 +304,27 @@ class FinanceScreenState extends State<FinanceScreen>{
     return _chartFullEnd;
   }
   bool get _chartCanNext{
-    final current=chartMode==_FinancePeriodMode.week?_weekStart(DateTime.now()):_chartCurrentMonth;
+    final current=chartMode==FinancePeriodMode.week?_weekStart(DateTime.now()):_chartCurrentMonth;
     return _chartStart.isBefore(current);
   }
   String get _chartLabel{
-    if(chartMode==_FinancePeriodMode.week){
+    if(chartMode==FinancePeriodMode.week){
       final end=_chartEnd.subtract(const Duration(days:1));
       return '${DateFormat('dd/MM').format(_chartStart)} – ${DateFormat('dd/MM/yyyy').format(end)}';
     }
-    if(chartMode==_FinancePeriodMode.month)return formatMonthYearPtBr(chartAnchor);
+    if(chartMode==FinancePeriodMode.month)return formatMonthYearPtBr(chartAnchor);
     final start=_chartStart;
     return '${formatShortMonthPtBr(start)} – ${'${formatShortMonthPtBr(chartAnchor)} ${chartAnchor.year}'}';
   }
-  void _setChartMode(_FinancePeriodMode next){setState((){chartMode=next;chartAnchor=next==_FinancePeriodMode.week?_weekStart(DateTime.now()):_chartCurrentMonth;});}
+  void _setChartMode(FinancePeriodMode next){setState((){chartMode=next;chartAnchor=next==FinancePeriodMode.week?_weekStart(DateTime.now()):_chartCurrentMonth;});}
   void _moveChart(int delta){setState((){
-    if(chartMode==_FinancePeriodMode.week) {
-      chartAnchor=_chartStart.add(Duration(days:7*delta));
-    } else if(chartMode==_FinancePeriodMode.month)chartAnchor=DateTime(chartAnchor.year,chartAnchor.month+delta,1);
-    else chartAnchor=DateTime(chartAnchor.year,chartAnchor.month+(delta*6),1);
+    if (chartMode == FinancePeriodMode.week) {
+      chartAnchor = _chartStart.add(Duration(days: 7 * delta));
+    } else if (chartMode == FinancePeriodMode.month) {
+      chartAnchor = DateTime(chartAnchor.year, chartAnchor.month + delta, 1);
+    } else {
+      chartAnchor = DateTime(chartAnchor.year, chartAnchor.month + (delta * 6), 1);
+    }
   });}
 
   @override Widget build(BuildContext context){
@@ -360,11 +384,11 @@ class FinanceScreenState extends State<FinanceScreen>{
       AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text('Evolução financeira',style:Theme.of(context).textTheme.titleLarge),
         const SizedBox(height:8),
-        SegmentedButton<_FinancePeriodMode>(
+        SegmentedButton<FinancePeriodMode>(
           segments:const[
-            ButtonSegment(value:_FinancePeriodMode.week,label:Text('Semanal')),
-            ButtonSegment(value:_FinancePeriodMode.month,label:Text('Mensal')),
-            ButtonSegment(value:_FinancePeriodMode.semester,label:Text('Semestral')),
+            ButtonSegment(value:FinancePeriodMode.week,label:Text('Semanal')),
+            ButtonSegment(value:FinancePeriodMode.month,label:Text('Mensal')),
+            ButtonSegment(value:FinancePeriodMode.semester,label:Text('Semestral')),
           ],
           selected:{chartMode},
           onSelectionChanged:(v){if(v.isNotEmpty)_setChartMode(v.first);},
@@ -413,7 +437,7 @@ class _FinancePoint{
 }
 // Gráficos reconstruídos: interação por toque e arraste.
 class _FinanceInteractiveChart extends StatefulWidget{
-  final DateTime start,end;final _FinancePeriodMode mode;final List<MoneyTransaction> items;final Color color;
+  final DateTime start,end;final FinancePeriodMode mode;final List<MoneyTransaction> items;final Color color;
   const _FinanceInteractiveChart({required this.start,required this.end,required this.mode,required this.items,required this.color});
   @override State<_FinanceInteractiveChart> createState()=>_FinanceInteractiveChartState();
 }
@@ -422,7 +446,7 @@ class _FinanceInteractiveChartState extends State<_FinanceInteractiveChart>{
   @override Widget build(BuildContext context)=>GestureDetector(behavior:HitTestBehavior.opaque,onTapDown:(d)=>setState(()=>selectionX=d.localPosition.dx),onHorizontalDragUpdate:(d)=>setState(()=>selectionX=d.localPosition.dx),child:CustomPaint(painter:_FinanceChart(start:widget.start,end:widget.end,mode:widget.mode,items:widget.items,color:widget.color,selectedX:selectionX),child:const SizedBox.expand()));
 }
 class _FinanceChart extends CustomPainter{
-  final DateTime start;final DateTime end;final _FinancePeriodMode mode;final List<MoneyTransaction> items;final Color color;final double? selectedX;
+  final DateTime start;final DateTime end;final FinancePeriodMode mode;final List<MoneyTransaction> items;final Color color;final double? selectedX;
   _FinanceChart({required this.start,required this.end,required this.mode,required this.items,required this.color,required this.selectedX});
   DateTime _movementDate(MoneyTransaction x)=>DateTime.tryParse(x.date)??DateTime(1900);
   double _delta(MoneyTransaction x)=>x.income?x.amount:-x.amount;
@@ -444,7 +468,7 @@ class _FinanceChart extends CustomPainter{
       if(x.isCancelled||!x.isPaid)continue;
       final d=_movementDate(x);
       if(d.isBefore(start)||!d.isBefore(visibleEnd))continue;
-      final bucket=(mode==_FinancePeriodMode.week||mode==_FinancePeriodMode.month)?DateTime(d.year,d.month,d.day):DateTime(d.year,d.month,1);
+      final bucket=(mode==FinancePeriodMode.week||mode==FinancePeriodMode.month)?DateTime(d.year,d.month,d.day):DateTime(d.year,d.month,1);
       events[bucket]=(events[bucket]??0)+_delta(x);
     }
 
@@ -455,7 +479,7 @@ class _FinanceChart extends CustomPainter{
       final delta=events[bucket]??0;
       if(delta.abs()<.000001)continue;
       balance+=delta;
-      final pointDate=(mode==_FinancePeriodMode.week||mode==_FinancePeriodMode.month)?bucket:(
+      final pointDate=(mode==FinancePeriodMode.week||mode==FinancePeriodMode.month)?bucket:(
         DateTime(bucket.year,bucket.month+1,1).isAfter(visibleEnd)
           ?visibleEnd.subtract(const Duration(days:1))
           :DateTime(bucket.year,bucket.month+1,1).subtract(const Duration(days:1))
@@ -506,7 +530,7 @@ class _FinanceChart extends CustomPainter{
       _text(c,moneyLabel(maxV-range*row/4),Offset(2,y-7),9,color.withValues(alpha:.75));
     }
 
-    if(mode==_FinancePeriodMode.week||mode==_FinancePeriodMode.month){
+    if(mode==FinancePeriodMode.week||mode==FinancePeriodMode.month){
       final days=visibleEnd.difference(start).inDays;
       for(var i=0;i<days;i++){
         final d=start.add(Duration(days:i));final x=xFor(d);
