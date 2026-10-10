@@ -62,21 +62,22 @@ jobs:
           fi
 
           LATEST_APK="/tmp/Poliroutines-latest.apk"
-          NEXT_CODE=""
-          if curl -fL --retry 3 --retry-delay 2               "https://github.com/brunopolii/app-do-poli/releases/latest/download/Poliroutines.apk"               -o "$LATEST_APK"; then
+          LATEST_CODE=""
+          if curl -fL --retry 3 --retry-delay 2 \
+              "https://github.com/brunopolii/app-do-poli/releases/latest/download/Poliroutines.apk" \
+              -o "$LATEST_APK"; then
             AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1 || true)"
             if [ -n "$AAPT" ]; then
-              NEXT_CODE="$("$AAPT" dump badging "$LATEST_APK" | sed -n "s/.*versionCode='\([0-9][0-9]*\)'.*/\1/p" | head -n 1)"
+              LATEST_CODE="$("$AAPT" dump badging "$LATEST_APK" | sed -n "s/.*versionCode='\\([0-9][0-9]*\\)'.*/\\1/p" | head -n 1)"
             fi
           fi
 
-          if [ -z "$NEXT_CODE" ]; then
-            NEXT_CODE="$CURRENT_CODE"
-          else
-            NEXT_CODE=$((NEXT_CODE + 1))
-          fi
-          if [ "$NEXT_CODE" -le "$CURRENT_CODE" ]; then
-            NEXT_CODE=$((CURRENT_CODE + 1))
+          NEXT_CODE="$CURRENT_CODE"
+          if [ -n "$LATEST_CODE" ]; then
+            RELEASE_NEXT=$((LATEST_CODE + 1))
+            if [ "$RELEASE_NEXT" -gt "$NEXT_CODE" ]; then
+              NEXT_CODE="$RELEASE_NEXT"
+            fi
           fi
           echo "versionCode atual no projeto: $CURRENT_CODE"
           echo "próximo versionCode do APK: $NEXT_CODE"
