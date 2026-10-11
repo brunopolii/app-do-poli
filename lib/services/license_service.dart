@@ -94,7 +94,7 @@ class LicenseService {
   Future<bool> initialize() async {
     final cached = await _cachedIsValid();
     final key = await storedLicenseKey();
-    if (key == null || key.isEmpty) return false;
+    if (key == null || key.isEmpty) return cached;
 
     try {
       final installationId = await _installationId();
