@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../services/storage_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/app_card.dart';
+import 'diary_screen.dart';
 
 class AgendaScreen extends StatefulWidget { const AgendaScreen({super.key}); @override State<AgendaScreen> createState() => _AgendaScreenState(); }
 class _AgendaScreenState extends State<AgendaScreen> {
@@ -78,6 +79,43 @@ class _AgendaScreenState extends State<AgendaScreen> {
     final cells = List.generate(offset + days, (i) => i < offset ? null : DateTime(month.year, month.month, i - offset + 1));
     return SafeArea(child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 28), children: [
       Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Agenda', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)), Text('${events.length} compromisso(s) salvo(s)')])), IconButton(onPressed: _testNotification, icon: const Icon(Icons.notifications_active_outlined), tooltip: 'Testar notificações'), IconButton(onPressed: () => _edit(), icon: const Icon(Icons.add_circle_outline), tooltip: 'Novo compromisso')]),
+      const SizedBox(height: 12),
+      Card(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const DiaryScreen()),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF824F).withValues(alpha: .16),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: const Icon(Icons.menu_book_rounded, color: Color(0xFFFF824F), size: 28),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Meu Diário', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 3),
+                      const Text('Registre seu dia, suas ideias e conquistas'),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
+          ),
+        ),
+      ),
       const SizedBox(height: 14),
       AppCard(child: Column(children: [Row(children: [IconButton(onPressed: () => _changeMonth(-1), icon: const Icon(Icons.chevron_left)), Expanded(child: Text(formatMonthYearPtBr(month), textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))), IconButton(onPressed: () => _changeMonth(1), icon: const Icon(Icons.chevron_right))]), const SizedBox(height: 8), Row(children: ['S','T','Q','Q','S','S','D'].map((d) => Expanded(child: Center(child: Text(d, style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))))).toList()), const SizedBox(height: 8), GridView.builder(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: cells.length, gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, mainAxisExtent: 48), itemBuilder: (c, i) { final d = cells[i]; if (d == null) return const SizedBox(); final selectedDay = key(d) == selectedKey; return InkWell(borderRadius: BorderRadius.circular(14), onTap: () => setState(() => selected = d), child: Container(margin: const EdgeInsets.all(3), decoration: BoxDecoration(color: selectedDay ? Theme.of(context).colorScheme.primaryContainer : null, borderRadius: BorderRadius.circular(14)), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text('${d.day}', style: TextStyle(fontWeight: selectedDay ? FontWeight.bold : FontWeight.normal)), if (hasEvent(d)) Container(width: 5, height: 5, margin: const EdgeInsets.only(top: 3), decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, shape: BoxShape.circle))]))); })])),
       const SizedBox(height: 14),
