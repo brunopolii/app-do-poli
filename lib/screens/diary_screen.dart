@@ -45,7 +45,6 @@ class _DiaryScreenState extends State<DiaryScreen> {
   bool _loading = true;
 
   String _dayKey(DateTime date) => DateFormat('yyyy-MM-dd').format(date);
-  String _dateLabel(DateTime date) => DateFormat('d MMM', 'pt_BR').format(date);
   String _weekdayLabel(DateTime date) =>
       DateFormat('EEEE', 'pt_BR').format(date);
 
@@ -180,7 +179,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
                     ],
                   ),
                   Text(
-                    '${DateFormat('d 'de' MMMM 'de' yyyy', 'pt_BR').format(_selectedDate)} • ${_weekdayLabel(_selectedDate)}',
+                    '${DateFormat("d 'de' MMMM 'de' yyyy", 'pt_BR').format(_selectedDate)} • ${_weekdayLabel(_selectedDate)}',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 14),
@@ -624,7 +623,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
                                     ?.copyWith(fontWeight: FontWeight.bold),
                               ),
                             ),
-                            Text(DateFormat('d 'de' MMM', 'pt_BR').format(_selectedDate)),
+                            Text(DateFormat("d 'de' MMM", 'pt_BR').format(_selectedDate)),
                           ],
                         ),
                         const SizedBox(height: 12),
