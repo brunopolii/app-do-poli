@@ -13,6 +13,9 @@ class LicenseService {
   static const _installationIdKey = 'polirotinas_installation_id';
   static const _licenseTypeKey = 'polirotinas_license_type';
   static const _expiresAtKey = 'polirotinas_license_expires_at';
+  // Distinguishes a new Free installation from a previously licensed install.
+  static const _paidLicensePreviouslyInstalledKey =
+      'polirotinas_paid_license_previously_installed';
 
   Future<String> _installationId() async {
     final prefs = await SharedPreferences.getInstance();
@@ -45,7 +48,12 @@ class LicenseService {
 
   Future<bool> _cachedIsValid() async {
     final key = await storedLicenseKey();
-    if (key == null || key.isEmpty) return false;
+    if (key == null || key.isEmpty) {
+      // First-time users enter the Free plan without an activation key.
+      // Keep previously licensed installations on the license-recovery path.
+      final prefs = await SharedPreferences.getInstance();
+      return !(prefs.getBool(_paidLicensePreviouslyInstalledKey) ?? false);
+    }
 
     final type = await storedLicenseType();
     if (type == 'lifetime') return true;
@@ -63,6 +71,7 @@ class LicenseService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_licenseKey, key);
     await prefs.setString(_licenseTypeKey, type);
+    await prefs.setBool(_paidLicensePreviouslyInstalledKey, true);
 
     if (expiresAt == null || expiresAt.isEmpty) {
       await prefs.remove(_expiresAtKey);
@@ -85,7 +94,7 @@ class LicenseService {
   Future<bool> initialize() async {
     final cached = await _cachedIsValid();
     final key = await storedLicenseKey();
-    if (key == null || key.isEmpty) return false;
+    if (key == null || key.isEmpty) return cached;
 
     try {
       final installationId = await _installationId();
