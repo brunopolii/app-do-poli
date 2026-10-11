@@ -117,10 +117,11 @@ class _DiaryScreenState extends State<DiaryScreen> {
     _mood = 'Normal';
   }
 
-  void _newEntry({String? category}) {
+  void _newEntry({String? category, String? mood}) {
     setState(() {
       _clearEditor();
       if (category != null) _category = category;
+      if (mood != null) _mood = mood;
     });
     _showEditor();
   }
@@ -438,7 +439,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 2),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(14),
-                  onTap: () => _newEntry(category: 'Pessoal'),
+                  onTap: () => _newEntry(category: 'Pessoal', mood: item.key),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
                     decoration: BoxDecoration(
