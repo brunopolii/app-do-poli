@@ -14,7 +14,7 @@ enum _FoodPeriodMode{week,month}
 
 class FoodScreen extends StatefulWidget { const FoodScreen({super.key}); @override State<FoodScreen> createState()=>_FoodScreenState(); }
 class _FoodScreenState extends State<FoodScreen> {
-  final ai=AiFoodService(); List<Meal> meals=[]; List<WeightEntry> weights=[]; Map<String,double>? goals; bool loading=true; _FoodPeriodMode mode=_FoodPeriodMode.week; late DateTime period; DateTime selectedDay=_day(DateTime.now()); String get todayKey=>DateFormat('yyyy-MM-dd').format(DateTime.now()); String get selectedDayKey=>DateFormat('yyyy-MM-dd').format(selectedDay);
+  final ai=AiFoodService(); List<Meal> meals=[]; List<WeightEntry> weights=[]; Map<String,double>? goals; bool loading=true; bool premium=false; _FoodPeriodMode mode=_FoodPeriodMode.week; late DateTime period; DateTime selectedDay=_day(DateTime.now()); String get todayKey=>DateFormat('yyyy-MM-dd').format(DateTime.now()); String get selectedDayKey=>DateFormat('yyyy-MM-dd').format(selectedDay);
   @override void initState(){super.initState();period=_weekStart(DateTime.now());_load();}
   static DateTime _day(DateTime d)=>DateTime(d.year,d.month,d.day);
   static DateTime _weekStart(DateTime d)=>_day(d).subtract(Duration(days:d.weekday%7));
@@ -24,9 +24,10 @@ class _FoodScreenState extends State<FoodScreen> {
   DateTime get currentStart{final now=DateTime.now();return mode==_FoodPeriodMode.week?_weekStart(now):_monthStart(now);}
   bool get canGoNext=>periodStart.isBefore(currentStart);
   String get periodLabel{if(mode==_FoodPeriodMode.week){final end=periodEnd.subtract(const Duration(days:1));return '${DateFormat('dd/MM').format(periodStart)} – ${DateFormat('dd/MM/yyyy').format(end)}';}return formatMonthYearPtBr(periodStart);}
-  void _setMode(_FoodPeriodMode next){setState((){mode=next;period=next==_FoodPeriodMode.week?_weekStart(DateTime.now()):_monthStart(DateTime.now());});}
-  void _move(int delta){setState((){period=mode==_FoodPeriodMode.week?periodStart.add(Duration(days:7*delta)):DateTime(periodStart.year,periodStart.month+delta,1);});}
-  Future<void> _load()async{meals=(await StorageService.read('meals')).map(Meal.fromJson).toList();weights=(await StorageService.read('body_weights')).map(WeightEntry.fromJson).toList()..sort((a,b)=>a.date.compareTo(b.date));final p=await SharedPreferences.getInstance();final r=p.getString('nutrition_goals');if(r!=null){final a=r.split('|');if(a.length==4){goals={'calories':double.tryParse(a[0])??0,'protein':double.tryParse(a[1])??0,'carbs':double.tryParse(a[2])??0,'fat':double.tryParse(a[3])??0};}}if(mounted)setState(()=>loading=false);}
+  void _setMode(_FoodPeriodMode next){if(!premium&&next!=_FoodPeriodMode.week){_message('Gráficos mensais são um recurso Premium.');return;}setState((){mode=next;period=next==_FoodPeriodMode.week?_weekStart(DateTime.now()):_monthStart(DateTime.now());});}
+  void _move(int delta){if(!premium&&delta<0){_message('O plano gratuito exibe apenas a semana atual.');return;}setState((){period=mode==_FoodPeriodMode.week?periodStart.add(Duration(days:7*delta)):DateTime(periodStart.year,periodStart.month+delta,1);});}
+  Future<void> _load()async{meals=(await StorageService.read('meals')).map(Meal.fromJson).toList();weights=(await StorageService.read('body_weights')).map(WeightEntry.fromJson).toList()..sort((a,b)=>a.date.compareTo(b.date));final p=await SharedPreferences.getInstance();final r=p.getString('nutrition_goals');if(r!=null){final a=r.split('|');if(a.length==4){goals={'calories':double.tryParse(a[0])??0,'protein':double.tryParse(a[1])??0,'carbs':double.tryParse(a[2])??0,'fat':double.tryParse(a[3])??0};}}final paid = await PlanService().hasPremium;if(mounted)setState(()=>{premium=paid,loading=false});}
+  void _message(String s)=>ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s)));
   Future<void> _saveMeals()=>StorageService.write('meals',meals.map((e)=>e.toJson()).toList());Future<void> _saveWeights()=>StorageService.write('body_weights',weights.map((e)=>e.toJson()).toList());
   Future<void> _saveWeight(double value,DateTime? date)async{final d=date??selectedDay;weights.add(WeightEntry(date:DateTime(d.year,d.month,d.day,DateTime.now().hour,DateTime.now().minute,DateTime.now().second).toIso8601String(),weight:value));weights.sort((a,b)=>a.date.compareTo(b.date));await _saveWeights();}
   Future<void> _weight()async{final c=TextEditingController();DateTime date=selectedDay;final ok=await showDialog<bool>(context:context,builder:(d)=>StatefulBuilder(builder:(d,setD)=>AlertDialog(title:const Text('Registrar peso'),content:Column(mainAxisSize:MainAxisSize.min,children:[TextField(controller:c,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'Peso',suffixText:'kg')),ListTile(contentPadding:EdgeInsets.zero,title:Text('Data: ${DateFormat('dd/MM/yyyy').format(date)}'),onTap:()async{final r=await showDatePicker(context:d,initialDate:date,firstDate:DateTime(2020),lastDate:DateTime(2100));if(r!=null)setD(()=>date=r);})]),actions:[TextButton(onPressed:()=>Navigator.pop(d,false),child:const Text('Cancelar')),FilledButton(onPressed:()=>Navigator.pop(d,true),child:const Text('Salvar'))])));final v=double.tryParse(c.text.replaceAll(',','.'));c.dispose();if(ok==true&&v!=null&&v>0){await _saveWeight(v,date);if(mounted)setState((){});}}
@@ -116,17 +117,20 @@ class _FoodScreenState extends State<FoodScreen> {
       AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text('Evolução do peso',style:Theme.of(context).textTheme.titleLarge),
         const SizedBox(height:8),
-        SegmentedButton<_FoodPeriodMode>(
-          segments:const[
-            ButtonSegment(value:_FoodPeriodMode.week,label:Text('Semanal')),
-            ButtonSegment(value:_FoodPeriodMode.month,label:Text('Mensal')),
-          ],
-          selected:{mode},
-          onSelectionChanged:(v){if(v.isNotEmpty)_setMode(v.first);},
-        ),
+        if (premium)
+          SegmentedButton<_FoodPeriodMode>(
+            segments:const[
+              ButtonSegment(value:_FoodPeriodMode.week,label:Text('Semanal')),
+              ButtonSegment(value:_FoodPeriodMode.month,label:Text('Mensal')),
+            ],
+            selected:{mode},
+            onSelectionChanged:(v){if(v.isNotEmpty)_setMode(v.first);},
+          )
+        else
+          const Text('Plano gratuito • semana atual'),
         const SizedBox(height:8),
         Row(children:[
-          IconButton(onPressed:()=>_move(-1),icon:const Icon(Icons.chevron_left)),
+          if(premium) IconButton(onPressed:()=>_move(-1),icon:const Icon(Icons.chevron_left)) else const SizedBox(width:48),
           Expanded(child:Text(periodLabel,textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.w600))),
           if(canGoNext)IconButton(onPressed:()=>_move(1),icon:const Icon(Icons.chevron_right))else const SizedBox(width:48),
         ]),
