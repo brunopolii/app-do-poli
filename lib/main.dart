@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/activation_screen.dart';
 import 'screens/agenda_screen.dart';
 import 'screens/finance_screen.dart';
+import 'screens/diary_screen.dart';
 import 'screens/food_screen.dart';
 import 'screens/gym_screen.dart';
 import 'screens/home_screen.dart';
@@ -166,6 +167,12 @@ class _AppDoPoliState extends State<AppDoPoli> {
     if (mounted) setState(() => agendaOnly = restricted);
   }
 
+  Future<void> _openDiary() async {
+    await _navigatorKey.currentState?.push<void>(
+      MaterialPageRoute(builder: (_) => const DiaryScreen()),
+    );
+  }
+
   Future<void> _showPremium() async {
     await showDialog<void>(
       context: _navigatorKey.currentContext ?? context,
@@ -310,6 +317,11 @@ class _AppDoPoliState extends State<AppDoPoli> {
             appBar: AppBar(
               title: const Text('Poliroutines', style: TextStyle(fontWeight: FontWeight.bold)),
               actions: [
+                if (!agendaOnly) IconButton(
+                  tooltip: 'Diário',
+                  onPressed: _openDiary,
+                  icon: const Icon(Icons.menu_book_outlined),
+                ),
                 TextButton.icon(onPressed: _showPremium, icon: const Icon(Icons.workspace_premium_outlined), label: const Text('Premium')),
                 if (!agendaOnly) IconButton(
                   tooltip: 'Personalizar tema',
