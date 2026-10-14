@@ -23,7 +23,7 @@ class PlanService {
     return prefs.getBool('polirotinas_paid_license_previously_installed') ?? false;
   }
 
-  Future<bool> get agendaOnly async => await isFormerPremium && !await hasPremium;
+  Future<bool> get agendaOnly async => (await isFormerPremium) && !(await hasPremium);
 
   Future<bool> canCreateAgenda() async {
     if (await hasPremium) return true;
