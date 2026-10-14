@@ -19,11 +19,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('pt_BR');
   await NotificationService.initialize();
-  final activated = await LicenseService().initialize();
+  await LicenseService().initialize();
   final settings = await ThemeService.load();
   final prefs = await SharedPreferences.getInstance();
   runApp(AppDoPoli(
-    initiallyActivated: activated,
     initialTheme: settings,
     initialThemeMode: prefs.getString('theme_mode') ?? 'system',
   ));
@@ -130,10 +129,9 @@ class _AppBackgroundState extends State<_AppBackground> {
 
 
 class AppDoPoli extends StatefulWidget {
-  final bool initiallyActivated;
   final ThemeSettings initialTheme;
   final String initialThemeMode;
-  const AppDoPoli({super.key, required this.initiallyActivated, required this.initialTheme, required this.initialThemeMode});
+  const AppDoPoli({super.key, required this.initialTheme, required this.initialThemeMode});
   @override State<AppDoPoli> createState() => _AppDoPoliState();
 }
 
@@ -141,7 +139,6 @@ class _AppDoPoliState extends State<AppDoPoli> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
   final GlobalKey<GymScreenState> _gymKey = GlobalKey<GymScreenState>();
-  late bool activated;
   bool agendaOnly = false;
   late ThemeSettings themeSettings;
   late ThemeMode themeMode;
@@ -150,7 +147,6 @@ class _AppDoPoliState extends State<AppDoPoli> {
   @override
   void initState() {
     super.initState();
-    activated = widget.initiallyActivated;
     _refreshPlanAccess();
     themeSettings = widget.initialTheme;
     themeMode = switch (widget.initialThemeMode) {
@@ -161,7 +157,6 @@ class _AppDoPoliState extends State<AppDoPoli> {
   }
 
   void _finishActivation() {
-    setState(() => activated = true);
     _refreshPlanAccess();
   }
 
