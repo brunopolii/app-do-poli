@@ -51,6 +51,12 @@ class PlanService {
     }).length < foodMonthlyLimit;
   }
 
+  Future<bool> canCreateDiaryNote(String dateKey) async {
+    if (await hasPremium) return true;
+    final notes = await StorageService.read('diary_notes');
+    return !notes.any((note) => (note['date'] ?? '').toString() == dateKey);
+  }
+
   Future<bool> canCreateFinanceRecord() async {
     if (await hasPremium) return true;
     final now = DateTime.now();
