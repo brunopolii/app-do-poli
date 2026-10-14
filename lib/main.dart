@@ -157,6 +157,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
   }
 
   void _finishActivation() {
+    _navigatorKey.currentState?.pop();
     _refreshPlanAccess();
   }
 
@@ -310,7 +311,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
               title: const Text('Poliroutines', style: TextStyle(fontWeight: FontWeight.bold)),
               actions: [
                 TextButton.icon(onPressed: _showPremium, icon: const Icon(Icons.workspace_premium_outlined), label: const Text('Premium')),
-                IconButton(
+                if (!agendaOnly) IconButton(
                   tooltip: 'Personalizar tema',
                   onPressed: _openTheme,
                   icon: const Icon(Icons.palette_outlined),
