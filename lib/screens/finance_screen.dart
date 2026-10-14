@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../utils/date_formatters.dart';
 import '../models/models.dart';
 import '../services/storage_service.dart';
+import '../services/plan_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/app_card.dart';
 
@@ -247,6 +248,12 @@ class _FinanceScreenState extends State<FinanceScreen>{
   }
 
   Future<void> _menu()async{
+    if (!await PlanService().canCreateFinanceRecord()) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('O plano gratuito permite 50 movimentações financeiras por mês. Conheça o Premium para continuar.')),
+      );
+      return;
+    }
     final choice=await showModalBottomSheet<String>(context:context,builder:(c)=>SafeArea(child:Column(mainAxisSize:MainAxisSize.min,children:[
       ListTile(title:const Text('Nova entrada'),onTap:()=>Navigator.pop(c,'in')),
       ListTile(title:const Text('Nova despesa'),onTap:()=>Navigator.pop(c,'out')),
