@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/theme_service.dart';
+import '../services/plan_service.dart';
 
 class ThemeEditResult {
   final ThemeSettings settings;
@@ -18,6 +19,7 @@ class ThemeScreen extends StatefulWidget {
 class _ThemeScreenState extends State<ThemeScreen> {
   late ThemeSettings settings;
   late ThemeMode mode;
+  bool premium = false;
   static const colors = <Color>[
     Color(0xFFF7F5FA), Color(0xFFE8F5E9), Color(0xFFE3F2FD), Color(0xFFFFF3E0),
     Color(0xFFFCE4EC), Color(0xFFEDE7F6), Color(0xFFE0F2F1), Color(0xFFFFFDE7),
@@ -25,11 +27,21 @@ class _ThemeScreenState extends State<ThemeScreen> {
     Color(0xFFE91E63), Color(0xFF2196F3), Color(0xFF00A884), Color(0xFFFF9800),
     Color(0xFF9C27B0), Color(0xFF795548),
   ];
-  @override void initState(){super.initState();settings=widget.initialSettings;mode=widget.initialMode;}
+  @override void initState(){super.initState();settings=widget.initialSettings;mode=widget.initialMode;_loadPlan();}
+  Future<void> _loadPlan() async { final value = await PlanService().hasPremium; if (mounted) setState(() => premium = value); }
 
   Future<void> _save(ThemeSettings next) async { setState(() => settings=next); await ThemeService.save(next); }
   Future<void> _mode(ThemeMode m) async { final p=await SharedPreferences.getInstance(); await p.setString('theme_mode',m==ThemeMode.dark?'dark':m==ThemeMode.light?'light':'system'); if(mounted)setState(()=>mode=m); }
-  Future<void> _pickImage() async { final p=await ThemeService.pickAndPersistImage(); if(p!=null&&mounted)await _save(settings.copyWith(imagePath:p)); }
+  Future<void> _pickImage() async {
+    if (!premium) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Imagem de fundo personalizada é um recurso Premium.')),
+      );
+      return;
+    }
+    final p=await ThemeService.pickAndPersistImage();
+    if(p!=null&&mounted)await _save(settings.copyWith(imagePath:p));
+  }
   Future<void> _clearImage() async => _save(settings.copyWith(clearImagePath:true));
 
   Future<void> _pickColor(String title, Color current, Future<void> Function(Color) onChanged) async {
@@ -94,8 +106,9 @@ class _ThemeScreenState extends State<ThemeScreen> {
         const SizedBox(height:28),
         Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           Text('Foto personalizada',style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:8),
+          if (!premium) const Text('Recurso Premium — ative uma licença para usar uma imagem própria.'),
           Text(has?'Sua foto está aplicada ao fundo.':'Escolha uma foto da galeria para usar como fundo.'),const SizedBox(height:12),
-          FilledButton.icon(onPressed:_pickImage,icon:const Icon(Icons.photo_library_outlined),label:Text(has?'Trocar foto':'Usar minha foto')),
+          FilledButton.icon(onPressed:premium?_pickImage:null,icon:const Icon(Icons.photo_library_outlined),label:Text(has?'Trocar foto':'Usar minha foto')),
           if(has)...[TextButton.icon(onPressed:_clearImage,icon:const Icon(Icons.close),label:const Text('Remover foto')),_slider('Zoom',settings.scale,.5,3,(v)=>settings.copyWith(scale:v)),_slider('Posição horizontal',settings.x,-5,5,(v)=>settings.copyWith(x:v)),_slider('Posição vertical',settings.y,-5,5,(v)=>settings.copyWith(y:v)),_slider('Transparência da foto',settings.opacity,.05,1,(v)=>settings.copyWith(opacity:v))]
         ]))),
         const SizedBox(height:12),
