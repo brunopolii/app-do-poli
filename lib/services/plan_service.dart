@@ -36,6 +36,11 @@ class PlanService {
     return active < agendaLimit;
   }
 
+  Future<bool> canCreateWorkoutPlan() async {
+    if (await hasPremium) return true;
+    return (await StorageService.read('workout_plans')).isEmpty;
+  }
+
   Future<bool> canCreateWorkout() async {
     if (await hasPremium) return true;
     return (await StorageService.read('workout_history')).isEmpty;
