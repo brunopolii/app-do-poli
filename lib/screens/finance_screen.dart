@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../utils/date_formatters.dart';
 import '../models/models.dart';
 import '../services/storage_service.dart';
+import '../services/plan_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/app_card.dart';
 
@@ -18,6 +19,7 @@ class _FinanceScreenState extends State<FinanceScreen>{
   List<MoneyTransaction> items=[];
   DateTime month=DateTime(DateTime.now().year,DateTime.now().month);
   bool loading=true;
+  bool premium=false;
   _FinancePeriodMode chartMode=_FinancePeriodMode.month;
   DateTime chartAnchor=DateTime(DateTime.now().year,DateTime.now().month);
 
@@ -29,7 +31,8 @@ class _FinanceScreenState extends State<FinanceScreen>{
     await _ensureRecurring();
     _refreshStatuses();
     await _save();
-    if(mounted)setState(()=>loading=false);
+    final paid = await PlanService().hasPremium;
+    if(mounted)setState(() { premium=paid; loading=false; if(!paid){chartMode=_FinancePeriodMode.week;chartAnchor=_weekStart(DateTime.now());} });
   }
 
   void _refreshStatuses(){
@@ -247,6 +250,12 @@ class _FinanceScreenState extends State<FinanceScreen>{
   }
 
   Future<void> _menu()async{
+    if (!await PlanService().canCreateFinanceRecord()) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('O plano gratuito permite 50 movimentações financeiras por mês. Conheça o Premium para continuar.')),
+      );
+      return;
+    }
     final choice=await showModalBottomSheet<String>(context:context,builder:(c)=>SafeArea(child:Column(mainAxisSize:MainAxisSize.min,children:[
       ListTile(title:const Text('Nova entrada'),onTap:()=>Navigator.pop(c,'in')),
       ListTile(title:const Text('Nova despesa'),onTap:()=>Navigator.pop(c,'out')),
@@ -284,8 +293,8 @@ class _FinanceScreenState extends State<FinanceScreen>{
     final start=_chartStart;
     return '${formatShortMonthPtBr(start)} – ${'${formatShortMonthPtBr(chartAnchor)} ${chartAnchor.year}'}';
   }
-  void _setChartMode(_FinancePeriodMode next){setState((){chartMode=next;chartAnchor=next==_FinancePeriodMode.week?_weekStart(DateTime.now()):_chartCurrentMonth;});}
-  void _moveChart(int delta){setState((){
+  void _setChartMode(_FinancePeriodMode next){if(!premium&&next!=_FinancePeriodMode.week){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Gráficos mensais e semestrais são recursos Premium.')));return;}setState((){chartMode=next;chartAnchor=next==_FinancePeriodMode.week?_weekStart(DateTime.now()):_chartCurrentMonth;});}
+  void _moveChart(int delta){if(!premium&&delta<0){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('O plano gratuito exibe apenas a semana atual.')));return;}setState((){
     if(chartMode==_FinancePeriodMode.week)chartAnchor=_chartStart.add(Duration(days:7*delta));
     else if(chartMode==_FinancePeriodMode.month)chartAnchor=DateTime(chartAnchor.year,chartAnchor.month+delta,1);
     else chartAnchor=DateTime(chartAnchor.year,chartAnchor.month+(delta*6),1);
@@ -348,18 +357,21 @@ class _FinanceScreenState extends State<FinanceScreen>{
       AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text('Evolução financeira',style:Theme.of(context).textTheme.titleLarge),
         const SizedBox(height:8),
-        SegmentedButton<_FinancePeriodMode>(
-          segments:const[
-            ButtonSegment(value:_FinancePeriodMode.week,label:Text('Semanal')),
-            ButtonSegment(value:_FinancePeriodMode.month,label:Text('Mensal')),
-            ButtonSegment(value:_FinancePeriodMode.semester,label:Text('Semestral')),
-          ],
-          selected:{chartMode},
-          onSelectionChanged:(v){if(v.isNotEmpty)_setChartMode(v.first);},
-        ),
+        if (premium)
+          SegmentedButton<_FinancePeriodMode>(
+            segments:const[
+              ButtonSegment(value:_FinancePeriodMode.week,label:Text('Semanal')),
+              ButtonSegment(value:_FinancePeriodMode.month,label:Text('Mensal')),
+              ButtonSegment(value:_FinancePeriodMode.semester,label:Text('Semestral')),
+            ],
+            selected:{chartMode},
+            onSelectionChanged:(v){if(v.isNotEmpty)_setChartMode(v.first);},
+          )
+        else
+          const Text('Plano gratuito • semana atual'),
         const SizedBox(height:8),
         Row(children:[
-          IconButton(onPressed:()=>_moveChart(-1),icon:const Icon(Icons.chevron_left)),
+          if(premium) IconButton(onPressed:()=>_moveChart(-1),icon:const Icon(Icons.chevron_left)) else const SizedBox(width:48),
           Expanded(child:Text(_chartLabel,textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.bold))),
           if(_chartCanNext)IconButton(onPressed:()=>_moveChart(1),icon:const Icon(Icons.chevron_right))else const SizedBox(width:48),
         ]),

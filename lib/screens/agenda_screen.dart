@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../utils/date_formatters.dart';
 import '../models/models.dart';
 import '../services/storage_service.dart';
+import '../services/plan_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/app_card.dart';
 
@@ -34,6 +35,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   Future<void> _edit({AgendaEvent? existing}) async {
+    if (existing == null && !await PlanService().canCreateAgenda()) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('O plano gratuito permite até 5 compromissos ativos. Conheça o Premium para ampliar esse limite.')),
+      );
+      return;
+    }
     final title = TextEditingController(text: existing?.title ?? '');
     final desc = TextEditingController(text: existing?.description ?? '');
     final now = TimeOfDay.now();

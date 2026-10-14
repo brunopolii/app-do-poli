@@ -11,6 +11,7 @@ import 'screens/gym_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/theme_screen.dart';
 import 'services/license_service.dart';
+import 'services/plan_service.dart';
 import 'services/notification_service.dart';
 import 'services/theme_service.dart';
 
@@ -18,11 +19,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('pt_BR');
   await NotificationService.initialize();
-  final activated = await LicenseService().initialize();
+  await LicenseService().initialize();
   final settings = await ThemeService.load();
   final prefs = await SharedPreferences.getInstance();
   runApp(AppDoPoli(
-    initiallyActivated: activated,
     initialTheme: settings,
     initialThemeMode: prefs.getString('theme_mode') ?? 'system',
   ));
@@ -129,10 +129,9 @@ class _AppBackgroundState extends State<_AppBackground> {
 
 
 class AppDoPoli extends StatefulWidget {
-  final bool initiallyActivated;
   final ThemeSettings initialTheme;
   final String initialThemeMode;
-  const AppDoPoli({super.key, required this.initiallyActivated, required this.initialTheme, required this.initialThemeMode});
+  const AppDoPoli({super.key, required this.initialTheme, required this.initialThemeMode});
   @override State<AppDoPoli> createState() => _AppDoPoliState();
 }
 
@@ -140,7 +139,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
   final GlobalKey<GymScreenState> _gymKey = GlobalKey<GymScreenState>();
-  late bool activated;
+  bool agendaOnly = false;
   late ThemeSettings themeSettings;
   late ThemeMode themeMode;
   int selectedIndex = 2;
@@ -148,7 +147,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
   @override
   void initState() {
     super.initState();
-    activated = widget.initiallyActivated;
+    _refreshPlanAccess();
     themeSettings = widget.initialTheme;
     themeMode = switch (widget.initialThemeMode) {
       'dark' => ThemeMode.dark,
@@ -157,7 +156,53 @@ class _AppDoPoliState extends State<AppDoPoli> {
     };
   }
 
-  void _finishActivation() => setState(() => activated = true);
+  void _finishActivation() {
+    _navigatorKey.currentState?.pop();
+    _refreshPlanAccess();
+  }
+
+  Future<void> _refreshPlanAccess() async {
+    final restricted = await PlanService().agendaOnly;
+    if (mounted) setState(() => agendaOnly = restricted);
+  }
+
+  Future<void> _showPremium() async {
+    await showDialog<void>(
+      context: _navigatorKey.currentContext ?? context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Poliroutines Premium'),
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Desbloqueie todos os recursos do Poliroutines:'),
+              SizedBox(height: 12),
+              Text('• Academia sem limite de treinos'),
+              Text('• Alimentação e Financeiro sem limites mensais'),
+              Text('• Histórico completo e gráficos avançados'),
+              Text('• Personalização com imagem de fundo'),
+              SizedBox(height: 12),
+              Text('Planos disponíveis: mensal, anual e vitalício. Após a compra, use a chave de ativação recebida.'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Fechar')),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _navigatorKey.currentState?.push<void>(MaterialPageRoute(
+                builder: (_) => ActivationScreen(onActivated: _finishActivation),
+              ));
+            },
+            icon: const Icon(Icons.key),
+            label: const Text('Ativar Premium'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _showHelp() async {
     await showDialog<void>(
@@ -258,15 +303,15 @@ class _AppDoPoliState extends State<AppDoPoli> {
     darkTheme: _theme(Brightness.dark),
     themeMode: themeMode,
     builder: (context, child) => _background(context, child ?? const SizedBox.shrink()),
-    home: activated
-        ? Scaffold(
+    home: Scaffold(
             backgroundColor: Colors.transparent,
             extendBody: true,
             extendBodyBehindAppBar: true,
             appBar: AppBar(
               title: const Text('Poliroutines', style: TextStyle(fontWeight: FontWeight.bold)),
               actions: [
-                IconButton(
+                TextButton.icon(onPressed: _showPremium, icon: const Icon(Icons.workspace_premium_outlined), label: const Text('Premium')),
+                if (!agendaOnly) IconButton(
                   tooltip: 'Personalizar tema',
                   onPressed: _openTheme,
                   icon: const Icon(Icons.palette_outlined),
@@ -283,7 +328,9 @@ class _AppDoPoliState extends State<AppDoPoli> {
                 ),
               ],
             ),
-            body: IndexedStack(
+            body: agendaOnly
+                ? const AgendaScreen()
+                : IndexedStack(
               index: selectedIndex,
               children: [
                 const AgendaScreen(),
@@ -338,6 +385,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
                   child: NavigationBar(
                     selectedIndex: selectedIndex,
                     onDestinationSelected: (i) {
+                      if (agendaOnly && i != 0) { _showPremium(); return; }
                       setState(() => selectedIndex = i);
                       if (i == 1) _gymKey.currentState?.refresh();
                       if (i == 2) _homeKey.currentState?.refresh();
@@ -373,7 +421,6 @@ class _AppDoPoliState extends State<AppDoPoli> {
                 );
               },
             ),
-          )
-        : ActivationScreen(onActivated: _finishActivation),
+          ),
   );
 }

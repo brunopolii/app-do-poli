@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../models/models.dart';
 import '../services/storage_service.dart';
+import '../services/plan_service.dart';
 import '../widgets/app_card.dart';
 const weekDays=['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
 const muscleGroups=['Peito','Costas','Ombros','Bíceps','Tríceps','Quadríceps','Posterior','Glúteos','Panturrilhas','Abdômen','Outros'];
@@ -138,6 +139,15 @@ class _WorkoutExecutionState extends State<WorkoutExecution>{
   }
 
   Future<void> finish()async{
+    if (!await PlanService().canCreateWorkout()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('O plano gratuito permite registrar 1 treino. Conheça o Premium para continuar.')),
+        );
+        Navigator.pop(context);
+      }
+      return;
+    }
     for(var i=0;i<widget.exercises.length;i++){
       for(var s=0;s<widget.exercises[i].sets;s++){
         final v=kg(i,s);
