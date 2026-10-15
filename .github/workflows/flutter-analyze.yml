@@ -28,5 +28,10 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
-      - name: Run tests
-        run: flutter test --no-pub
+      - name: Run tests when present
+        run: |
+          if [ -d test ]; then
+            flutter test --no-pub
+          else
+            echo "No test directory found; skipping Flutter tests."
+          fi
