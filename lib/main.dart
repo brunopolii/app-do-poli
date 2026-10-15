@@ -7,6 +7,8 @@ import 'screens/activation_screen.dart';
 import 'screens/agenda_screen.dart';
 import 'screens/finance_screen.dart';
 import 'screens/diary_screen.dart';
+import 'screens/premium_diary_screen.dart';
+import 'screens/premium_screen.dart';
 import 'screens/food_screen.dart';
 import 'screens/gym_screen.dart';
 import 'screens/home_screen.dart';
@@ -168,12 +170,25 @@ class _AppDoPoliState extends State<AppDoPoli> {
   }
 
   Future<void> _openDiary() async {
+    final isPremium = await PlanService().hasPremium;
+    if (!mounted) return;
     await _navigatorKey.currentState?.push<void>(
-      MaterialPageRoute(builder: (_) => const DiaryScreen()),
+      MaterialPageRoute(
+        builder: (_) => isPremium
+            ? const PremiumDiaryScreen()
+            : const DiaryScreen(),
+      ),
     );
   }
 
   Future<void> _showPremium() async {
+    await _navigatorKey.currentState?.push<void>(
+      MaterialPageRoute(builder: (_) => const PremiumScreen()),
+    );
+  }
+
+  /* Legacy Premium dialog kept out of navigation for reference.
+  Future<void> _showPremiumLegacy() async {
     await showDialog<void>(
       context: _navigatorKey.currentContext ?? context,
       builder: (dialogContext) => AlertDialog(
@@ -210,6 +225,8 @@ class _AppDoPoliState extends State<AppDoPoli> {
       ),
     );
   }
+
+  */
 
   Future<void> _showHelp() async {
     await showDialog<void>(
