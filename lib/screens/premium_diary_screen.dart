@@ -6,7 +6,7 @@ class PremiumDiaryScreen extends StatefulWidget {
   const PremiumDiaryScreen({super.key});
 
   @override
-  State<PremiumDiaryScreen> createState() => _DiaryScreenState();
+  State<PremiumDiaryScreen> createState() => _PremiumDiaryScreenState();
 }
 
 class _PremiumDiaryScreenState extends State<PremiumDiaryScreen> {
