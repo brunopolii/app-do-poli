@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 class PremiumScreen extends StatelessWidget {
-  const PremiumScreen({super.key});
+  final VoidCallback onActivate;
+
+  const PremiumScreen({super.key, required this.onActivate});
 
   static const Color _accent = Color(0xFF9B82DB);
 
@@ -133,6 +135,12 @@ class PremiumScreen extends StatelessWidget {
             _planCard(context: context, name: 'Mensal', price: 'R\$ 9,90', description: 'Primeira parcela R\$ 9,90; depois R\$ 11,90 por mês.', icon: Icons.calendar_month_outlined),
             _planCard(context: context, name: 'Anual', price: 'R\$ 59,90', description: 'Pagamento anual.', icon: Icons.event_available_outlined, featured: true),
             _planCard(context: context, name: 'Vitalício', price: 'R\$ 99,90', description: 'Pagamento único. Sem vencimento.', icon: Icons.all_inclusive_rounded),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: onActivate,
+              icon: const Icon(Icons.key_outlined),
+              label: const Text('Já tenho uma chave de ativação'),
+            ),
             const SizedBox(height: 8),
             Text('Os botões de compra serão ativados quando os links oficiais de pagamento estiverem configurados. Nenhuma compra é realizada nesta versão.', textAlign: TextAlign.center, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           ],
