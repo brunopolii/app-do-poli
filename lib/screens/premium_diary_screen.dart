@@ -64,6 +64,33 @@ class _PremiumDiaryScreenState extends State<PremiumDiaryScreen> {
 
   Future<void> _loadEntries() async {
     final values = await StorageService.read(_storageKey);
+    // Bring notes created by the current Free diary into the classic Premium
+    // diary without deleting or rewriting the original records.
+    final freeNotes = await StorageService.read('diary_notes');
+    var migrated = false;
+    for (final note in freeNotes) {
+      final date = (note['date'] ?? '').toString();
+      final body = (note['content'] ?? '').toString();
+      if (date.isEmpty || body.trim().isEmpty) continue;
+      final alreadyPresent = values.any((entry) =>
+          (entry['date'] ?? '').toString() == date &&
+          (entry['body'] ?? '').toString() == body);
+      if (alreadyPresent) continue;
+      final timestamp = (note['updatedAt'] ?? DateTime.now().toIso8601String()).toString();
+      values.add(<String, dynamic>{
+        'id': 'migrated_${note['id'] ?? timestamp}',
+        'date': date,
+        'title': _defaultTitle(body),
+        'body': body,
+        'category': 'Geral',
+        'mood': 'Normal',
+        'favorite': false,
+        'createdAt': timestamp,
+        'updatedAt': timestamp,
+      });
+      migrated = true;
+    }
+    if (migrated) await StorageService.write(_storageKey, values);
     if (!mounted) return;
     setState(() {
       _entries = values;
