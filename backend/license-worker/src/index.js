@@ -387,6 +387,93 @@ async function cancelSubscription(body, env) {
   });
 }
 
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+async function deliverLicenseEmail(env, licenseKey) {
+  const license = await env.DB.prepare(
+    "SELECT transaction_id, buyer_email, buyer_name, license_key, license_type FROM licenses WHERE license_key = ?1 LIMIT 1"
+  ).bind(licenseKey).first();
+
+  if (!license) return { ok: false, reason: "license_not_found" };
+
+  const email = String(license.buyer_email || "").trim().toLowerCase();
+  if (!email || email.endsWith("@poliroutines.local")) {
+    return { ok: true, skipped: true, reason: "customer_email_unavailable" };
+  }
+
+  const alreadyDelivered = await env.DB.prepare(
+    "SELECT id FROM license_deliveries WHERE license_key = ?1 LIMIT 1"
+  ).bind(license.license_key).first();
+  if (alreadyDelivered) return { ok: true, already_sent: true };
+
+  if (!env.RESEND_API_KEY || !env.RESEND_FROM_EMAIL) {
+    return { ok: false, reason: "resend_not_configured" };
+  }
+
+  const name = escapeHtml(license.buyer_name || "Cliente");
+  const key = escapeHtml(license.license_key);
+  const plan = escapeHtml(license.license_type || "lifetime");
+  const apkUrl = "https://brunopolii.github.io/app-do-poli/download.html";
+  const payload = {
+    from: env.RESEND_FROM_EMAIL,
+    to: [email],
+    subject: "Seu acesso ao Poliroutines",
+    html:
+      "<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#24212b\">" +
+      "<h2 style=\"color:#4f378b\">Compra aprovada! 🎉</h2>" +
+      "<p>Olá, " + name + "!</p>" +
+      "<p>Obrigado por adquirir o <strong>Poliroutines</strong>.</p>" +
+      "<p>Seu código de ativação:</p>" +
+      "<p style=\"font-size:24px;font-weight:700;letter-spacing:1px;background:#f0ecf8;padding:16px;border-radius:12px;text-align:center\">" + key + "</p>" +
+      "<p><strong>Plano:</strong> " + plan + "</p>" +
+      "<p><a href=\"" + apkUrl + "\" style=\"display:inline-block;background:#6750a4;color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px\">Baixar o Poliroutines</a></p>" +
+      "<p>Instale o aplicativo, abra a tela de ativação e informe o código acima.</p>" +
+      "<p>Guarde este e-mail para futuras reinstalações.</p>" +
+      "</div>",
+  };
+
+  let response;
+  try {
+    response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer " + env.RESEND_API_KEY,
+        "content-type": "application/json",
+        "Idempotency-Key": "poliroutines-license-" + license.license_key,
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    return { ok: false, reason: "resend_unreachable" };
+  }
+
+  if (!response.ok) {
+    return { ok: false, reason: "resend_rejected", status: response.status };
+  }
+
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    return { ok: false, reason: "resend_invalid_response" };
+  }
+  if (!result?.id) return { ok: false, reason: "resend_message_id_missing" };
+
+  await env.DB.prepare(
+    "INSERT INTO license_deliveries (transaction_id, email, license_key, sent_at) VALUES (?1, ?2, ?3, datetime('now')) ON CONFLICT(transaction_id) DO NOTHING"
+  ).bind(license.transaction_id, email, license.license_key).run();
+
+  return { ok: true, sent: true };
+}
+
 async function handleWebhook(request, env) {
   const configuredSecrets = [
     env.KIWIFY_WEBHOOK_SECRET,
@@ -442,7 +529,27 @@ async function handleWebhook(request, env) {
   }
 
   if (isApprovedEvent(event, status)) {
-    return upsertApproved(body, env);
+    const licenseResponse = await upsertApproved(body, env);
+    if (!licenseResponse.ok) return licenseResponse;
+
+    let licenseResult;
+    try {
+      licenseResult = await licenseResponse.clone().json();
+    } catch {
+      return licenseResponse;
+    }
+
+    if (licenseResult?.license_key && !licenseResult?.ignored) {
+      const delivery = await deliverLicenseEmail(env, licenseResult.license_key);
+      if (!delivery.ok) {
+        return json({
+          error: "license_created_email_delivery_failed",
+          reason: delivery.reason,
+          ...(delivery.status ? { resend_status: delivery.status } : {}),
+        }, 503);
+      }
+    }
+    return licenseResponse;
   }
 
   return json({ ok: true, ignored: true, event, status });
@@ -613,7 +720,7 @@ export default {
     let response;
 
     if (url.pathname === "/health") {
-      response = json({ ok: true, service: "poliroutines-license", version: "6" });
+      response = json({ ok: true, service: "poliroutines-license", version: "7" });
     } else if (url.pathname === "/webhook" && request.method === "POST") {
       response = await handleWebhook(request, env);
     } else if (url.pathname === "/activate" && request.method === "POST") {
