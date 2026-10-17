@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#121318">
+<title>Obrigado pela compra | Poliroutines</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--bg:#121318;--card:#20232a;--line:#3b3e45;--text:#f3f0e7;--muted:#c3c0b9;--gold:#c38d2c;--cream:#f3f0e7}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--bg);color:var(--text);font-family:"DM Sans",sans-serif;line-height:1.6}.card{width:min(100%,520px);padding:clamp(24px,6vw,42px);background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:0 20px 60px #0004}.brand{font-family:"Playfair Display",serif;font-weight:700;font-size:1.4rem;color:var(--gold)}h1{font-family:"Playfair Display",serif;font-size:clamp(2rem,7vw,2.8rem);line-height:1.1;margin:22px 0 14px}.muted{color:var(--muted)}label{display:block;font-weight:700;margin:18px 0 7px}input{width:100%;padding:14px;border-radius:12px;border:1px solid #555963;background:#15161b;color:var(--text);font:inherit}button,.link{display:flex;justify-content:center;align-items:center;width:100%;padding:14px 18px;border:0;border-radius:12px;background:var(--gold);color:#17130d;font:700 1rem "DM Sans",sans-serif;text-align:center;cursor:pointer;margin-top:20px;text-decoration:none}button:disabled{opacity:.65;cursor:wait}.key{padding:18px;border-radius:12px;background:#15161b;border:1px solid var(--line);font-weight:800;font-size:1.3rem;text-align:center;letter-spacing:1px;overflow-wrap:anywhere;margin-top:20px}.error{color:#ffb4ab;margin-top:14px}.foot{font-size:.85rem;color:var(--muted);margin-top:22px}.back{display:block;color:var(--cream);text-align:center;margin-top:18px}
+</style></head>
+<body><main class="card">
+<a href="https://polirotinas.vercel.app/" class="brand" style="text-decoration:none">POLIROUTINES</a>
+<h1>Obrigado pela compra!</h1>
+<p class="muted">Para consultar sua chave de ativação, informe o e-mail utilizado no pagamento e o ID do pedido. Se a compra acabou de ser aprovada, aguarde alguns minutos e tente novamente.</p>
+<label for="email">E-mail usado na compra</label><input id="email" type="email" autocomplete="email" placeholder="seu@email.com" required>
+<label for="order">ID do pedido da Kiwify</label><input id="order" autocomplete="off" placeholder="ID do pedido" required>
+<button id="submit" type="button">Consultar minha chave</button>
+<div id="result" aria-live="polite"></div>
+<a class="back" href="https://polirotinas.vercel.app/">Voltar ao site do Poliroutines</a>
+<p class="foot">Sua chave é consultada com segurança pelo sistema de licenças do Poliroutines. Nunca compartilhe seu código de ativação.</p>
+</main>
+<script>
+const WORKER = "https://polirotinas-license.brunopoli95.workers.dev";
+const params = new URLSearchParams(location.search);
+document.getElementById("email").value = params.get("email") || "";
+document.getElementById("order").value = params.get("order_id") || params.get("order") || "";
+document.getElementById("submit").addEventListener("click", async () => {
+ const button=document.getElementById("submit"), result=document.getElementById("result");
+ const email=document.getElementById("email").value.trim(), order_id=document.getElementById("order").value.trim();
+ result.replaceChildren();
+ if(!email || !order_id){const p=document.createElement("p");p.className="error";p.textContent="Preencha o e-mail e o ID do pedido.";result.appendChild(p);return;}
+ button.disabled=true;button.textContent="Consultando...";
+ try {
+  const response=await fetch(WORKER+"/claim",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,order_id})});
+  const data=await response.json();
+  if(!response.ok){const messages={purchase_not_found:"Compra não encontrada. Confira o e-mail e o ID do pedido.",license_expired:"Esta assinatura expirou.",license_revoked:"Esta licença foi revogada. Entre em contato com o suporte."};throw new Error(messages[data.error]||"Não foi possível consultar a licença. Tente novamente.");}
+  const key=document.createElement("div");key.className="key";key.textContent=data.license_key;result.appendChild(key);
+  const copy=document.createElement("button");copy.type="button";copy.textContent="Copiar chave";
+  copy.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(data.license_key);copy.textContent="Chave copiada!";}catch{copy.textContent="Selecione e copie a chave acima.";}});result.appendChild(copy);
+  const info=document.createElement("p");info.className="muted";info.textContent=data.license_type==="lifetime"?"Plano vitalício":data.license_type==="annual"?"Plano anual":"Plano mensal";result.appendChild(info);
+ } catch(error){const p=document.createElement("p");p.className="error";p.textContent=error.message;result.appendChild(p);}
+ finally{button.disabled=false;button.textContent="Consultar minha chave";}
+});
+</script></body></html>
