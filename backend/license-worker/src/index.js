@@ -539,16 +539,9 @@ async function handleWebhook(request, env) {
       return licenseResponse;
     }
 
-    if (licenseResult?.license_key && !licenseResult?.ignored) {
-      const delivery = await deliverLicenseEmail(env, licenseResult.license_key);
-      if (!delivery.ok) {
-        return json({
-          error: "license_created_email_delivery_failed",
-          reason: delivery.reason,
-          ...(delivery.status ? { resend_status: delivery.status } : {}),
-        }, 503);
-      }
-    }
+    // The license is available through the post-purchase and recovery pages.
+    // Email is intentionally optional: an unverified sender domain must not
+    // make Kiwify retry an already-created license or report a failed purchase.
     return licenseResponse;
   }
 
@@ -694,21 +687,26 @@ body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#f7f5fa;
 <body><main class="card">
 <div class="brand">POLIROUTINES</div>
 <h1>Chave de ativação</h1>
-<p class="sub">Informe o e-mail usado na compra e o ID do pedido para consultar sua licença.</p>
+<p class="sub">Informe o e-mail usado na compra e o ID do pedido para consultar sua licença. Se a compra acabou de ser aprovada, aguarde alguns minutos e tente novamente.</p>
 <label for="email">E-mail da compra</label><input id="email" type="email" autocomplete="email" placeholder="seu@email.com">
 <label for="order">ID do pedido</label><input id="order" autocomplete="off" placeholder="Ex.: 123456789">
 <button id="btn" onclick="claim()">Consultar licença</button><div id="result"></div>
 <a class="download" href="https://brunopolii.github.io/app-do-poli/download.html">Baixar o APK do Poliroutines</a>
 <p class="small">A chave fica vinculada ao primeiro aparelho em que for ativada.</p>
 <script>
+const params=new URLSearchParams(window.location.search);
+document.getElementById('order').value=params.get('order_id')||params.get('order')||'';
+document.getElementById('email').value=params.get('email')||'';
 async function claim(){
 const btn=document.getElementById('btn'),result=document.getElementById('result');btn.disabled=true;result.textContent='Consultando...';
 try{
 const r=await fetch('/claim',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:document.getElementById('email').value,order_id:document.getElementById('order').value})});
 const d=await r.json();
-if(!r.ok)throw new Error(d.error==='purchase_not_found'?'Compra não encontrada. Confira o e-mail e o ID do pedido.':d.error==='license_expired'?'Esta assinatura expirou. Faça uma nova renovação.':d.error||'Não foi possível consultar a licença.');
-result.innerHTML='<div class="key">'+d.license_key+'</div>';
-}catch(e){result.innerHTML='<div class="error">'+e.message+'</div>';}
+if(!r.ok)throw new Error(d.error==='purchase_not_found'?'Compra não encontrada. Confira o e-mail e o ID do pedido.':d.error==='license_expired'?'Esta assinatura expirou. Faça uma nova renovação.':d.error==='license_revoked'?'Esta licença foi revogada. Entre em contato com o suporte.':'Não foi possível consultar a licença. Confira os dados e tente novamente.');
+result.replaceChildren();
+const key=document.createElement('div');key.className='key';key.textContent=d.license_key;result.appendChild(key);
+const copy=document.createElement('button');copy.type='button';copy.textContent='Copiar chave';copy.onclick=async()=>{try{await navigator.clipboard.writeText(d.license_key);copy.textContent='Chave copiada!';}catch{copy.textContent='Selecione e copie a chave acima.';}};result.appendChild(copy);
+}catch(e){result.textContent='';const error=document.createElement('div');error.className='error';error.textContent=e.message;result.appendChild(error);}
 finally{btn.disabled=false;}
 }
 </script></main></body></html>`;
@@ -720,15 +718,20 @@ export default {
     let response;
 
     if (url.pathname === "/health") {
-      response = json({ ok: true, service: "poliroutines-license", version: "7" });
+      response = json({ ok: true, service: "poliroutines-license", version: "8" });
     } else if (url.pathname === "/webhook" && request.method === "POST") {
       response = await handleWebhook(request, env);
     } else if (url.pathname === "/activate" && request.method === "POST") {
       response = await activate(request, env);
     } else if (url.pathname === "/validate" && request.method === "POST") {
       response = await validate(request, env);
-    } else if (url.pathname === "/claim" && request.method === "GET") {
-      response = new Response(claimPage, {
+    } else if ((url.pathname === "/claim" || url.pathname === "/thanks") && request.method === "GET") {
+      const page = url.pathname === "/thanks"
+        ? claimPage
+            .replace("<h1>Chave de ativação</h1>", "<h1>Obrigado pela compra!</h1>")
+            .replace("Informe o e-mail usado na compra e o ID do pedido para consultar sua licença. Se a compra acabou de ser aprovada, aguarde alguns minutos e tente novamente.", "Sua compra é processada pela plataforma de pagamento. Consulte sua chave abaixo usando o e-mail da compra e o ID do pedido. Se ainda não aparecer, aguarde alguns minutos e tente novamente.")
+        : claimPage;
+      response = new Response(page, {
         headers: {
           "content-type": "text/html; charset=utf-8",
           "cache-control": "no-store",
@@ -741,7 +744,7 @@ export default {
         ok: true,
         service: "poliroutines-license",
         status: "online",
-        endpoints: ["/health", "/webhook", "/activate", "/validate", "/claim"],
+        endpoints: ["/health", "/webhook", "/activate", "/validate", "/claim", "/thanks"],
       });
     } else {
       response = json({ error: "not_found" }, 404);
