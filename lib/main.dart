@@ -7,6 +7,8 @@ import 'screens/activation_screen.dart';
 import 'screens/agenda_screen.dart';
 import 'screens/finance_screen.dart';
 import 'screens/diary_screen.dart';
+import 'screens/premium_diary_screen.dart';
+import 'screens/premium_screen.dart';
 import 'screens/food_screen.dart';
 import 'screens/gym_screen.dart';
 import 'screens/home_screen.dart';
@@ -157,59 +159,40 @@ class _AppDoPoliState extends State<AppDoPoli> {
     };
   }
 
-  void _finishActivation() {
-    _navigatorKey.currentState?.pop();
-    _refreshPlanAccess();
-  }
-
   Future<void> _refreshPlanAccess() async {
     final restricted = await PlanService().agendaOnly;
     if (mounted) setState(() => agendaOnly = restricted);
   }
 
   Future<void> _openDiary() async {
+    final isPremium = await PlanService().hasPremium;
+    if (!mounted) return;
     await _navigatorKey.currentState?.push<void>(
-      MaterialPageRoute(builder: (_) => const DiaryScreen()),
+      MaterialPageRoute(
+        builder: (_) => isPremium
+            ? const PremiumDiaryScreen()
+            : const DiaryScreen(),
+      ),
+    );
+  }
+
+  Future<void> _openActivation() async {
+    await _navigatorKey.currentState?.push<void>(
+      MaterialPageRoute(
+        builder: (_) => ActivationScreen(onActivated: () {
+          _navigatorKey.currentState?.pop();
+          _refreshPlanAccess();
+        }),
+      ),
     );
   }
 
   Future<void> _showPremium() async {
-    await showDialog<void>(
-      context: _navigatorKey.currentContext ?? context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Poliroutines Premium'),
-        content: const SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Desbloqueie todos os recursos do Poliroutines:'),
-              SizedBox(height: 12),
-              Text('• Academia sem limite de treinos'),
-              Text('• Alimentação e Financeiro sem limites mensais'),
-              Text('• Histórico completo e gráficos avançados'),
-              Text('• Personalização com imagem de fundo'),
-              SizedBox(height: 12),
-              Text('Planos disponíveis: mensal, anual e vitalício. Após a compra, use a chave de ativação recebida.'),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Fechar')),
-          FilledButton.icon(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              _navigatorKey.currentState?.push<void>(MaterialPageRoute(
-                builder: (_) => ActivationScreen(onActivated: _finishActivation),
-              ));
-            },
-            icon: const Icon(Icons.key),
-            label: const Text('Ativar Premium'),
-          ),
-        ],
-      ),
+    await _navigatorKey.currentState?.push<void>(
+      MaterialPageRoute(builder: (_) => PremiumScreen(onActivate: _openActivation)),
     );
   }
+
 
   Future<void> _showHelp() async {
     await showDialog<void>(
