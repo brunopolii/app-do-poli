@@ -347,7 +347,7 @@ class _AppDoPoliState extends State<AppDoPoli> {
               children: [
                 const AgendaScreen(),
                 GymScreen(key: _gymKey),
-                HomeScreen(key: _homeKey, onOpenTheme: _openTheme, onNavigate: (index) => setState(() => selectedIndex = index)),
+                HomeScreen(key: _homeKey, onOpenTheme: _openTheme, onNavigate: (index) => setState(() => selectedIndex = index), onOpenWorkout: () => _gymKey.currentState?.openRecordedWorkout()),
                 const FoodScreen(),
                 const FinanceScreen(),
               ],
