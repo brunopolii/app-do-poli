@@ -113,12 +113,13 @@ Future<void> openRecordedWorkout() async {
     ));
   }
   if (chosen == null || !mounted) return;
+  final selectedWorkout = chosen;
   await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
-    title: Text(chosen!.name),
+    title: Text(selectedWorkout.name),
     content: SizedBox(width: double.maxFinite, child: ListView(shrinkWrap: true, children: [
-      Text('Registrado em ${DateFormat('dd/MM/yyyy • HH:mm').format(DateTime.tryParse(chosen!.date) ?? DateTime.now())}'),
+      Text('Registrado em ${DateFormat('dd/MM/yyyy • HH:mm').format(DateTime.tryParse(selectedWorkout.date) ?? DateTime.now())}'),
       const SizedBox(height: 12),
-      ...chosen!.exercises.map((e) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      ...selectedWorkout.exercises.map((e) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(e.name, style: Theme.of(context).textTheme.titleMedium),
         Text(e.weights.asMap().entries.map((entry) => 'Série ${entry.key + 1}: ${entry.value.toStringAsFixed(1)} kg • ${e.reps} reps').join('\\n')),
       ]))),
