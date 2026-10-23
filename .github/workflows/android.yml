@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
 
 permissions:
   contents: write
@@ -17,57 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  analyze:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.47.2"
-          channel: stable
-          cache: true
-
-      - name: Flutter pub get
-        run: flutter pub get
-
-      - name: Analyze
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
-
-  build-pr-apk:
-    if: github.event_name == 'pull_request'
-    needs: analyze
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.47.2"
-          channel: stable
-          cache: true
-
-      - name: Flutter pub get
-        run: flutter pub get
-
-      - name: Build test APK
-        run: flutter build apk --debug
-
-      - name: Upload test APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: poliroutines-test-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
-          if-no-files-found: error
-          retention-days: 7
-
   build:
-    if: github.event_name != 'pull_request'
-    needs: analyze
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -122,6 +70,9 @@ jobs:
           echo "versionCode atual no projeto: $CURRENT_CODE"
           echo "próximo versionCode do APK: $NEXT_CODE"
           echo "NEXT_VERSION_CODE=$NEXT_CODE" >> "$GITHUB_ENV"
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Configure release signing
         env:
