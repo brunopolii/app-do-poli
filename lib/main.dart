@@ -118,7 +118,7 @@ class _AppBackgroundState extends State<_AppBackground> {
                           height: height,
                           child: Image(
                             image: _image!,
-                            fit: BoxFit.cover,
+                            fit: BoxFit.contain,
                             alignment: Alignment.center,
                             gaplessPlayback: true,
                             errorBuilder: (_, __, ___) => const SizedBox.shrink(),
@@ -151,7 +151,10 @@ class AppDoPoli extends StatefulWidget {
 class _AppDoPoliState extends State<AppDoPoli> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
+  final GlobalKey<AgendaScreenState> _agendaKey = GlobalKey<AgendaScreenState>();
   final GlobalKey<GymScreenState> _gymKey = GlobalKey<GymScreenState>();
+  final GlobalKey<FoodScreenState> _foodKey = GlobalKey<FoodScreenState>();
+  final GlobalKey<FinanceScreenState> _financeKey = GlobalKey<FinanceScreenState>();
   bool agendaOnly = false;
   late ThemeSettings themeSettings;
   late ThemeMode themeMode;
@@ -357,11 +360,19 @@ class _AppDoPoliState extends State<AppDoPoli> {
                 : IndexedStack(
               index: selectedIndex,
               children: [
-                const AgendaScreen(),
+                AgendaScreen(key: _agendaKey),
                 GymScreen(key: _gymKey),
-                HomeScreen(key: _homeKey, onOpenTheme: _openTheme, onNavigate: (index) => setState(() => selectedIndex = index), onOpenWorkout: () => _gymKey.currentState?.openRecordedWorkout()),
-                const FoodScreen(),
-                const FinanceScreen(),
+                HomeScreen(
+                  key: _homeKey,
+                  onOpenTheme: _openTheme,
+                  onNavigate: (index) => setState(() => selectedIndex = index),
+                  onQuickAgenda: () => _agendaKey.currentState?.openQuickAdd(),
+                  onQuickWorkout: () => _gymKey.currentState?.openQuickWorkout(),
+                  onQuickMeal: () => _foodKey.currentState?.openQuickAdd(),
+                  onQuickFinance: () => _financeKey.currentState?.openQuickAdd(),
+                ),
+                FoodScreen(key: _foodKey),
+                FinanceScreen(key: _financeKey),
               ],
             ),
             bottomNavigationBar: Builder(
