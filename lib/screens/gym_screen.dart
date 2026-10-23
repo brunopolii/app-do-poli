@@ -83,9 +83,49 @@ String defaultExerciseImage(String name){
   return '';
 }
 
+class _WorkoutDayChoice { final WorkoutPlan plan; final int day; const _WorkoutDayChoice(this.plan, this.day); }
+
 class GymScreen extends StatefulWidget{const GymScreen({super.key});@override State<GymScreen> createState()=>GymScreenState();}
 class GymScreenState extends State<GymScreen>{List<WorkoutPlan> plans=[];List<ExerciseInfo> custom=[];int _historyRefresh=0;@override void initState(){super.initState();load();}Future<void> load()async{plans=(await StorageService.read('workout_plans')).map(WorkoutPlan.fromJson).toList();for(final p in plans){for(final list in p.dayExercises.values){for(final e in list){if(e.imagePath.isEmpty)e.imagePath=defaultExerciseImage(e.name);}}}custom=(await StorageService.read('exercise_library')).map((e)=><String,String>{'name':'${e['name']??''}','muscle':'${e['muscle']??'Outros'}','equipment':'${e['equipment']??''}','description':'${e['description']??''}','imagePath':'${e['imagePath']??''}'}).where((e)=>e['name']!.isNotEmpty).toList();if(mounted)setState(()=>_historyRefresh++);}Future<void> refresh()async{await load();}
-Future<void> openRecordedWorkout() async {
+Future<void> openQuickWorkout() async {
+   await load();
+   if (!mounted) return;
+   final choices = <_WorkoutDayChoice>[
+     for (final plan in plans)
+       for (final day in plan.weekdays.toSet().toList()..sort())
+         if (plan.exercisesFor(day).isNotEmpty) _WorkoutDayChoice(plan, day),
+   ];
+   if (choices.isEmpty) {
+     ScaffoldMessenger.of(context).showSnackBar(
+       const SnackBar(content: Text('Nenhum dia de treino salvo. Crie um treino e escolha os dias da semana.')),
+     );
+     return;
+   }
+   final choice = await showDialog<_WorkoutDayChoice>(
+     context: context,
+     builder: (dialogContext) => AlertDialog(
+       title: const Text('Escolha o treino do dia'),
+       content: SizedBox(
+         width: double.maxFinite,
+         child: ListView(
+           shrinkWrap: true,
+           children: [
+             for (final item in choices)
+               ListTile(
+                 leading: const Icon(Icons.fitness_center),
+                 title: Text(weekDays[item.day - 1]),
+                 subtitle: Text('${item.plan.name} • ${item.plan.exercisesFor(item.day).length} exercício(s)'),
+                 onTap: () => Navigator.pop(dialogContext, item),
+               ),
+           ],
+         ),
+       ),
+       actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancelar'))],
+     ),
+   );
+   if (choice != null && mounted) await startWorkout(choice.plan, choice.day);
+ }
+ Future<void> openRecordedWorkout() async {
   final records = (await StorageService.read('workout_history')).map(Workout.fromJson).toList()
     ..sort((a, b) => b.date.compareTo(a.date));
   if (!mounted) return;
