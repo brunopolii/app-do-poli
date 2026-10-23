@@ -47,6 +47,8 @@ android {
         release {
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
+            } else {
+                throw GradleException("Keystore de release não configurado. Configure android/key.properties antes de gerar um APK release.")
             }
         }
     }
