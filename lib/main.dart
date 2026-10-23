@@ -55,7 +55,7 @@ class _AppBackgroundState extends State<_AppBackground> {
   @override
   void didUpdateWidget(covariant _AppBackground oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.settings.imagePath != _path) {
+    if (widget.settings.imagePath != oldWidget.settings.imagePath) {
       _setImage(widget.settings.imagePath);
     }
   }
@@ -101,22 +101,34 @@ class _AppBackgroundState extends State<_AppBackground> {
         ColoredBox(color: base),
         if (_image != null)
           IgnorePointer(
-            child: ClipRect(
-              child: Opacity(
-                opacity: s.opacity,
-                child: Transform.translate(
-                  offset: Offset(s.x * 40, s.y * 40),
-                  child: Transform.scale(
-                    scale: s.scale,
-                    child: Image(
-                      image: _image!,
-                      fit: BoxFit.cover,
-                      gaplessPlayback: true,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final height = constraints.maxHeight;
+                return ClipRect(
+                  child: Opacity(
+                    opacity: s.opacity.clamp(0.05, 1.0),
+                    child: Transform.translate(
+                      offset: Offset(s.x * width / 10, s.y * height / 10),
+                      child: Transform.scale(
+                        scale: s.scale.clamp(0.5, 3.0),
+                        alignment: Alignment.center,
+                        child: SizedBox(
+                          width: width,
+                          height: height,
+                          child: Image(
+                            image: _image!,
+                            fit: BoxFit.cover,
+                            alignment: Alignment.center,
+                            gaplessPlayback: true,
+                            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         s.imagePath != null && _image == null
