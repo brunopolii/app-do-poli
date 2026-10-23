@@ -249,6 +249,8 @@ class _FinanceScreenState extends State<FinanceScreen>{
     await _save();if(mounted)setState((){});
   }
 
+  Future<void> openQuickAdd() => _menu();
+
   Future<void> _menu()async{
     if (!await PlanService().canCreateFinanceRecord()) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
