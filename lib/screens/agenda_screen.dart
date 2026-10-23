@@ -7,8 +7,8 @@ import '../services/plan_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/app_card.dart';
 
-class AgendaScreen extends StatefulWidget { const AgendaScreen({super.key}); @override State<AgendaScreen> createState() => _AgendaScreenState(); }
-class _AgendaScreenState extends State<AgendaScreen> {
+class AgendaScreen extends StatefulWidget { const AgendaScreen({super.key}); @override State<AgendaScreen> createState() => AgendaScreenState(); }
+class AgendaScreenState extends State<AgendaScreen> {
   DateTime month = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime selected = DateTime.now();
   List<AgendaEvent> events = [];
@@ -20,6 +20,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
   @override void initState() { super.initState(); _load(); }
   Future<void> _load() async { events = (await StorageService.read('agenda')).map(AgendaEvent.fromJson).toList(); if (mounted) setState(() {}); }
   Future<void> _save() => StorageService.write('agenda', events.map((e) => e.toJson()).toList());
+
+  Future<void> openQuickAdd() async {
+    final now = DateTime.now();
+    if (mounted) setState(() { selected = DateTime(now.year, now.month, now.day); month = DateTime(now.year, now.month); });
+    await _edit();
+  }
   List<AgendaEvent> get dayEvents { final x = events.where((e) => e.date == selectedKey).toList()..sort((a,b) => a.start.compareTo(b.start)); return x; }
   bool hasEvent(DateTime d) => events.any((e) => e.date == key(d));
 
