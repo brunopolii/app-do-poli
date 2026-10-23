@@ -188,7 +188,7 @@ class _ExerciseThumb extends StatelessWidget{
     );
     return ClipRRect(
       borderRadius:BorderRadius.circular(10),
-      child:Image.file(File(path),width:52,height:52,fit:BoxFit.cover,cacheWidth:160,cacheHeight:160,filterQuality:FilterQuality.low,gaplessPlayback:true,errorBuilder:(_,__,___)=>const CircleAvatar(radius:26,child:Icon(Icons.fitness_center))),
+      child:Image.file(File(path),width:52,height:52,fit:BoxFit.contain,cacheWidth:160,cacheHeight:160,filterQuality:FilterQuality.medium,gaplessPlayback:true,errorBuilder:(_,__,___)=>const CircleAvatar(radius:26,child:Icon(Icons.fitness_center))),
     );
   }
 }
@@ -263,7 +263,7 @@ class _WorkoutExecutionState extends State<WorkoutExecution>{
     for(var i=0;i<widget.exercises.length;i++){
       final rows=<Widget>[
         if(widget.exercises[i].imagePath.isNotEmpty)
-          ClipRRect(borderRadius:BorderRadius.circular(12),child:widget.exercises[i].imagePath.startsWith('assets/')?SvgPicture.asset(widget.exercises[i].imagePath,height:130,width:double.infinity,fit:BoxFit.cover,placeholderBuilder:(_)=>const SizedBox.shrink()):Image.file(File(widget.exercises[i].imagePath),height:130,width:double.infinity,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const SizedBox.shrink())),
+          ClipRRect(borderRadius:BorderRadius.circular(12),child:widget.exercises[i].imagePath.startsWith('assets/')?SvgPicture.asset(widget.exercises[i].imagePath,height:130,width:double.infinity,fit:BoxFit.cover,placeholderBuilder:(_)=>const SizedBox.shrink()):Image.file(File(widget.exercises[i].imagePath),height:130,width:double.infinity,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const SizedBox.shrink())),
         Text(widget.exercises[i].name,style:Theme.of(context).textTheme.titleLarge),
         Text(widget.exercises[i].muscle)
       ];
