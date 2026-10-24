@@ -83,8 +83,91 @@ String defaultExerciseImage(String name){
   return '';
 }
 
+class _WorkoutDayChoice { final WorkoutPlan plan; final int day; const _WorkoutDayChoice(this.plan, this.day); }
+
 class GymScreen extends StatefulWidget{const GymScreen({super.key});@override State<GymScreen> createState()=>GymScreenState();}
-class GymScreenState extends State<GymScreen>{List<WorkoutPlan> plans=[];List<ExerciseInfo> custom=[];int _historyRefresh=0;@override void initState(){super.initState();load();}Future<void> load()async{plans=(await StorageService.read('workout_plans')).map(WorkoutPlan.fromJson).toList();for(final p in plans){for(final list in p.dayExercises.values){for(final e in list){if(e.imagePath.isEmpty)e.imagePath=defaultExerciseImage(e.name);}}}custom=(await StorageService.read('exercise_library')).map((e)=><String,String>{'name':'${e['name']??''}','muscle':'${e['muscle']??'Outros'}','equipment':'${e['equipment']??''}','description':'${e['description']??''}','imagePath':'${e['imagePath']??''}'}).where((e)=>e['name']!.isNotEmpty).toList();if(mounted)setState(()=>_historyRefresh++);}Future<void> refresh()async{await load();}List<ExerciseInfo> get library{final all=<ExerciseInfo>[...defaultExercises.map((e)=><String,String>{'name':e['name']!,'muscle':e['muscle']!,'equipment':'','description':'','imagePath':e['imagePath']!}),...custom];final seen=<String>{};final unique=all.where((e)=>seen.add(e['name']!.toLowerCase())).toList();unique.sort((a,b){final am=muscleGroups.indexOf(a['muscle']!);final bm=muscleGroups.indexOf(b['muscle']!);final group=(am<0?999:am).compareTo(bm<0?999:bm);return group!=0?group:a['name']!.toLowerCase().compareTo(b['name']!.toLowerCase());});return unique;}Future<ExerciseInfo?> newExercise()async{final result=await showDialog<ExerciseInfo>(context:context,builder:(_)=>const NewExerciseDialog());if(result==null)return null;if(!library.any((e)=>e['name']!.toLowerCase()==result['name']!.toLowerCase())){custom.add(result);await StorageService.write('exercise_library',custom);}return result;}Future<void> savePlans()=>StorageService.write('workout_plans',plans.map((e)=>e.toJson()).toList());Future<void> editPlan([WorkoutPlan? old])async{if(old==null&&!await PlanService().canCreateWorkoutPlan()){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('O plano gratuito permite cadastrar 1 treino. Conheça o Premium para criar outros.')));return;}final draft=await Navigator.push<WorkoutPlanDraft>(context,MaterialPageRoute(builder:(_)=>PlanEditor(old:old,library:library,newExercise:newExercise)));if(draft==null)return;final p=old??WorkoutPlan(id:DateTime.now().microsecondsSinceEpoch.toString(),name:draft.name,weekdays:[],dayExercises:{});p.name=draft.name;p.weekdays=draft.weekdays.toList()..sort();p.dayExercises=draft.dayExercises;if(old==null)plans.add(p);await savePlans();if(mounted)setState((){});}Future<void> deletePlan(WorkoutPlan p)async{final ok=await showDialog<bool>(context:context,builder:(d)=>AlertDialog(title:const Text('Excluir treino?'),content:Text('Excluir ${p.name}? O histórico será preservado.'),actions:[TextButton(onPressed:()=>Navigator.pop(d,false),child:const Text('Cancelar')),FilledButton(onPressed:()=>Navigator.pop(d,true),child:const Text('Excluir'))]));if(ok==true){plans.removeWhere((x)=>x.id==p.id);await savePlans();if(mounted)setState((){});}}Future<void> startWorkout(WorkoutPlan p,int day)async{final ex=p.exercisesFor(day).map((e)=>Exercise(id:e.id,name:e.name,muscle:e.muscle,sets:e.sets,reps:e.reps,imagePath:e.imagePath)).toList();if(ex.isEmpty)return;await Navigator.push(context,MaterialPageRoute(builder:(_)=>WorkoutExecution(name:p.name,weekday:day,exercises:ex)));if(mounted)await load();}@override Widget build(BuildContext context){final today=DateTime.now().weekday;return SafeArea(child:ListView(padding:const EdgeInsets.all(16),children:[Row(children:[Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Academia',style:Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.bold)),Text('${plans.length} treino(s) configurado(s)')])),FilledButton.icon(onPressed:()=>editPlan(),icon:const Icon(Icons.add),label:const Text('Criar treino'))]),const SizedBox(height:12),if(plans.isEmpty)const AppCard(child:Text('Nenhum treino criado.')),for(final p in plans)AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[const Icon(Icons.fitness_center),const SizedBox(width:8),Expanded(child:Text(p.name,style:Theme.of(context).textTheme.titleLarge)),PopupMenuButton<String>(onSelected:(v){if(v=='edit')editPlan(p);if(v=='delete')deletePlan(p);},itemBuilder:(_)=>const[PopupMenuItem(value:'edit',child:Text('Editar')),PopupMenuItem(value:'delete',child:Text('Excluir'))])]),for(final d in p.weekdays)ListTile(contentPadding:EdgeInsets.zero,title:Text(weekDays[d-1]),subtitle:Text(p.exercisesFor(d).map((e)=>'${e.name} (${e.sets}×${e.reps})').join(', ')),trailing:IconButton(onPressed:()=>startWorkout(p,d),icon:const Icon(Icons.play_arrow)))])),if(plans.any((p)=>p.weekdays.contains(today)))const SizedBox(height:4),HistorySection(key:ValueKey(_historyRefresh))]));}}
+class GymScreenState extends State<GymScreen>{List<WorkoutPlan> plans=[];List<ExerciseInfo> custom=[];int _historyRefresh=0;@override void initState(){super.initState();load();}Future<void> load()async{plans=(await StorageService.read('workout_plans')).map(WorkoutPlan.fromJson).toList();for(final p in plans){for(final list in p.dayExercises.values){for(final e in list){if(e.imagePath.isEmpty)e.imagePath=defaultExerciseImage(e.name);}}}custom=(await StorageService.read('exercise_library')).map((e)=><String,String>{'name':'${e['name']??''}','muscle':'${e['muscle']??'Outros'}','equipment':'${e['equipment']??''}','description':'${e['description']??''}','imagePath':'${e['imagePath']??''}'}).where((e)=>e['name']!.isNotEmpty).toList();if(mounted)setState(()=>_historyRefresh++);}Future<void> refresh()async{await load();}
+Future<void> openQuickWorkout() async {
+   await load();
+   if (!mounted) return;
+   final choices = <_WorkoutDayChoice>[
+     for (final plan in plans)
+       for (final day in plan.weekdays.toSet().toList()..sort())
+         if (plan.exercisesFor(day).isNotEmpty) _WorkoutDayChoice(plan, day),
+   ];
+   if (choices.isEmpty) {
+     ScaffoldMessenger.of(context).showSnackBar(
+       const SnackBar(content: Text('Nenhum dia de treino salvo. Crie um treino e escolha os dias da semana.')),
+     );
+     return;
+   }
+   final choice = await showDialog<_WorkoutDayChoice>(
+     context: context,
+     builder: (dialogContext) => AlertDialog(
+       title: const Text('Escolha o treino do dia'),
+       content: SizedBox(
+         width: double.maxFinite,
+         child: ListView(
+           shrinkWrap: true,
+           children: [
+             for (final item in choices)
+               ListTile(
+                 leading: const Icon(Icons.fitness_center),
+                 title: Text(weekDays[item.day - 1]),
+                 subtitle: Text('${item.plan.name} • ${item.plan.exercisesFor(item.day).length} exercício(s)'),
+                 onTap: () => Navigator.pop(dialogContext, item),
+               ),
+           ],
+         ),
+       ),
+       actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancelar'))],
+     ),
+   );
+   if (choice != null && mounted) await startWorkout(choice.plan, choice.day);
+ }
+ Future<void> openRecordedWorkout() async {
+  final records = (await StorageService.read('workout_history')).map(Workout.fromJson).toList()
+    ..sort((a, b) => b.date.compareTo(a.date));
+  if (!mounted) return;
+  if (records.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nenhum treino registrado ainda.')));
+    return;
+  }
+  final now = DateTime.now();
+  final todayRecords = records.where((w) {
+    final d = DateTime.tryParse(w.date);
+    return d != null && d.year == now.year && d.month == now.month && d.day == now.day;
+  }).toList();
+  Workout? chosen;
+  if (todayRecords.length == 1) {
+    chosen = todayRecords.first;
+  } else {
+    chosen = await showDialog<Workout>(context: context, builder: (dialogContext) => AlertDialog(
+      title: Text(todayRecords.isEmpty ? 'Escolha um treino registrado' : 'Treinos registrados hoje'),
+      content: SizedBox(width: double.maxFinite, child: ListView(shrinkWrap: true, children: (todayRecords.isNotEmpty ? todayRecords : records).map((w) {
+        final d = DateTime.tryParse(w.date);
+        final date = d == null ? w.date : DateFormat('dd/MM/yyyy • HH:mm').format(d);
+        return ListTile(leading: const Icon(Icons.fitness_center), title: Text(w.name), subtitle: Text(date), onTap: () => Navigator.pop(dialogContext, w));
+      }).toList())),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancelar'))],
+    ));
+  }
+  if (chosen == null || !mounted) return;
+  final selectedWorkout = chosen;
+  await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
+    title: Text(selectedWorkout.name),
+    content: SizedBox(width: double.maxFinite, child: ListView(shrinkWrap: true, children: [
+      Text('Registrado em ${DateFormat('dd/MM/yyyy • HH:mm').format(DateTime.tryParse(selectedWorkout.date) ?? DateTime.now())}'),
+      const SizedBox(height: 12),
+      ...selectedWorkout.exercises.map((e) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(e.name, style: Theme.of(context).textTheme.titleMedium),
+        Text(e.weights.asMap().entries.map((entry) => 'Série ${entry.key + 1}: ${entry.value.toStringAsFixed(1)} kg • ${e.reps} reps').join('\\n')),
+      ]))),
+    ])),
+    actions: [FilledButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Fechar'))],
+  ));
+}
+List<ExerciseInfo> get library{final all=<ExerciseInfo>[...defaultExercises.map((e)=><String,String>{'name':e['name']!,'muscle':e['muscle']!,'equipment':'','description':'','imagePath':e['imagePath']!}),...custom];final seen=<String>{};final unique=all.where((e)=>seen.add(e['name']!.toLowerCase())).toList();unique.sort((a,b){final am=muscleGroups.indexOf(a['muscle']!);final bm=muscleGroups.indexOf(b['muscle']!);final group=(am<0?999:am).compareTo(bm<0?999:bm);return group!=0?group:a['name']!.toLowerCase().compareTo(b['name']!.toLowerCase());});return unique;}Future<ExerciseInfo?> newExercise()async{final result=await showDialog<ExerciseInfo>(context:context,builder:(_)=>const NewExerciseDialog());if(result==null)return null;if(!library.any((e)=>e['name']!.toLowerCase()==result['name']!.toLowerCase())){custom.add(result);await StorageService.write('exercise_library',custom);}return result;}Future<void> savePlans()=>StorageService.write('workout_plans',plans.map((e)=>e.toJson()).toList());Future<void> editPlan([WorkoutPlan? old])async{if(old==null&&!await PlanService().canCreateWorkoutPlan()){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('O plano gratuito permite cadastrar 1 treino. Conheça o Premium para criar outros.')));return;}final draft=await Navigator.push<WorkoutPlanDraft>(context,MaterialPageRoute(builder:(_)=>PlanEditor(old:old,library:library,newExercise:newExercise)));if(draft==null)return;final p=old??WorkoutPlan(id:DateTime.now().microsecondsSinceEpoch.toString(),name:draft.name,weekdays:[],dayExercises:{});p.name=draft.name;p.weekdays=draft.weekdays.toList()..sort();p.dayExercises=draft.dayExercises;if(old==null)plans.add(p);await savePlans();if(mounted)setState((){});}Future<void> deletePlan(WorkoutPlan p)async{final ok=await showDialog<bool>(context:context,builder:(d)=>AlertDialog(title:const Text('Excluir treino?'),content:Text('Excluir ${p.name}? O histórico será preservado.'),actions:[TextButton(onPressed:()=>Navigator.pop(d,false),child:const Text('Cancelar')),FilledButton(onPressed:()=>Navigator.pop(d,true),child:const Text('Excluir'))]));if(ok==true){plans.removeWhere((x)=>x.id==p.id);await savePlans();if(mounted)setState((){});}}Future<void> startWorkout(WorkoutPlan p,int day)async{final ex=p.exercisesFor(day).map((e)=>Exercise(id:e.id,name:e.name,muscle:e.muscle,sets:e.sets,reps:e.reps,imagePath:e.imagePath)).toList();if(ex.isEmpty)return;await Navigator.push(context,MaterialPageRoute(builder:(_)=>WorkoutExecution(name:p.name,weekday:day,exercises:ex)));if(mounted)await load();}@override Widget build(BuildContext context){final today=DateTime.now().weekday;return SafeArea(child:ListView(padding:const EdgeInsets.all(16),children:[Row(children:[Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Academia',style:Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.bold)),Text('${plans.length} treino(s) configurado(s)')])),FilledButton.icon(onPressed:()=>editPlan(),icon:const Icon(Icons.add),label:const Text('Criar treino'))]),const SizedBox(height:12),if(plans.isEmpty)const AppCard(child:Text('Nenhum treino criado.')),for(final p in plans)AppCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[const Icon(Icons.fitness_center),const SizedBox(width:8),Expanded(child:Text(p.name,style:Theme.of(context).textTheme.titleLarge)),PopupMenuButton<String>(onSelected:(v){if(v=='edit')editPlan(p);if(v=='delete')deletePlan(p);},itemBuilder:(_)=>const[PopupMenuItem(value:'edit',child:Text('Editar')),PopupMenuItem(value:'delete',child:Text('Excluir'))])]),for(final d in p.weekdays)ListTile(contentPadding:EdgeInsets.zero,title:Text(weekDays[d-1]),subtitle:Text(p.exercisesFor(d).map((e)=>'${e.name} (${e.sets}×${e.reps})').join(', ')),trailing:IconButton(onPressed:()=>startWorkout(p,d),icon:const Icon(Icons.play_arrow)))])),if(plans.any((p)=>p.weekdays.contains(today)))const SizedBox(height:4),HistorySection(key:ValueKey(_historyRefresh))]));}}
 class NewExerciseDialog extends StatefulWidget{const NewExerciseDialog({super.key});@override State<NewExerciseDialog> createState()=>_NewExerciseDialogState();}
 class _NewExerciseDialogState extends State<NewExerciseDialog>{final name=TextEditingController(),equipment=TextEditingController(),description=TextEditingController();String muscle='Outros',imagePath='';@override void dispose(){name.dispose();equipment.dispose();description.dispose();super.dispose();}Future<void> pickImage()async{final picked=await ImagePicker().pickImage(source:ImageSource.gallery,imageQuality:85);if(picked==null)return;final dir=await getApplicationDocumentsDirectory();final folder=Directory('${dir.path}/exercises');await folder.create(recursive:true);final ext=picked.path.contains('.')?picked.path.substring(picked.path.lastIndexOf('.')):'.jpg';final file=File('${folder.path}/${DateTime.now().microsecondsSinceEpoch}$ext');await file.writeAsBytes(await picked.readAsBytes(),flush:true);if(mounted){await precacheImage(FileImage(file),context);setState(()=>imagePath=file.path);}}@override Widget build(BuildContext context)=>AlertDialog(title:const Text('Novo exercício'),content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[TextField(controller:name,decoration:const InputDecoration(labelText:'Nome *')),DropdownButtonFormField<String>(initialValue:muscle,items:muscleGroups.map((m)=>DropdownMenuItem(value:m,child:Text(m))).toList(),onChanged:(v){if(v!=null)setState(()=>muscle=v);},decoration:const InputDecoration(labelText:'Grupo muscular')),TextField(controller:equipment,decoration:const InputDecoration(labelText:'Equipamento (opcional)')),TextField(controller:description,maxLines:2,decoration:const InputDecoration(labelText:'Descrição (opcional)')),OutlinedButton.icon(onPressed:pickImage,icon:const Icon(Icons.image_outlined),label:Text(imagePath.isEmpty?'Adicionar imagem':'Imagem selecionada'))])),actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Cancelar')),FilledButton(onPressed:(){final n=name.text.trim();if(n.isEmpty)return;Navigator.pop(context,<String,String>{'name':n,'muscle':muscle,'equipment':equipment.text.trim(),'description':description.text.trim(),'imagePath':imagePath});},child:const Text('Salvar'))]);}
 class WorkoutPlanDraft{final String name;final Set<int> weekdays;final Map<String,List<Exercise>> dayExercises;WorkoutPlanDraft({required this.name,required this.weekdays,required this.dayExercises});}
@@ -105,7 +188,7 @@ class _ExerciseThumb extends StatelessWidget{
     );
     return ClipRRect(
       borderRadius:BorderRadius.circular(10),
-      child:Image.file(File(path),width:52,height:52,fit:BoxFit.cover,cacheWidth:160,cacheHeight:160,filterQuality:FilterQuality.low,gaplessPlayback:true,errorBuilder:(_,__,___)=>const CircleAvatar(radius:26,child:Icon(Icons.fitness_center))),
+      child:Image.file(File(path),width:52,height:52,fit:BoxFit.contain,cacheWidth:160,cacheHeight:160,filterQuality:FilterQuality.medium,gaplessPlayback:true,errorBuilder:(_,__,___)=>const CircleAvatar(radius:26,child:Icon(Icons.fitness_center))),
     );
   }
 }
@@ -180,7 +263,7 @@ class _WorkoutExecutionState extends State<WorkoutExecution>{
     for(var i=0;i<widget.exercises.length;i++){
       final rows=<Widget>[
         if(widget.exercises[i].imagePath.isNotEmpty)
-          ClipRRect(borderRadius:BorderRadius.circular(12),child:widget.exercises[i].imagePath.startsWith('assets/')?SvgPicture.asset(widget.exercises[i].imagePath,height:130,width:double.infinity,fit:BoxFit.cover,placeholderBuilder:(_)=>const SizedBox.shrink()):Image.file(File(widget.exercises[i].imagePath),height:130,width:double.infinity,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const SizedBox.shrink())),
+          ClipRRect(borderRadius:BorderRadius.circular(12),child:widget.exercises[i].imagePath.startsWith('assets/')?SvgPicture.asset(widget.exercises[i].imagePath,height:130,width:double.infinity,fit:BoxFit.cover,placeholderBuilder:(_)=>const SizedBox.shrink()):Image.file(File(widget.exercises[i].imagePath),height:130,width:double.infinity,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const SizedBox.shrink())),
         Text(widget.exercises[i].name,style:Theme.of(context).textTheme.titleLarge),
         Text(widget.exercises[i].muscle)
       ];

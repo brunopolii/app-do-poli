@@ -10,7 +10,11 @@ import 'weekly_report_screen.dart';
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onOpenTheme;
   final ValueChanged<int>? onNavigate;
-  const HomeScreen({super.key, this.onOpenTheme, this.onNavigate});
+  final VoidCallback? onQuickAgenda;
+  final VoidCallback? onQuickWorkout;
+  final VoidCallback? onQuickMeal;
+  final VoidCallback? onQuickFinance;
+  const HomeScreen({super.key, this.onOpenTheme, this.onNavigate, this.onQuickAgenda, this.onQuickWorkout, this.onQuickMeal, this.onQuickFinance});
   @override
   State<HomeScreen> createState() => HomeScreenState();
 }
@@ -114,10 +118,10 @@ class HomeScreenState extends State<HomeScreen> {
       case 'quick':
         final metrics = (config['metrics'] as List? ?? []).cast<String>();
         return _card(config, Wrap(spacing: 8, runSpacing: 8, children: [
-          if (metrics.contains('agenda')) _quickAction(Icons.event_outlined, 'Compromisso', () => _go(0)),
-          if (metrics.contains('gym')) _quickAction(Icons.fitness_center, 'Treino', () => _go(1)),
-          if (metrics.contains('food')) _quickAction(Icons.restaurant_outlined, 'Refeição', () => _go(3)),
-          if (metrics.contains('finance')) _quickAction(Icons.account_balance_wallet_outlined, 'Finanças', () => _go(4)),
+          if (metrics.contains('agenda')) _quickAction(Icons.event_outlined, 'Compromisso', () => widget.onQuickAgenda?.call()),
+          if (metrics.contains('gym')) _quickAction(Icons.fitness_center, 'Treino', () => widget.onQuickWorkout?.call()),
+          if (metrics.contains('food')) _quickAction(Icons.restaurant_outlined, 'Refeição', () => widget.onQuickMeal?.call()),
+          if (metrics.contains('finance')) _quickAction(Icons.account_balance_wallet_outlined, 'Finanças', () => widget.onQuickFinance?.call()),
         ]));
       case 'agenda':
         return _card(config, upcoming.isEmpty
