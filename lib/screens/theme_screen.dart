@@ -107,9 +107,9 @@ class _ThemeScreenState extends State<ThemeScreen> {
         Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           Text('Foto personalizada',style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:8),
           if (!premium) const Text('Recurso Premium — ative uma licença para usar uma imagem própria.'),
-          Text(has?'Sua foto está aplicada ao fundo.':'Escolha uma foto da galeria para usar como fundo.'),const SizedBox(height:12),
+          Text(has?'Sua foto está aplicada ao fundo. Arraste a tela inicial para reposicionar a imagem; as bordas ficam limitadas para não mostrar espaços vazios.':'Escolha uma foto da galeria para usar como fundo.'),const SizedBox(height:12),
           FilledButton.icon(onPressed:premium?_pickImage:null,icon:const Icon(Icons.photo_library_outlined),label:Text(has?'Trocar foto':'Usar minha foto')),
-          if(has)...[TextButton.icon(onPressed:_clearImage,icon:const Icon(Icons.close),label:const Text('Remover foto')),_slider('Zoom',settings.scale,.5,3,(v)=>settings.copyWith(scale:v)),_slider('Posição horizontal',settings.x,-5,5,(v)=>settings.copyWith(x:v)),_slider('Posição vertical',settings.y,-5,5,(v)=>settings.copyWith(y:v)),_slider('Transparência da foto',settings.opacity,.05,1,(v)=>settings.copyWith(opacity:v))]
+          if(has)...[TextButton.icon(onPressed:_clearImage,icon:const Icon(Icons.close),label:const Text('Remover foto')),_slider('Zoom',settings.scale,1,3,(v)=>settings.copyWith(scale:v)),_slider('Posição horizontal',settings.x.clamp(-1.0,1.0),-1,1,(v)=>settings.copyWith(x:v)),_slider('Posição vertical',settings.y.clamp(-1.0,1.0),-1,1,(v)=>settings.copyWith(y:v)),_slider('Transparência da foto',settings.opacity,.05,1,(v)=>settings.copyWith(opacity:v))]
         ]))),
         const SizedBox(height:12),
         OutlinedButton.icon(
