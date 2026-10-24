@@ -97,11 +97,11 @@ class _AppBackgroundState extends State<_AppBackground> {
 
   void _panBackground(Offset delta, Size viewport, Size imageSize) {
     final fitScale = (viewport.width / imageSize.width)
-        .clamp(0.0, double.infinity);
+        .clamp(0.0, double.infinity).toDouble();
     final coverScale = (viewport.height / imageSize.height)
         .clamp(0.0, double.infinity);
     final baseScale = fitScale > coverScale ? fitScale : coverScale;
-    final scale = baseScale * widget.settings.scale.clamp(1.0, 3.0);
+    final scale = baseScale * widget.settings.scale.clamp(1.0, 3.0).toDouble().toDouble();
     final overflowX = ((imageSize.width * scale) - viewport.width) / 2;
     final overflowY = ((imageSize.height * scale) - viewport.height) / 2;
     final currentX = overflowX <= 0 ? 0.0 : widget.settings.x * overflowX;
@@ -139,11 +139,11 @@ class _AppBackgroundState extends State<_AppBackground> {
           final imageHeight = source.height * scale;
           final overflowX = ((imageWidth - viewport.width) / 2).clamp(0.0, double.infinity);
           final overflowY = ((imageHeight - viewport.height) / 2).clamp(0.0, double.infinity);
-          final offsetX = overflowX * s.x.clamp(-1.0, 1.0);
-          final offsetY = overflowY * s.y.clamp(-1.0, 1.0);
+          final offsetX = overflowX * s.x.clamp(-1.0, 1.0).toDouble();
+          final offsetY = overflowY * s.y.clamp(-1.0, 1.0).toDouble();
           background = ClipRect(
             child: Opacity(
-              opacity: s.opacity.clamp(0.05, 1.0),
+              opacity: s.opacity.clamp(0.05, 1.0).toDouble(),
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onPanUpdate: (details) => _panBackground(details.delta, viewport, source),
