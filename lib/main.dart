@@ -313,6 +313,10 @@ class _AppDoPoliState extends State<AppDoPoli> {
   Widget _background(BuildContext context, Widget child) {
     return _AppBackground(
       settings: themeSettings,
+      onSettingsChanged: (next) {
+        setState(() => themeSettings = next);
+        ThemeService.save(next);
+      },
       child: child,
     );
   }
