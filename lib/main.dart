@@ -31,10 +31,12 @@ Future<void> main() async {
 
 class _AppBackground extends StatefulWidget {
   final ThemeSettings settings;
+  final ValueChanged<ThemeSettings> onSettingsChanged;
   final Widget child;
 
   const _AppBackground({
     required this.settings,
+    required this.onSettingsChanged,
     required this.child,
   });
 
@@ -44,6 +46,7 @@ class _AppBackground extends StatefulWidget {
 
 class _AppBackgroundState extends State<_AppBackground> {
   ImageProvider? _image;
+  Size? _sourceSize;
   String? _path;
 
   @override
@@ -66,25 +69,50 @@ class _AppBackgroundState extends State<_AppBackground> {
         setState(() {
           _path = null;
           _image = null;
+          _sourceSize = null;
         });
       }
       return;
     }
-
+    if (_path == path && _image != null) return;
     final provider = FileImage(File(path));
     _path = path;
-    _precacheAndShow(provider);
+    final stream = provider.resolve(const ImageConfiguration());
+    late final ImageStreamListener listener;
+    listener = ImageStreamListener((info, synchronousCall) {
+      stream.removeListener(listener);
+      if (!mounted) return;
+      setState(() {
+        _image = provider;
+        _sourceSize = Size(
+          info.image.width.toDouble(),
+          info.image.height.toDouble(),
+        );
+      });
+    }, onError: (error, stackTrace) {
+      stream.removeListener(listener);
+    });
+    stream.addListener(listener);
   }
 
-  Future<void> _precacheAndShow(ImageProvider provider) async {
-    try {
-      await precacheImage(provider, context);
-    } catch (_) {
-      // Keep the current background if the new image cannot be decoded.
-      return;
-    }
-    if (!mounted) return;
-    setState(() => _image = provider);
+  void _panBackground(Offset delta, Size viewport, Size imageSize) {
+    final fitScale = (viewport.width / imageSize.width)
+        .clamp(0.0, double.infinity);
+    final coverScale = (viewport.height / imageSize.height)
+        .clamp(0.0, double.infinity);
+    final baseScale = fitScale > coverScale ? fitScale : coverScale;
+    final scale = baseScale * widget.settings.scale.clamp(1.0, 3.0);
+    final overflowX = ((imageSize.width * scale) - viewport.width) / 2;
+    final overflowY = ((imageSize.height * scale) - viewport.height) / 2;
+    final currentX = overflowX <= 0 ? 0.0 : widget.settings.x * overflowX;
+    final currentY = overflowY <= 0 ? 0.0 : widget.settings.y * overflowY;
+    final nextX = overflowX <= 0
+        ? 0.0
+        : ((currentX + delta.dx).clamp(-overflowX, overflowX)) / overflowX;
+    final nextY = overflowY <= 0
+        ? 0.0
+        : ((currentY + delta.dy).clamp(-overflowY, overflowY)) / overflowY;
+    widget.onSettingsChanged(widget.settings.copyWith(x: nextX, y: nextY));
   }
 
   @override
@@ -95,51 +123,62 @@ class _AppBackgroundState extends State<_AppBackground> {
     final configured = Color(s.backgroundColorValue);
     final base = dark ? theme.colorScheme.surface : configured;
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        ColoredBox(color: base),
-        if (_image != null)
-          IgnorePointer(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.maxWidth;
-                final height = constraints.maxHeight;
-                return ClipRect(
-                  child: Opacity(
-                    opacity: s.opacity.clamp(0.05, 1.0),
-                    child: Transform.translate(
-                      offset: Offset(s.x * width / 10, s.y * height / 10),
-                      child: Transform.scale(
-                        scale: s.scale.clamp(0.5, 3.0),
-                        alignment: Alignment.center,
-                        child: SizedBox(
-                          width: width,
-                          height: height,
-                          child: Image(
-                            image: _image!,
-                            fit: BoxFit.contain,
-                            alignment: Alignment.center,
-                            gaplessPlayback: true,
-                            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                          ),
-                        ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final viewport = Size(constraints.maxWidth, constraints.maxHeight);
+        final source = _sourceSize;
+        Widget background = ColoredBox(color: base);
+        if (_image != null && source != null && viewport.width > 0 && viewport.height > 0) {
+          final coverScale = (viewport.width / source.width)
+              .clamp(0.0, double.infinity);
+          final coverHeightScale = (viewport.height / source.height)
+              .clamp(0.0, double.infinity);
+          final baseScale = coverScale > coverHeightScale ? coverScale : coverHeightScale;
+          final scale = baseScale * s.scale.clamp(1.0, 3.0);
+          final imageWidth = source.width * scale;
+          final imageHeight = source.height * scale;
+          final overflowX = ((imageWidth - viewport.width) / 2).clamp(0.0, double.infinity);
+          final overflowY = ((imageHeight - viewport.height) / 2).clamp(0.0, double.infinity);
+          final offsetX = overflowX * s.x.clamp(-1.0, 1.0);
+          final offsetY = overflowY * s.y.clamp(-1.0, 1.0);
+          background = ClipRect(
+            child: Opacity(
+              opacity: s.opacity.clamp(0.05, 1.0),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanUpdate: (details) => _panBackground(details.delta, viewport, source),
+                child: Stack(
+                  clipBehavior: Clip.hardEdge,
+                  children: [
+                    Positioned(
+                      width: imageWidth,
+                      height: imageHeight,
+                      left: (viewport.width - imageWidth) / 2 + offsetX,
+                      top: (viewport.height - imageHeight) / 2 + offsetY,
+                      child: Image(
+                        image: _image!,
+                        fit: BoxFit.fill,
+                        gaplessPlayback: true,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                       ),
                     ),
-                  ),
-                );
-              },
+                  ],
+                ),
+              ),
             ),
-          ),
-        s.imagePath != null && _image == null
-            ? const SizedBox.shrink()
-            : const SizedBox.shrink(),
-        widget.child,
-      ],
+          );
+        }
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            background,
+            widget.child,
+          ],
+        );
+      },
     );
   }
 }
-
 
 class AppDoPoli extends StatefulWidget {
   final ThemeSettings initialTheme;
