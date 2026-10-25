@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/activation_screen.dart';
+import 'screens/premium_screen.dart';
 import 'screens/agenda_screen.dart';
 import 'screens/finance_screen.dart';
 import 'screens/diary_screen.dart';
@@ -228,41 +229,12 @@ class _AppDoPoliState extends State<AppDoPoli> {
   }
 
   Future<void> _showPremium() async {
-    await showDialog<void>(
-      context: _navigatorKey.currentContext ?? context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Poliroutines Premium'),
-        content: const SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Desbloqueie todos os recursos do Poliroutines:'),
-              SizedBox(height: 12),
-              Text('• Academia sem limite de treinos'),
-              Text('• Alimentação e Financeiro sem limites mensais'),
-              Text('• Histórico completo e gráficos avançados'),
-              Text('• Personalização com imagem de fundo'),
-              SizedBox(height: 12),
-              Text('Planos disponíveis: mensal, anual e vitalício. Após a compra, use a chave de ativação recebida.'),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Fechar')),
-          FilledButton.icon(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              _navigatorKey.currentState?.push<void>(MaterialPageRoute(
-                builder: (_) => ActivationScreen(onActivated: _finishActivation),
-              ));
-            },
-            icon: const Icon(Icons.key),
-            label: const Text('Ativar Premium'),
-          ),
-        ],
+    await _navigatorKey.currentState?.push<void>(
+      MaterialPageRoute(
+        builder: (_) => PremiumScreen(onActivated: _finishActivation),
       ),
     );
+    await _refreshPlanAccess();
   }
 
   Future<void> _showHelp() async {
