@@ -3,7 +3,7 @@ name: Build Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, fix/workout-shortcut-background-image]
 
 permissions:
   contents: write
@@ -111,6 +111,7 @@ jobs:
         run: cp build/app/outputs/flutter-apk/app-release.apk Poliroutines.apk
 
       - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-${{ github.run_number }}
