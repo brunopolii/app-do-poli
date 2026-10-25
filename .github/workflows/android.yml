@@ -106,6 +106,8 @@ jobs:
         with:
           name: app-do-poli-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Prepare public APK filename
         run: cp build/app/outputs/flutter-apk/app-release.apk Poliroutines.apk
