@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'screens/activation_screen.dart';
 import 'screens/premium_screen.dart';
 import 'screens/agenda_screen.dart';
 import 'screens/finance_screen.dart';
 import 'screens/diary_screen.dart';
+import 'screens/premium_diary_screen.dart';
 import 'screens/food_screen.dart';
 import 'screens/gym_screen.dart';
 import 'screens/home_screen.dart';
@@ -223,8 +223,14 @@ class _AppDoPoliState extends State<AppDoPoli> {
   }
 
   Future<void> _openDiary() async {
+    final premium = await PlanService().hasPremium;
+    if (!mounted) return;
     await _navigatorKey.currentState?.push<void>(
-      MaterialPageRoute(builder: (_) => const DiaryScreen()),
+      MaterialPageRoute(
+        builder: (_) => premium
+            ? const PremiumDiaryScreen()
+            : const DiaryScreen(),
+      ),
     );
   }
 
