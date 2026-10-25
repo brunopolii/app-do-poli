@@ -11,7 +11,7 @@ permissions:
 # Evita duas gerações de APK ao mesmo tempo, o que poderia fazer ambas
 # calcularem o mesmo versionCode.
 concurrency:
-  group: poliroutines-apk-release
+  group: poliroutines-apk-release-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
