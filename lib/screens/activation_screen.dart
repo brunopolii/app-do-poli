@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/license_service.dart';
+import '../services/experimental_metrics_service.dart';
 
 class ActivationScreen extends StatefulWidget {
   final VoidCallback onActivated;
@@ -14,6 +15,7 @@ class ActivationScreen extends StatefulWidget {
 class _ActivationScreenState extends State<ActivationScreen> {
   final _controller = TextEditingController();
   final _service = LicenseService();
+  final _metrics = ExperimentalMetricsService();
   bool _loading = false;
   String? _error;
 
@@ -46,11 +48,13 @@ class _ActivationScreenState extends State<ActivationScreen> {
     if (!mounted) return;
 
     if (result.ok) {
+      await _metrics.record('license_activation_success', details: {'license_type': result.licenseType});
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Poliroutines ativado com sucesso!')),
       );
       widget.onActivated();
     } else {
+      await _metrics.record('license_activation_failure');
       setState(() => _error = result.message);
     }
 
