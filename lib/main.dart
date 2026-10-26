@@ -13,6 +13,7 @@ import 'screens/gym_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/theme_screen.dart';
 import 'services/license_service.dart';
+import 'services/experimental_metrics_service.dart';
 import 'services/plan_service.dart';
 import 'services/notification_service.dart';
 import 'services/theme_service.dart';
@@ -22,6 +23,7 @@ Future<void> main() async {
   await initializeDateFormatting('pt_BR');
   await NotificationService.initialize();
   await LicenseService().initialize();
+  await ExperimentalMetricsService().recordFirstLaunchIfNeeded();
   final settings = await ThemeService.load();
   final prefs = await SharedPreferences.getInstance();
   runApp(AppDoPoli(
