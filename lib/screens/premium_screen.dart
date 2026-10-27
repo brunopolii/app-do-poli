@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../services/experimental_metrics_service.dart';
 import '../services/plan_service.dart';
 import 'activation_screen.dart';
 
@@ -15,12 +14,10 @@ class _PremiumScreenState extends State<PremiumScreen> {
   bool _premium = false;
   bool _loading = true;
   String _selectedPlan = 'Anual';
-  final _metrics = ExperimentalMetricsService();
 
   @override
   void initState() {
     super.initState();
-    _metrics.record('premium_screen_view');
     _refresh();
   }
 
@@ -41,40 +38,14 @@ class _PremiumScreenState extends State<PremiumScreen> {
 
   Future<void> _selectPlan(String plan) async {
     setState(() => _selectedPlan = plan);
-    await _metrics.record('plan_selected', details: {'plan': plan});
   }
 
   Future<void> _purchaseIntent() async {
-    await _metrics.record('purchase_intent', details: {'plan': _selectedPlan});
     if (!mounted) return;
     showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
       title: const Text('Compra em modo de teste'),
       content: Text('Plano selecionado: ' + _selectedPlan + '. O checkout oficial ainda não está conectado, então nenhuma cobrança será feita.'),
       actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Entendi'))],
-    ));
-  }
-
-  Future<void> _showMetrics() async {
-    final data = await _metrics.summary();
-    if (!mounted) return;
-    const labels = <String, String>{
-      'install_first_open': 'Primeira abertura neste aparelho',
-      'premium_screen_view': 'Visualizações da tela Premium',
-      'plan_selected': 'Seleções de plano',
-      'purchase_intent': 'Intenções de compra (teste)',
-      'license_activation_success': 'Ativações bem-sucedidas',
-      'license_activation_failure': 'Falhas de ativação',
-    };
-    showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
-      title: const Text('Métricas experimentais'),
-      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: labels.entries.map((entry) => ListTile(
-        dense: true, contentPadding: EdgeInsets.zero, title: Text(entry.value),
-        trailing: Text((data[entry.key] ?? 0).toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
-      )).toList())),
-      actions: [
-        TextButton(onPressed: () async { await _metrics.clear(); if (dialogContext.mounted) Navigator.pop(dialogContext); }, child: const Text('Zerar dados de teste')),
-        TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Fechar')),
-      ],
     ));
   }
 
@@ -107,7 +78,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Poliroutines Premium'), actions: [IconButton(tooltip: 'Métricas do teste', onPressed: _showMetrics, icon: const Icon(Icons.analytics_outlined))]),
+      appBar: AppBar(title: const Text('Poliroutines Premium')),
       body: _loading ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 28), children: [
         Container(padding: const EdgeInsets.all(22), decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: LinearGradient(colors: [colors.primaryContainer, colors.surfaceContainerHighest], begin: Alignment.topLeft, end: Alignment.bottomRight)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Icon(Icons.workspace_premium_rounded, size: 44, color: colors.primary), const SizedBox(height: 12),
