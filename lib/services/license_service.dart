@@ -16,6 +16,7 @@ class LicenseService {
   // Distinguishes a new Free installation from a previously licensed install.
   static const _paidLicensePreviouslyInstalledKey =
       'polirotinas_paid_license_previously_installed';
+  static const _needsReactivationKey = 'polirotinas_license_needs_reactivation';
 
   Future<String> _installationId() async {
     final prefs = await SharedPreferences.getInstance();
@@ -47,6 +48,8 @@ class LicenseService {
   }
 
   Future<bool> _cachedIsValid() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_needsReactivationKey) ?? false) return false;
     final key = await storedLicenseKey();
     if (key == null || key.isEmpty) {
       // First-time users enter the Free plan without an activation key.
@@ -72,6 +75,7 @@ class LicenseService {
     await prefs.setString(_licenseKey, key);
     await prefs.setString(_licenseTypeKey, type);
     await prefs.setBool(_paidLicensePreviouslyInstalledKey, true);
+    await prefs.remove(_needsReactivationKey);
 
     if (expiresAt == null || expiresAt.isEmpty) {
       await prefs.remove(_expiresAtKey);
@@ -126,7 +130,13 @@ class LicenseService {
         return true;
       }
 
-      if (response.statusCode == 403 || response.statusCode == 409) {
+      if (response.statusCode == 409) {
+        // Keep the key: the user can recover it by explicitly reactivating.
+        await (await SharedPreferences.getInstance())
+            .setBool(_needsReactivationKey, true);
+        return false;
+      }
+      if (response.statusCode == 403) {
         await _clearLicense();
         return false;
       }

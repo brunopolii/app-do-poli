@@ -13,9 +13,9 @@ const expenseCategories=['Alimentação','Transporte','Moradia','Lazer','Educaç
 const incomeCategories=['Salário','Freelance','Investimentos','Outros'];
 enum _FinancePeriodMode{week,month,semester}
 
-class FinanceScreen extends StatefulWidget{const FinanceScreen({super.key});@override State<FinanceScreen> createState()=>_FinanceScreenState();}
+class FinanceScreen extends StatefulWidget{const FinanceScreen({super.key});@override State<FinanceScreen> createState()=>FinanceScreenState();}
 
-class _FinanceScreenState extends State<FinanceScreen>{
+class FinanceScreenState extends State<FinanceScreen>{
   List<MoneyTransaction> items=[];
   DateTime month=DateTime(DateTime.now().year,DateTime.now().month);
   bool loading=true;
@@ -248,6 +248,8 @@ class _FinanceScreenState extends State<FinanceScreen>{
     }
     await _save();if(mounted)setState((){});
   }
+
+  Future<void> openQuickAdd() => _menu();
 
   Future<void> _menu()async{
     if (!await PlanService().canCreateFinanceRecord()) {

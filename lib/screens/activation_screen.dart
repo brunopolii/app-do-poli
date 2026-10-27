@@ -18,6 +18,18 @@ class _ActivationScreenState extends State<ActivationScreen> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    _loadExistingKey();
+  }
+
+  Future<void> _loadExistingKey() async {
+    final key = await _service.storedLicenseKey();
+    if (!mounted || key == null || key.isEmpty) return;
+    _controller.text = key;
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();

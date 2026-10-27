@@ -3,7 +3,7 @@ name: Build Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, fix/workout-shortcut-background-image]
 
 permissions:
   contents: write
@@ -11,8 +11,8 @@ permissions:
 # Evita duas gerações de APK ao mesmo tempo, o que poderia fazer ambas
 # calcularem o mesmo versionCode.
 concurrency:
-  group: poliroutines-apk-release
-  cancel-in-progress: false
+  group: poliroutines-apk-release-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
@@ -106,11 +106,14 @@ jobs:
         with:
           name: app-do-poli-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Prepare public APK filename
         run: cp build/app/outputs/flutter-apk/app-release.apk Poliroutines.apk
 
       - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-${{ github.run_number }}

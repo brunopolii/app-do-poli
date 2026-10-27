@@ -587,11 +587,10 @@ async function activate(request, env) {
   if (lookup.error) return json({ error: lookup.error }, lookup.status);
 
   const license = lookup.license;
-  if (license.installation_id && license.installation_id !== installationId) {
-    return json({ error: "license_already_activated" }, 409);
-  }
-
-  if (!license.installation_id) {
+  // Possession of the original secret key is the recovery proof. Re-activating
+  // a valid, non-revoked key transfers its single-device binding to this install.
+  // This lets a buyer recover after reinstalling the app or replacing a phone.
+  if (license.installation_id !== installationId) {
     await env.DB.prepare(
       "UPDATE licenses SET installation_id=?1, activated_at=COALESCE(activated_at, datetime('now')) WHERE id=?2"
     ).bind(installationId, license.id).run();
